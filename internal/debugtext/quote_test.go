@@ -6,7 +6,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
-// Each want is the Debug-style text the quoting rules give for the string.
+// Each want is the quoted text the quoting rules give for the string.
 func TestQuoteWritesStringsInDebugStyle(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

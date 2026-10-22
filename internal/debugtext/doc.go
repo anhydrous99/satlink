@@ -1,6 +1,6 @@
-// Package debugtext writes values in the Debug style that satlink's messages
-// use: strings quoted with the escapes a Debug print produces, and structs
-// printed with their field names.
+// Package debugtext writes values as satlink's messages show them: strings
+// quoted, with control characters as \u{…} escapes, and structs written with
+// their field names.
 //
 // Messages quote a command, a phone number, a host name, a rule or a URL with
 // Quote, which writes control characters as "\u{b}" where Go's %q would write

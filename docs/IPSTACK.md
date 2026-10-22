@@ -16,9 +16,9 @@ sockets. It has two consumers:
 It is built in layers, one package each, which the `ipstack` package doc
 describes. From the bottom up: `wire`, `storage` and `socket`; the sockets
 `tcp`, `udp` and `dns`; then `ipstack` itself. `internal/netlog` holds the
-logging they share. Each layer uses only the layers below it. `tcp`, `udp` and `dns` never import
-`ipstack`, and neither do their test helpers: `ipstack` imports those packages,
-so the import would form a cycle.
+logging they share. Each layer uses only the layers below it. `tcp`, `udp` and
+`dns` never import `ipstack`, and neither do their test helpers: `ipstack`
+imports those packages, so the import would form a cycle.
 
 The stack is pull-driven, as the `ipstack` package doc explains: the device
 offers a transmit slot only when it can take a datagram. [Layers and their
