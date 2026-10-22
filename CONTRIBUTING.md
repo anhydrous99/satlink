@@ -47,13 +47,12 @@ go test -race -cover ./...
 
 ## Code
 
-- Follow the [conventions](docs/DESIGN.md#conventions) for names, errors,
-  time, concurrency and logging.
+- Follow the [conventions](docs/DESIGN.md#conventions): names, constants,
+  errors, time, concurrency, logging and tests.
 - Keep functions small and single-purpose. Aim for a cyclomatic complexity of
   10 or less; 15 is the ceiling the checks enforce.
-- Name constants and say why they have their value.
-- Never ignore an error.
-- Keep every package at 80% statement coverage or more.
+- Meet the [coverage targets](docs/DESIGN.md#tests): at least 80% of
+  statements in every package, and more in `ppp` and `satnet`.
 - Package and identifier comments are the API contract. Change them with the
   behaviour.
 
