@@ -69,7 +69,9 @@ type Credentials = ppp.Credentials
 // dialling, as [Config.Validate] does, so a configuration that cannot work
 // never costs airtime, and keeps its own copy.
 type Config struct {
-	// Number is dialled for the data call.
+	// Number is dialled for the data call. Some providers use another
+	// number than [IridiumInternetNumber], such as Telstra's 66666. The
+	// airtime plan must include circuit-switched data.
 	Number string
 	// Call holds the bearer, call-setup timeout and escape guard for the
 	// data call, and its Cancellation, which stops [Establish] from another
