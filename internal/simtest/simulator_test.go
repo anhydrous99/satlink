@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -15,7 +15,7 @@ import (
 const handsetTimeout = 500 * time.Millisecond
 
 // readAll reads from transport until it has been quiet for a moment.
-func readAll(t *testing.T, transport satlink.Transport) string {
+func readAll(t *testing.T, transport iridium.Transport) string {
 	t.Helper()
 	var received strings.Builder
 	buffer := make([]byte, 256)
@@ -60,7 +60,7 @@ func TestNewSimulatorGivesAHandsetThatClosesWithTheTest(t *testing.T) {
 
 	err := simulator.WriteAll([]byte("AT\r"))
 
-	var handsetErr *satlink.Error
+	var handsetErr *iridium.Error
 	if !errors.As(err, &handsetErr) || handsetErr.Message != "the simulated handset is closed" {
 		t.Errorf("WriteAll after the test = %v; want the simulator closed", err)
 	}
@@ -104,7 +104,7 @@ func TestAFaultyTransportOverASimulatorIsDeafToTheEscape(t *testing.T) {
 	// Short: an escape the handset ignores is followed by waits for its
 	// answer to ATH.
 	handset.SetTimeout(handsetTimeout)
-	settings := satlink.DefaultDataCallSettings()
+	settings := iridium.DefaultDataCallSettings()
 	settings.EscapeGuard = CallEscapeGuard
 	call, err := handset.DialData("008816000025", settings)
 	if err != nil {
@@ -114,7 +114,7 @@ func TestAFaultyTransportOverASimulatorIsDeafToTheEscape(t *testing.T) {
 
 	hangUpErr := call.HangUp()
 
-	if !errors.Is(hangUpErr, satlink.ErrCallMayStillBeUp) || !simulator.Control().Stats().InDataCall {
+	if !errors.Is(hangUpErr, iridium.ErrCallMayStillBeUp) || !simulator.Control().Stats().InDataCall {
 		t.Errorf("HangUp = %v with the call up: %v; want a call that could not be ended",
 			hangUpErr, simulator.Control().Stats().InDataCall)
 	}
@@ -131,7 +131,7 @@ func TestAFaultyTransportWithoutCPASOverASimulatorGetsERRORForIt(t *testing.T) {
 
 	_, err := handset.Command("AT+CPAS")
 
-	if !errors.Is(err, satlink.ErrCommandFailed) {
+	if !errors.Is(err, iridium.ErrCommandFailed) {
 		t.Errorf("AT+CPAS = %v; want ERROR, as older firmware answers", err)
 	}
 }

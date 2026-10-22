@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -66,7 +66,7 @@ func newFaultyLine(t *testing.T) *faultyLine {
 func (l *faultyLine) WriteAll(p []byte) error {
 	if len(p) > 0 && p[0] == frameFlag {
 		if l.refusesFrames.Load() {
-			return &satlink.Error{Kind: satlink.ErrTransport, Message: lostFrame}
+			return &iridium.Error{Kind: iridium.ErrTransport, Message: lostFrame}
 		}
 		if l.losesNextFrame.CompareAndSwap(true, false) {
 			l.lostFrames.Add(1)
@@ -97,7 +97,7 @@ func testLinkConfig() Config {
 // testLinkConfig and a PPP endpoint as Establish makes one, changed by
 // adjust; it returns the engine the driver shares, and its outcome. The
 // test's end closes the link and waits for the hang-up.
-func driverOver(t *testing.T, line satlink.Transport, adjust func(*ppp.Config)) (*shared, *driverOutcome) {
+func driverOver(t *testing.T, line iridium.Transport, adjust func(*ppp.Config)) (*shared, *driverOutcome) {
 	t.Helper()
 	config := testLinkConfig()
 	pppConfig := pppClientConfig(&config)
@@ -223,7 +223,7 @@ func TestALineThatRefusesALaterFrameEndsTheLink(t *testing.T) {
 
 // awaitNoCarrier reads from call until the handset says NO CARRIER, failing
 // the test if it does not within waitBudget.
-func awaitNoCarrier(t *testing.T, call *satlink.DataCall) {
+func awaitNoCarrier(t *testing.T, call *iridium.DataCall) {
 	t.Helper()
 	buffer := make([]byte, readChunk)
 	simtest.Eventually(t, waitBudget, "the handset says NO CARRIER", func() bool {

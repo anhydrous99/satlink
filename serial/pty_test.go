@@ -13,7 +13,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // The serial library on a real tty, a pseudo-terminal's slave
@@ -89,7 +89,7 @@ func TestAPortBeyondSelectsDescriptorsFailsItsReadsInsteadOfPanicking(t *testing
 
 	_, err := transport.ReadTimeout(make([]byte, 8), time.Millisecond)
 
-	if !errors.Is(err, satlink.ErrTransport) || !strings.Contains(fmt.Sprint(err), "select(2)") {
+	if !errors.Is(err, iridium.ErrTransport) || !strings.Contains(fmt.Sprint(err), "select(2)") {
 		t.Errorf("ReadTimeout = %v, want the transport error of a port beyond select(2)'s descriptors", err)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 func TestAReadThatTheLibraryCannotWaitForFailsInsteadOfPanicking(t *testing.T) {
@@ -23,7 +23,7 @@ func TestAReadThatTheLibraryCannotWaitForFailsInsteadOfPanicking(t *testing.T) {
 
 	want := "transport error: the serial library cannot wait for this port (select(2) watches no descriptor from 1024 up): " +
 		"runtime error: index out of range [32] with length 32"
-	if received != 0 || !errors.Is(err, satlink.ErrTransport) || fmt.Sprint(err) != want {
+	if received != 0 || !errors.Is(err, iridium.ErrTransport) || fmt.Sprint(err) != want {
 		t.Errorf("ReadTimeout = %d, %q; want 0, %q", received, err, want)
 	}
 	var runtimeErr runtime.Error

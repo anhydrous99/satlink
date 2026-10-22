@@ -5,7 +5,7 @@
 // own driver exposes it as a serial port — /dev/cu.usbmodem* on macOS,
 // /dev/ttyACM* on Linux, a COM port on Windows — and no vendor driver is
 // needed. [Discover] finds handsets by Iridium's USB vendor ID, [Open]
-// opens one as a satlink.Transport, and [Connect] does both and
+// opens one as an iridium.Transport, and [Connect] does both and
 // initialises the handset:
 //
 //	handset, err := serial.Connect("", serial.DefaultBaud)
@@ -25,5 +25,5 @@
 // On macOS, port discovery uses IOKit through cgo: building this package
 // for macOS needs cgo and the macOS SDK, also when cross-compiling.
 //
-// Errors are *satlink.Error values of kind satlink.ErrTransport.
+// Errors are *iridium.Error values of kind iridium.ErrTransport.
 package serial

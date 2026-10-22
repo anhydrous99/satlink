@@ -49,6 +49,7 @@ Tests.
 | `scripts/build-android.sh` | Builds the Android archive `satlink.aar`. Details below the table. |
 | `scripts/build-bindings.sh` | Builds the Apple binding framework `Satlink.xcframework`. Details below the table. |
 | `scripts/mark-unusable-inits.sh` | Marks NSObject's `init` and `new` unavailable in the gobind classes that declare no argument-less `init`: those whose Go constructor takes arguments, for which gobind writes only an `init:` that takes them, and those that stand for a Go implementation of an interface (section 4, mobile, Zero values). It makes one awk pass per header, keeps the file's permissions, is idempotent, and fails, leaving the header unchanged, on a header of another shape. |
+| `internal/portability/portability_test.go` | For the whole module, every package and its tests type-check for linux/386 and linux/arm, where `int` has 32 bits, and for freebsd/amd64, openbsd/amd64, windows/amd64 and android/arm64. Those platforms have files of their own (terminals, interruptions, close-on-exec) that the host never compiles. The check runs `go vet ./...` from the module root (`moduleRoot`, two directories up) with `GOOS`, `GOARCH` and `CGO_ENABLED=0`, and is skipped under `-short`. |
 
 `AndroidUsbTransport.kt` holds the USB transport for Android. `open` claims the
 interfaces, sets the line coding (`setLineCoding`, failures ignored) and pulses DTR
@@ -110,7 +111,7 @@ is excluded by a build constraint.
 fails if none is found. The script needs a full Xcode: gomobile refuses the Command Line
 Tools alone. gomobile has no Kotlin/JVM desktop target (section 3).
 
-### satlink (module root)
+### iridium
 
 | File | Role |
 |---|---|
@@ -130,13 +131,12 @@ Tools alone. gomobile has no Kotlin/JVM desktop target (section 3).
 | `handset_test.go` | Internal tests: the records' names, `mayGoOnline`, `validateNumber` and the quoting of a number it refuses, the +CREG codes, and the cap on the hang-up waits, which is the command timeout but at most ten seconds (`TestAHangUpWaitsForTheCommandTimeoutButAtMostTenSeconds`). |
 | `datacall.go`, `datacall_test.go` | API: `DefaultEscapeGuard`, `MaxEscapeGuard`, `BearerService`, `DataCallSettings`, `DataCall`, and `Handset.DialData`, `AnswerData` and `EndDataCall`. Internal: setting a call up (`setUpCall`, `prepareAndStart` with `preparationFailed`), `dialData`, `answerData` with `hangUpVoiceCall`, `callRequest`, `isUnfinished`, `abortAttempt`, `abortCallAttempt` and `endAbandonedCall`. A failed call has no type of its own: it is an `*Error` whose `CallMayStillBeUp` flag says whether the call may still be up (section 2, Errors). The tests cover the escape guard, including refusal of a guard longer than any handset's. `debugDuration`'s cases include 0 (`0ns`) and 1.5 µs. |
 | `hangup.go` | Internal: the escape, `ATH`, the DTR fallback, the DTR pulse that a transport's panic sets off (`pulseDTR`, `pulseDTRUnless`; section 4, Hanging up), `awaitOwnResult` and `discardUntil`. |
-| `device.go`, `device_test.go` | API: `IridiumUSBVendorID`, `Product`, `KnownProducts`, `ModelForProductID`. The test checks that `KnownProducts` hands out a copy. |
+| `device.go`, `device_test.go` | API: `USBVendorID`, `Product`, `KnownProducts`, `ModelForProductID`. The test checks that `KnownProducts` hands out a copy. |
 | `support_integration_test.go` | The scripted transport used by the external tests. It implements `Transport` and `DTRController`, records every write with its time (`writtenAt(data) (time.Time, bool)`: when `data` was first written in one piece), records each DTR change with its time (`dtrChange{at, raised}`, returned by `dtrChangesSoFar`), and tracks the steps not yet played. All of this is guarded by a mutex, because `Handset.Close` runs while a read is in progress. Its replies come at once unless a test makes them late. `answersLate(write, delay)` delays the reply to the first unplayed step that writes `write`. `unsolicitedAfter(delay, data)` sends data unprompted, and `unsolicited(data)` is `unsolicitedAfter(0, data)`. No reply arrives before one sent ahead of it. `ReadTimeout` decides at its start whether the next reply arrives within its timeout. If it does, `ReadTimeout` sleeps until the reply arrives and delivers it; if not, it waits out the timeout and returns 0. A slow machine can therefore make a reply arrive sooner than the handset expects, never later. With no reply on its way, it naps `min(timeout, 1 ms)`, which spares the CPU in long waits such as the ten-second abort grace. A separate blocking transport that implements `io.Closer` serves the tests of `Close` and `SetTimeout` during a dial. |
 | `handset_integration_test.go` | Tests of `Initialize` over the scripted transport. The `configuration()` steps end `Initialize` (`ATE0`, `ATV1`, `AT+CMEE=2`, `AT+CMGF=1`), and the `AT+CPAS` replies 000 and 004 report a ready or data-call status. The file covers: a call left up whose far end never pauses, which the escape ends (about 11 s, run in parallel); text entry left by ESC CR before the first AT; a line-only Unicode string that folds to the command not being taken as an echo (the echo is matched ASCII-only); a line left after an answer not being the next command's answer; late and partial answers that must not hide a call held in online-command mode (a late OK within the first drain's 300 ms of quiet, and a partial answer left before `Initialize`, since the drain clears the line buffer); earlier output being dropped; a late answer to each AT still synchronising; a zero timeout failing a command without waiting for its answer; firmware refusing the optional settings, which is tolerated, and refusing a required setting (ATE0 or ATV1 answered with ERROR), which fails `Initialize` with `ErrCommandFailed` for that command and sends nothing after it (section 4, Stale input). |
 | `datacall_integration_test.go` | Tests of dialling, answering and hanging up over the scripted transport: escape timing and the settings' guard of silence (a guard counts from the last write), the handset's own answers that confirm an escape or a raw ATH, and the answer to a DTR drop, which must not pass for an ATH answer. It also covers late and partial answers that must not pass for the next command's answer or decide a dial; the DTR fallback, which `assertHungUpByDroppingDTR` checks (DTR stays down at least 150 ms and comes up again); and `EndDataCall` failing with `CallMayStillBeUp` set when the handset answers nothing (`TestEndDataCallThatFailsSaysTheCallMayStillBeUp`). The tests of a wait between two writes assert it with `assertWaitedBetween(t, transport, earlier, later, atLeast)`. |
 | `cancellation_integration_test.go` | The cancellation tests. `cancelsOn` is a scripted transport that calls a cancel function the moment a command is written, so that a context can be used too. `readTimeouts` records the timeout of every read while a command waits for its answer; `TestADialLooksAtItsCancellationEveryFifthOfASecond` checks that no read of a cancellable dial waits longer than 200 ms. `TestACancelledAnswerIsAborted` checks that an `AnswerData` cancelled as ATA goes out either ends the attempt or ends a call that connects anyway, and returns `ErrCancelled` with `CallMayStillBeUp` false. |
 | `busy_integration_test.go` | `ErrBusy` and the release of the handset on every path out of a call, including a transport that panics during `HangUp` or the dial. `TakeURCs` returns nothing while busy, and `SetTimeout` and `Close` are not blocked by a dial. Concurrent callers take turns (`TestConcurrentCallsTakeTurns`: eight goroutines, five `SignalQuality` and `Battery` calls each, over a transport that answers one byte per read, under `-race`). A panic out of a dial or a hang-up pulses DTR before it goes on; the test checks DTR is down for at least 150 ms, then up, and that the panic value reaches the caller. The pulse happens under the lock, before the handset is released, and each site has its own test, over a `panicsOnWrite` whose `DropDTR` has another goroutine send `Command("AT")`. That command must fail with `ErrBusy` and write nothing while DTR is down. A pulse that panics too leaves the first panic to go on, and so does a transport without DTR. |
-| `portability_test.go` | For the whole module, every package and its tests type-check for linux/386 and linux/arm, where `int` has 32 bits, and for freebsd/amd64, openbsd/amd64, windows/amd64 and android/arm64. Those platforms have files of their own (terminals, interruptions, close-on-exec) that the host never compiles. The check runs `go vet ./...` with `GOOS`, `GOARCH` and `CGO_ENABLED=0`, and is skipped under `-short`. |
 
 ### ppp
 
@@ -183,7 +183,7 @@ overwrite the packet. `go test` runs the seed corpora. To run one target, use
 |---|---|
 | `doc.go`, `example_test.go` | Package documentation. The example is an `Example` without an output comment, so it is compiled but not run. |
 | `config.go`, `config_test.go` | API: `IridiumInternetNumber`, `IridiumInternetBearer`, `Credentials`, `Config` with `Validate` (value receivers, so that `satnet.NewConfig(policy).Validate()` works), `NewConfig`, `Limits`, `Tuning`, and their defaults. Tests: the PPP client's configuration, including the receive ACCM spelled out bit by bit (`TestPPPAsksTheGatewayToEscapeCRAndTheFlowControlCharacters`) and an MRU equal to the MTU, which is 576 bytes by default (`TestPPPTakesPacketsOfUpToTheMTU`). |
-| `error.go`, `error_test.go` | API: `Error` (with `CallMayStillBeUp`) and `ErrorKind`. A link failure has no type of its own: its `CallMayStillBeUp` flag is `Error.CallMayStillBeUp` (section 2). The tests cover the texts, the standard-library equivalents of section 2, and `satlink.ErrCallMayStillBeUp` matched by the flag and through a wrapped `*satlink.Error`. |
+| `error.go`, `error_test.go` | API: `Error` (with `CallMayStillBeUp`) and `ErrorKind`. A link failure has no type of its own: its `CallMayStillBeUp` flag is `Error.CallMayStillBeUp` (section 2). The tests cover the texts, the standard-library equivalents of section 2, and `iridium.ErrCallMayStillBeUp` matched by the flag and through a wrapped `*iridium.Error`. |
 | `status.go`, `status_test.go` | API: `LinkState`, `CloseReason`, `Usage`, `Status`, and the aliases `DownReason` and `IPv4Settings`. |
 | `policy.go`, `policy_test.go` | API: `Policy`, `AllowRule`, `PortRange`, `ParsePortRange`, `ParseRuleError`. |
 | `link.go`, `dial.go`, `dial_test.go` | API: `Link`, `Establish`, `Watcher` (`link.go`). Internal: the insides of `Resolve`, `Dial`, `DialUDP` and `DialContext` (`dial.go`). The tests check that `DialContext` returns the context's error only once its deadline has passed. A timeout or an ended context ends a dial's attempts at its first address (`endsAttempts`). Nothing new (a lookup, a TCP connection, a UDP socket) starts while the link drains. |
@@ -313,11 +313,11 @@ The golden files are in `cmd/satlink/testdata/commands`, `testdata/help`, `testd
 | `link.go`, `connection.go`, `tls.go`, `cancellation.go` | API. `cancellation.go` holds the `Cancellation` object. |
 | `logging.go`, `logging_test.go` | API. The internal tests build the unexported bridge, one per test, without touching `slog.Default` (section 4). One test logs through a logger made with `With("pkg", …)`, and another through a record carrying a `"pkg"` attribute. Both check the target and the text of an attribute. `TestASinkThatFallsBehindLosesRecordsRatherThanHoldingUpTheLogger` holds the queue to the 256 records that `SetLogSink` documents. |
 | `boundary.go`, `convert.go`, `errormapping.go`, `goroutine.go`, `handsetslot.go`, `linkconfig.go`, `linkstate.go`, `listener.go`, `log.go`, `portcloser.go` | Internal. `boundary.go`: what every exported function shares as the boundary with the host app. It recovers panics and refuses nil and zero values. `convert.go`: the saturating conversions of milliseconds, seconds and counts. `errormapping.go`: the error mapping. `goroutine.go`: named goroutines that recover their panics. `handsetslot.go`: where an `IridiumHandset`'s handset is, whether lent or stranded. `linkconfig.go`: `LinkSettings` converted to satnet's configuration. `linkstate.go`: the app's copies of the link's state and status. `listener.go`: the listener goroutine. `log.go`: this package's own logging. `portcloser.go`: the goroutine that closes a port once its call has ended. |
-| `link_integration_test.go` | The link tests, over `simulatedUSB`, a `simtest.ByteTransport` over `simtest.NewSimulator(t, sim.DefaultConfig())`, and `stubbornUSB`, a `simtest.FaultyTransport` with `DeafToEscape` and `DeafToDTR` set. Its `DeafToDTR.Store(false)` makes the handset honour DTR, and `PanicsOnNextEscape` makes the next escape panic, then turns itself off. `noDTRUSB` is a `simtest.ByteTransport` over a `simtest.FaultyTransport` over a `satlink.Transport` that hides the DTR line, so DTR changes fail with "this transport has no DTR line". The failing-hang-up and no-CPAS variants use `FailsNextHangUp` and `WithoutCPAS`. `dataCallThatWillNotEnd` is a `mobile.ByteTransport` of its own, whose reads with nothing to give nap for the lesser of the timeout and 10 ms. The test transports are in `support_integration_test.go`. The link-level cases cover: a setup cancelled before it dials gives a lent handset back; cancelling a link that is up changes nothing; limits too small to be of use; `Reinitialize` strands a ready handset whose call cannot be ended (`TestReinitializeStrandsAReadyHandsetWhoseCallCannotBeEnded`); collected links, including one whose listener hears it close and a lent one that gives its handset back; a lent link's listener hears every change; and two goroutines taking turns setting links up with one handset leave it usable (`TestSetupsTakingTurnsWithAHandsetLeaveItUsable`). |
+| `link_integration_test.go` | The link tests, over `simulatedUSB`, a `simtest.ByteTransport` over `simtest.NewSimulator(t, sim.DefaultConfig())`, and `stubbornUSB`, a `simtest.FaultyTransport` with `DeafToEscape` and `DeafToDTR` set. Its `DeafToDTR.Store(false)` makes the handset honour DTR, and `PanicsOnNextEscape` makes the next escape panic, then turns itself off. `noDTRUSB` is a `simtest.ByteTransport` over a `simtest.FaultyTransport` over an `iridium.Transport` that hides the DTR line, so DTR changes fail with "this transport has no DTR line". The failing-hang-up and no-CPAS variants use `FailsNextHangUp` and `WithoutCPAS`. `dataCallThatWillNotEnd` is a `mobile.ByteTransport` of its own, whose reads with nothing to give nap for the lesser of the timeout and 10 ms. The test transports are in `support_integration_test.go`. The link-level cases cover: a setup cancelled before it dials gives a lent handset back; cancelling a link that is up changes nothing; limits too small to be of use; `Reinitialize` strands a ready handset whose call cannot be ended (`TestReinitializeStrandsAReadyHandsetWhoseCallCannotBeEnded`); collected links, including one whose listener hears it close and a lent one that gives its handset back; a lent link's listener hears every change; and two goroutines taking turns setting links up with one handset leave it usable (`TestSetupsTakingTurnsWithAHandsetLeaveItUsable`). |
 | `logging_integration_test.go` | `TestRecordsAtOrAboveTheLevelReachTheSinkOnceSet` runs in a child process. It re-executes `os.Args[0]` with `-test.run=^TestLogSinkChild$` and an environment marker. The child, which is skipped without the marker, checks the exact records, and checks that a second `SetLogSink` fails. Because of this, `-count=N` and other tests cannot interfere. |
 | `export_test.go` | Test-only exports for package `mobile`, shared with the external tests. `ListenerPatience` (10 times `listenerPoll`). `SlowCallSetup` (5 s, the call setup of `TestALinkBeingSetUpCanBeCancelled` and `TestClosingAHandsetWhileItsLinkIsSetUpClosesItOnceTheCallEnds`). `CollectGarbageUntil` runs `runtime.GC` every 50 ms until a condition holds, within 30 s. `HangUpAtCleanup`. `StateRecorder`, a `LinkListener` that records the texts of `DescribeState`. `AssertHeardEveryChange` waits for a close with any reason, then expects Up, Closing(Requested) and Closed(Requested). `DescribeState` gives texts such as "Closed(Requested)". |
 | `support_integration_test.go`, `connection_integration_test.go`, `handset_integration_test.go` | External tests, and the helpers that only they use. Helpers shared with the internal tests are in `export_test.go`. `connection_integration_test.go` covers TCP, UDP and TLS connections, over helpers that close the connection they open at the test's end (`openEcho` in `link_integration_test.go`, `openUDPEcho` and `openTLS`, through `closeAtCleanup`, which reports a failing `Close` as `closeConnection` does; `TestTheConnectionHelpersCloseTheirConnectionsAtTheTestsEnd`). It also covers `SendSome` and `Abort`: `SendSome` over TLS, a `SendSome` that queues part at once and then times out with the send buffer full, and `Abort` of a TLS connection, after which `ShutdownWrite` fails because no close_notify can be sent. An aborted TCP connection keeps what it had settled, so `WaitAcknowledged` and `ShutdownWrite` succeed and `Receive` returns what had arrived (`TestAnAbortedConnectionKeepsWhatWasSettled`). `SendSome` and `Abort` after `Close` are covered, as is TLS `Close` while a `Send` waits for room (serial, and skipped under `-short`). A closed UDP connection is covered, and `UDPConnection.Receive(0, …)` takes a datagram and keeps none of it (`TestUDPDatagramsAreEchoed`). `TestReceiveRefusesALengthItCannotHonour` is also here. `handset_integration_test.go` covers `IridiumHandset` over the simulator: status, SMS, `SatlinkErrorHandsetBusy`, and a closed `IridiumHandset` refusing every method, including after a link that had it has ended. `TestClosingAHandsetLeavesTheAppsTransportAlone` checks the transport through a new `IridiumHandset`. |
-| `error_test.go`, `transport_test.go`, `convert_test.go`, `zerovalue_test.go`, `lists_test.go`, `nilargs_test.go`, `boundary_test.go`, `cancellation_test.go`, `connection_test.go`, `handset_test.go`, `handsetslot_test.go`, `closingport_test.go`, `linkconfig_test.go`, `linkstate_test.go`, `listener_test.go`, `log_test.go`, `portcloser_test.go`, `tls_test.go`, `serial_test.go` | Internal tests. `error_test.go` holds the error-mapping table: every satlink and satnet kind, `net.ErrClosed`, `*ParseRuleError`, a failed hang-up, and the kinds, fields and texts for each. `ErrCallMayStillBeUp` maps to `SatlinkErrorHangUpFailed`, `ErrCancelled` (also inside `ErrHandset`) maps to `SatlinkErrorCancelled`, and a cancelled setup whose hang-up failed maps to `SatlinkErrorHangUpFailed`. An establishing error with `CallMayStillBeUp` maps to `SatlinkErrorHangUpFailed` with the error's text, while the generic mapping keeps such an error's own kind. An `ErrLinkDown` from a connection keeps its reason. `cancellation_test.go`: a `Cancellation`, made or zero, cancels; the link's call settings share it; without one, a link has its own. `handset_test.go`: `endStrandedCall`, whose failing `Initialize` or `ATH` becomes `ErrCallMayStillBeUp`, and `asCallMayStillBeUp`, which keeps an error of that kind and rewords any other, flag included. `handsetslot_test.go`: `strand` takes only a ready handset; a settled setup leaves the next setup's handset alone, whether its link did not come up or came up and ended (`TestASettledSetupLeavesTheNextSetupAlone`); the slots' names. `transport_test.go`: the transport adapter, which clamps milliseconds to [1, 2147483647], copies at most `len(p)`, maps a host error to `ErrTransport` with its message, and turns a panicking `ByteTransport` into `SatlinkErrorInternal`. A panic once the call is up pulses DTR, which ends the call over a transport whose DTR line reaches the handset (`TestAPanicOnceTheCallIsUpPulsesDTRWhichEndsTheCall`). A call that a panic left up is ended by a new `IridiumHandset` on the app's transport, over a handset deaf to DTR (`TestACallAPanicLeftUpIsEndedByANewHandsetOnTheAppsTransport`). `convert_test.go`: the saturation of timeouts and seconds. `zerovalue_test.go`: every exported method on a zero receiver, through `reflect`, must not panic and must report "the %s was not made by this library". `nilargs_test.go`: every function with nil arguments. `lists_test.go`: `Get` out of range. `connection_test.go`: `receiveStream` over a fake stream (data, data with `io.EOF` or a truncation, the end of the stream, and the failures: a TLS session cut short gives `SatlinkErrorTLSTruncated`, a timeout, a closed connection, and a deadline refused by a closed connection). It also covers `receiveBuffer`'s 64 KiB cap, which the test writes out itself rather than taking it from `maxReceiveLen`, a stream buffer that needs room for a byte, and a datagram buffer that may be empty but not negative. `handset_test.go` also covers `Close` of a handset that is lent or dialling, during a real `EstablishLinkWithHandset`, which does not wait for a `PollEvents`. A fault in `reclaim` leaves the lock free. `closingport_test.go` holds the port double, which carries its simulator's control (`newClosingPortWith(config)`, `connectPanickingPort`, `closePanickingPort`). `listener_test.go`: the listener goroutine stops once it has delivered `LinkStateClosed`, and a link that cannot be followed (a nil watcher) logs "the link listener panicked: …". `log_test.go`: `recordErrors`, a process-wide logger built on `internal/logtext` that keeps this package's error records, for tests that never call `t.Parallel`; `TestRecordingErrorsLeavesTheLogPackageAsItWas` checks that it leaves the log package as it was. `portcloser_test.go`: a port closer whose port panics as it closes logs "the port closer panicked: a port bug while closing" and the app carries on. `boundary_test.go`: `survivePanic` logs "recovered a panic in %s: %v". `linkconfig_test.go` and `tls_test.go`: the settings' conversion. A host address that is not IPv4 is refused with the reason "invalid IPv4 address syntax" (`TestHostAddressesMustBeIPv4`), and a name added twice keeps its last address (`TestANameAddedTwiceKeepsTheLastAddress`). Adders race a link or a connector under `-race`. The TLS settings are checked in a fixed order. The internal listener tests also assert the close reasons, through `AssertHeardEveryChange`. `serial_test.go`, with `serial.go`'s build constraint: panics close the port, a collected serial link closes its port, and a serial link has a listener. |
+| `error_test.go`, `transport_test.go`, `convert_test.go`, `zerovalue_test.go`, `lists_test.go`, `nilargs_test.go`, `boundary_test.go`, `cancellation_test.go`, `connection_test.go`, `handset_test.go`, `handsetslot_test.go`, `closingport_test.go`, `linkconfig_test.go`, `linkstate_test.go`, `listener_test.go`, `log_test.go`, `portcloser_test.go`, `tls_test.go`, `serial_test.go` | Internal tests. `error_test.go` holds the error-mapping table: every iridium and satnet kind, `net.ErrClosed`, `*ParseRuleError`, a failed hang-up, and the kinds, fields and texts for each. `ErrCallMayStillBeUp` maps to `SatlinkErrorHangUpFailed`, `ErrCancelled` (also inside `ErrHandset`) maps to `SatlinkErrorCancelled`, and a cancelled setup whose hang-up failed maps to `SatlinkErrorHangUpFailed`. An establishing error with `CallMayStillBeUp` maps to `SatlinkErrorHangUpFailed` with the error's text, while the generic mapping keeps such an error's own kind. An `ErrLinkDown` from a connection keeps its reason. `cancellation_test.go`: a `Cancellation`, made or zero, cancels; the link's call settings share it; without one, a link has its own. `handset_test.go`: `endStrandedCall`, whose failing `Initialize` or `ATH` becomes `ErrCallMayStillBeUp`, and `asCallMayStillBeUp`, which keeps an error of that kind and rewords any other, flag included. `handsetslot_test.go`: `strand` takes only a ready handset; a settled setup leaves the next setup's handset alone, whether its link did not come up or came up and ended (`TestASettledSetupLeavesTheNextSetupAlone`); the slots' names. `transport_test.go`: the transport adapter, which clamps milliseconds to [1, 2147483647], copies at most `len(p)`, maps a host error to `ErrTransport` with its message, and turns a panicking `ByteTransport` into `SatlinkErrorInternal`. A panic once the call is up pulses DTR, which ends the call over a transport whose DTR line reaches the handset (`TestAPanicOnceTheCallIsUpPulsesDTRWhichEndsTheCall`). A call that a panic left up is ended by a new `IridiumHandset` on the app's transport, over a handset deaf to DTR (`TestACallAPanicLeftUpIsEndedByANewHandsetOnTheAppsTransport`). `convert_test.go`: the saturation of timeouts and seconds. `zerovalue_test.go`: every exported method on a zero receiver, through `reflect`, must not panic and must report "the %s was not made by this library". `nilargs_test.go`: every function with nil arguments. `lists_test.go`: `Get` out of range. `connection_test.go`: `receiveStream` over a fake stream (data, data with `io.EOF` or a truncation, the end of the stream, and the failures: a TLS session cut short gives `SatlinkErrorTLSTruncated`, a timeout, a closed connection, and a deadline refused by a closed connection). It also covers `receiveBuffer`'s 64 KiB cap, which the test writes out itself rather than taking it from `maxReceiveLen`, a stream buffer that needs room for a byte, and a datagram buffer that may be empty but not negative. `handset_test.go` also covers `Close` of a handset that is lent or dialling, during a real `EstablishLinkWithHandset`, which does not wait for a `PollEvents`. A fault in `reclaim` leaves the lock free. `closingport_test.go` holds the port double, which carries its simulator's control (`newClosingPortWith(config)`, `connectPanickingPort`, `closePanickingPort`). `listener_test.go`: the listener goroutine stops once it has delivered `LinkStateClosed`, and a link that cannot be followed (a nil watcher) logs "the link listener panicked: …". `log_test.go`: `recordErrors`, a process-wide logger built on `internal/logtext` that keeps this package's error records, for tests that never call `t.Parallel`; `TestRecordingErrorsLeavesTheLogPackageAsItWas` checks that it leaves the log package as it was. `portcloser_test.go`: a port closer whose port panics as it closes logs "the port closer panicked: a port bug while closing" and the app carries on. `boundary_test.go`: `survivePanic` logs "recovered a panic in %s: %v". `linkconfig_test.go` and `tls_test.go`: the settings' conversion. A host address that is not IPv4 is refused with the reason "invalid IPv4 address syntax" (`TestHostAddressesMustBeIPv4`), and a name added twice keeps its last address (`TestANameAddedTwiceKeepsTheLastAddress`). Adders race a link or a connector under `-race`. The TLS settings are checked in a fixed order. The internal listener tests also assert the close reasons, through `AssertHeardEveryChange`. `serial_test.go`, with `serial.go`'s build constraint: panics close the port, a collected serial link closes its port, and a serial link has a listener. |
 | `bindings_test.go`, `unusableinits_test.go` | Skipped under `-short` (section 4, Bindings check). `bindings_test.go` builds the pinned `gobind` into `t.TempDir()` and runs it for Android, iOS, Mac Catalyst (where the serial API is absent) and macOS (where it is present). It fails on any skipped symbol. It compiles the package for each target. It checks that the Java declarations the Kotlin sources use exist: the establish functions with their `Cancellation`, `Cancellation()`, `IridiumHandset`'s `hangUp` and `reinitialize`, `SatlinkErrorHangUpFailed` and `SatlinkErrorInternal` among them. It checks that `ByteTransport.java` declares exactly the four methods that `AndroidUsbTransport.kt` implements. `TestTheJavaBindingsCompareExportedFieldsOnly` checks which fields each generated `equals` compares, so that the package doc's Equality section is revisited if gobind changes. When a JDK is found through `JAVA_HOME` or `PATH`, the test compiles the generated Java with `javac --release 8` against a stub `android.content.Context`. `unusableinits_test.go` runs `scripts/mark-unusable-inits.sh` on the macOS header that gobind writes, and type-checks the Objective-C against it with clang (section 4, Bindings check). |
 
 ### Support packages
@@ -327,14 +327,14 @@ contract.
 
 | Package | Users | Contents |
 |---|---|---|
-| `internal/asciicase` | satlink, satnet, sim, `cmd/satlink` | `EqualFold(a, b string) bool`, `Lower(text string) string` and `Upper(text string) string` fold ASCII letters only: 'A'–'Z' and 'a'–'z' change, and nothing else does. Go's `strings.EqualFold`, `ToLower` and `ToUpper` follow Unicode, which maps 'ſ', 'ı' and the Kelvin sign onto ASCII letters. The core matches the echo, `responsePrefix` and `mayGoOnline` with it; satnet uses it for host names and DNS answers; sim uses it for AT commands and DNS names; the CLI uses it for HTTP header names. Its tests cover those three letters, the bytes just outside the ASCII letter ranges ('@', '[', '`'), letters beyond ASCII, and bytes that are not UTF-8. Each user keeps a parity test of its own: the core's echo, satnet's and sim's Kelvin sign, sim's `ATſ12=50`, and the CLI's `Tranſfer-Encoding`. |
+| `internal/asciicase` | iridium, satnet, sim, `cmd/satlink` | `EqualFold(a, b string) bool`, `Lower(text string) string` and `Upper(text string) string` fold ASCII letters only: 'A'–'Z' and 'a'–'z' change, and nothing else does. Go's `strings.EqualFold`, `ToLower` and `ToUpper` follow Unicode, which maps 'ſ', 'ı' and the Kelvin sign onto ASCII letters. The core matches the echo, `responsePrefix` and `mayGoOnline` with it; satnet uses it for host names and DNS answers; sim uses it for AT commands and DNS names; the CLI uses it for HTTP header names. Its tests cover those three letters, the bytes just outside the ASCII letter ranges ('@', '[', '`'), letters beyond ASCII, and bytes that are not UTF-8. Each user keeps a parity test of its own: the core's echo, satnet's and sim's Kelvin sign, sim's `ATſ12=50`, and the CLI's `Tranſfer-Encoding`. |
 | `internal/errnotext` | serial, `cmd/satlink` | `Text(errno syscall.Errno) string` gives an error number's text as C's strerror(3) writes it, which is Go's text with a capital first letter ("No such file or directory"). The CLI reports such errors in this form. Used by serial's `systemError` and the CLI's `osError`, which adds " (os error N)". |
 | `internal/logtext` | mobile, `cmd/satlink`; the record key and trace level for satnet, sim, mobile and ipstack's `netlog` | The one rendering of log records for people (section 2, Logging). `TestAHandlerFromLevelTraceShowsTheRecordsLoggedFourBelowDebug` pins the trace level. `LevelTrace` is `slog.LevelDebug - 4`. `PackageKey` is `"pkg"`. `LevelName(level slog.Level) string` gives the level's name. `NewHandler(minimum slog.Leveler, emit func(level slog.Level, pkg, text string)) slog.Handler` builds a complete handler, with `WithAttrs` and `WithGroup`, that is safe for concurrent use. A nil `minimum` means `LevelInfo`, and a nil `emit` panics. Each record is rendered and passed to `emit` from the logging goroutine. The attributes are rendered by `slog.TextHandler` itself, so its quoting holds exactly. |
 | `internal/ringprovider` | satnet, sim | The fixed TLS settings that satnet's TLS client and sim's TLS echo share: `TLS12CipherSuites() []uint16`, the six TLS 1.2 suites (ECDHE-ECDSA and ECDHE-RSA with AES-256-GCM, AES-128-GCM and ChaCha20-Poly1305), and `KeyExchangeGroups() []tls.CurveID`, X25519, P-256 and P-384. Each call returns a fresh list, because a `tls.Config` keeps the list it is given. The lists are those of rustls 0.23.46's ring provider, and the tests hold them as literals. satnet's client offers them and sim's echo serves them (section 4, TLS configuration and sim). |
-| `internal/debugtext` | satlink, satnet, sim, mobile, `cmd/satlink` | Debug-style text of the values that messages print, in the form the CLI has always printed them. `Quote(text string) string` quotes a string for every message that quotes one (section 2, Errors). `IPv4Settings(local, peer netip.Addr, dnsServers []netip.Addr) string` gives the debug form of ppp's IPv4 settings for the "IPv4 up" log lines, for example `Ipv4Settings { local_address: 10.64.0.2, peer_address: Some(10.64.0.1), dns_servers: [10.64.0.1] }`. It takes the settings' fields, so the package imports nothing from the module and the core can use it. `Quote` escapes a character as `\u{…}` when it is not printable, extends a grapheme, or is default-ignorable. The default-ignorable check is `isWrittenAsCodePoint`, which tests Other_Default_Ignorable_Code_Point, because Go's tables have no Default_Ignorable_Code_Point. The exception is the halfwidth katakana sound marks U+FF9E and U+FF9F, which are written as they are. The Unicode properties come from Go's tables. Checked against rustc 1.99.1's string escaping, over every Unicode scalar value and 200,000 random strings (both at Unicode 17.0.0), `Quote` writes the same text. `TestQuoteWritesStringsInDebugStyle` holds rustc's texts as literals, including the Hangul fillers and the sound marks. `TestQuoteWritesAByteThatIsNotUTF8AsAnEscape` pins the form for a byte that no `string` can hold: `\xNN` in lower case, as `u8::escape_ascii` writes it, next to a valid U+FFFD written as it is. |
-| `internal/utf8lossy` | satlink, ppp, satnet (the labels of DNS answers), sim, `cmd/satlink` | `String(data []byte) string` writes one U+FFFD for each maximal subpart of an ill-formed sequence. `strings.ToValidUTF8` would replace a whole run with one. |
+| `internal/debugtext` | iridium, satnet, sim, mobile, `cmd/satlink` | Debug-style text of the values that messages print, in the form the CLI has always printed them. `Quote(text string) string` quotes a string for every message that quotes one (section 2, Errors). `IPv4Settings(local, peer netip.Addr, dnsServers []netip.Addr) string` gives the debug form of ppp's IPv4 settings for the "IPv4 up" log lines, for example `Ipv4Settings { local_address: 10.64.0.2, peer_address: Some(10.64.0.1), dns_servers: [10.64.0.1] }`. It takes the settings' fields, so the package imports nothing from the module and the core can use it. `Quote` escapes a character as `\u{…}` when it is not printable, extends a grapheme, or is default-ignorable. The default-ignorable check is `isWrittenAsCodePoint`, which tests Other_Default_Ignorable_Code_Point, because Go's tables have no Default_Ignorable_Code_Point. The exception is the halfwidth katakana sound marks U+FF9E and U+FF9F, which are written as they are. The Unicode properties come from Go's tables. Checked against rustc 1.99.1's string escaping, over every Unicode scalar value and 200,000 random strings (both at Unicode 17.0.0), `Quote` writes the same text. `TestQuoteWritesStringsInDebugStyle` holds rustc's texts as literals, including the Hangul fillers and the sound marks. `TestQuoteWritesAByteThatIsNotUTF8AsAnEscape` pins the form for a byte that no `string` can hold: `\xNN` in lower case, as `u8::escape_ascii` writes it, next to a valid U+FFFD written as it is. |
+| `internal/utf8lossy` | iridium, ppp, satnet (the labels of DNS answers), sim, `cmd/satlink` | `String(data []byte) string` writes one U+FFFD for each maximal subpart of an ill-formed sequence. `strings.ToValidUTF8` would replace a whole run with one. |
 | `internal/memconn` | sim | An in-memory `net.Conn` for crypto/tls. `Conn` is built with `New(local, remote netip.AddrPort)`, and has a pump side for its owner: `Inject`, `CloseInbound`, `Extract`, `Pending`, `AwaitReader(timeout)`, `EOFDelivered` and `Closed` (section 4, sim). The broadcast that it waits on is in `signal.go`. `tls_test.go` pumps a crypto/tls client and server step by step over two `Conn`s. The tests run with `-race`. The tests of what wakes `AwaitReader` (a `Read` that starts waiting, and `Close` after the FIN) run in `testing/synctest` bubbles. There, an `AwaitReader` that was woken returns with no fake time passed. One that gave up after its timeout returns that much later, with the same result, because `AwaitReader` looks once more before it gives up. The two parts of its rule (the bytes, and the FIN, that a woken `Read` has yet to take) are tested by holding that `Read` still, since a test cannot catch the moment from outside (`TestAwaitReaderWaitsUntilTheReaderHasTakenWhatWasInjected`; the internal helpers are `bufferWithoutWaking`, `closeInboundWithoutWaking` and `wakeWaitingReads`). Every receive from a test goroutine goes through `awaitResult`, bounded by `patience`, so that a regression fails by name instead of hanging `go test`. |
-| `internal/simtest` | satnet, mobile, `cmd/satlink` (their internal and external tests) | Test support for their tests. `EscapeGuard` (20 ms), `CallEscapeGuard` (60 ms) and `SimulatorConfig()`. `NewSimulator(t, config)` is closed by `t.Cleanup`. `NewHandset(t, config) (*satlink.Handset, *sim.Control)` and `InitializedHandset(t, transport)`. `FaultyTransport` (`NewFaultyTransport(transport)`) has the switches `DeafToEscape`, `DeafToDTR`, `PanicsOnEscape`, `PanicsOnNextEscape`, `PanicsOnNextRead`, `FailsNextHangUp`, `WithoutCPAS` and `Unplugged`, all `atomic.Bool` fields, and `DTRDrops()`. The switches whose names contain `Next` turn themselves off once they have acted. `ByteTransport` (`NewByteTransport(transport)`) is a `mobile.ByteTransport` by its methods alone. `Eventually(t, timeout, what, condition)` polls for a condition. The "this transport has no DTR line" helper that both transports share is in `dtr.go`. Its tests run with `-race`. sim's internal tests cannot import it, because that would be an import cycle. It imports neither satnet nor mobile. |
+| `internal/simtest` | satnet, mobile, `cmd/satlink` (their internal and external tests) | Test support for their tests. `EscapeGuard` (20 ms), `CallEscapeGuard` (60 ms) and `SimulatorConfig()`. `NewSimulator(t, config)` is closed by `t.Cleanup`. `NewHandset(t, config) (*iridium.Handset, *sim.Control)` and `InitializedHandset(t, transport)`. `FaultyTransport` (`NewFaultyTransport(transport)`) has the switches `DeafToEscape`, `DeafToDTR`, `PanicsOnEscape`, `PanicsOnNextEscape`, `PanicsOnNextRead`, `FailsNextHangUp`, `WithoutCPAS` and `Unplugged`, all `atomic.Bool` fields, and `DTRDrops()`. The switches whose names contain `Next` turn themselves off once they have acted. `ByteTransport` (`NewByteTransport(transport)`) is a `mobile.ByteTransport` by its methods alone. `Eventually(t, timeout, what, condition)` polls for a condition. The "this transport has no DTR line" helper that both transports share is in `dtr.go`. Its tests run with `-race`. sim's internal tests cannot import it, because that would be an import cycle. It imports neither satnet nor mobile. |
 
 Tests that hand-build IPv4, TCP or UDP datagrams (satnet's pacing, device and stack, sim's
 connection requests, DNS and support) build them with `internal/ipstack/wire`'s Reprs rather
@@ -359,26 +359,27 @@ from them.
   `satlink-link`, `satlink-link-listener`, `satlink-log` and `satlink-port-closer`, the
   CHAP authenticator name `satlink-ppp`, the CLI's `User-Agent: satlink-cli`, and the
   `satlink hangup` command that its hang-up warning suggests. Hardware facts keep their
-  Iridium names (`IridiumUSBVendorID`, `IridiumInternetNumber`, `IridiumHandset` in
-  mobile, "Iridium 9575", the simulated network's greeting, and the test CA's name).
+  Iridium names (the `iridium` package, `IridiumInternetNumber`, `IridiumHandset` and
+  `IridiumUSBVendorID` in mobile, "Iridium 9575", the simulated network's greeting, and
+  the test CA's name).
 
 ### Enumerations
 
-- A fieldless enum is `type X int` with constants named `X<Variant>` (`satlink.SMSFilterUnread`,
+- A fieldless enum is `type X int` with constants named `X<Variant>` (`iridium.SMSFilterUnread`,
   `ppp.PhaseOpen`, `ppp.AuthProtocolCHAPMD5`) and a `String` method. A value without a
   constant is refused where it is an input (`Handset.ListSMS`, `ppp.NewEndpoint`; section 5).
 - A data-carrying enum is a struct with a `Kind` field of type `XKind` plus the payload
   fields, comparable with `==`: `satnet.LinkState{Kind: satnet.LinkStateClosed, Reason:
   satnet.CloseReason{Kind: satnet.CloseReasonCarrierLost}}`. Kind constants are named after
   the struct: `ppp.EventUp`, `ppp.DownReasonLoopedBack`, `satnet.LinkStateUp`,
-  `satnet.CloseReasonPPP`, `satlink.FinalResultNoCarrier`. Payload fields are named after
+  `satnet.CloseReasonPPP`, `iridium.FinalResultNoCarrier`. Payload fields are named after
   their meaning: `Protocol`, `Detail`, `Reason`, `PPP`.
 - The exception: `ppp.Event` carries `ppp.IPv4Settings`, whose `DNSServers` is a slice, so
   neither is comparable with `==`. Compare them with `Event.Equal` and `IPv4Settings.Equal`
   (as ipstack's `TCPRepr.Equal`). Records that hold pointers compare them by pointer with
   `==` (`satnet.Status.IPv4`, `ppp.Config.Keepalive`, and a server role's policy), and their
   docs say so.
-- Where a value is a protocol code, the Go value is the code. `satlink.ChargeStatus` holds
+- Where a value is a protocol code, the Go value is the code. `iridium.ChargeStatus` holds
   the +CBC code, so `Unknown(n)` needs no field. The `RegistrationStatus` constants are the
   3GPP codes 0 to 5, and every other code becomes `RegistrationStatusUnknown`.
 - `String()` returns the text the CLI prints for the type. For `DownReason` and `CloseReason`
@@ -418,7 +419,7 @@ gomobile turns nil into null, so only fields documented as optional are ever nil
   function docs.
 - Struct-valued constants are functions that return a fresh value, so no caller can change
   them for everyone: `satnet.IridiumInternetBearer()`, `satnet.AllPorts()`,
-  `sim.InstantLinkProfile()`, `sim.IridiumLinkProfile()`, `satlink.KnownProducts()`,
+  `sim.InstantLinkProfile()`, `sim.IridiumLinkProfile()`, `iridium.KnownProducts()`,
   `sim.SecureTestKeySHA256()`.
 - A default-value function is `Default<Type>()`: `DefaultDataCallSettings`,
   `ppp.DefaultTimers`, `ppp.DefaultKeepalive`, `satnet.DefaultLimits`,
@@ -434,11 +435,11 @@ gomobile turns nil into null, so only fields documented as optional are ever nil
   `PortRange` allow nothing; `DataCallSettings` documents its zero timeouts), or not usable,
   naming what makes one ("The zero TCPConn is not usable; Link.Dial and Link.DialContext make
   one"). A zero `AllowRule`'s target kind is `targetNone`, which matches nothing.
-- A constructor given a nil required interface panics (`satlink.NewHandset`). mobile, whose
+- A constructor given a nil required interface panics (`iridium.NewHandset`). mobile, whose
   callers use other languages, refuses nil arguments with an error instead (section 4).
 - A type that promises an interface asserts it at compile time, so that an optional
   interface such as `DTRController` cannot silently stop matching:
-  `var _ satlink.DTRController = (*Handset)(nil)` in sim, serial and for `DataCall`;
+  `var _ iridium.DTRController = (*Handset)(nil)` in sim, serial and for `DataCall`;
   `var _ net.Conn = (*TCPConn)(nil)` in satnet; and so on for mobile's internal transport
   adapter.
 
@@ -447,10 +448,10 @@ gomobile turns nil into null, so only fields documented as optional are ever nil
 One pattern in every package:
 
 - The error type is a struct with a `Kind` field plus the fields the kinds need:
-  `*satlink.Error`, `*satnet.Error`, `*ppp.ConfigError`, `*ppp.SendError`,
+  `*iridium.Error`, `*satnet.Error`, `*ppp.ConfigError`, `*ppp.SendError`,
   `*satnet.ParseRuleError`, `*mobile.SatlinkError`.
 - The kind type implements `error`, so every kind constant is a sentinel:
-  `errors.Is(err, satlink.ErrTimeout)`, `errors.Is(err, satnet.ErrLinkDown)`,
+  `errors.Is(err, iridium.ErrTimeout)`, `errors.Is(err, satnet.ErrLinkDown)`,
   `errors.Is(err, ppp.ErrNotOpen)`. Kind constants are named `Err<Variant>`
   (`satnet.ErrRule<Variant>` for rule parsing). A kind's own text is a short label; the
   error's text has the details. (`mobile` binds no named types, so its kinds are int
@@ -466,8 +467,8 @@ One pattern in every package:
   other message that quotes a string uses it too, so the messages read alike. In the texts this
   guide quotes, `%q` stands for it. A list of strings is written with `debugList`,
   `["a", "b"]` (section 4), which is built on `Quote`.
-- `Unwrap` returns the cause: a transport's error inside `satlink.ErrTransport`, the
-  `*satlink.Error` inside `satnet.ErrHandset`, the crypto/tls or x509 error inside
+- `Unwrap` returns the cause: a transport's error inside `iridium.ErrTransport`, the
+  `*iridium.Error` inside `satnet.ErrHandset`, the crypto/tls or x509 error inside
   `satnet.ErrTLS`.
 - `satnet` errors also match the standard library's equivalents of the `io.ErrorKind`
   conversion (table in the satnet package doc): `os.ErrDeadlineExceeded` for timeouts,
@@ -480,11 +481,11 @@ One pattern in every package:
   Err: ctx.Err()}`, as `net.Dialer` does). Timeouts are `net.Error`s with `Timeout()` and
   `Temporary()` true.
 - A failed hang-up is a flag on the error of whatever failed: the `CallMayStillBeUp` field of
-  `*satlink.Error` and `*satnet.Error`. The flag never changes the text.
+  `*iridium.Error` and `*satnet.Error`. The flag never changes the text.
 - The error that `Handset.Initialize` and `Handset.Answer` return when a call may still be up
-  has the kind `satlink.ErrCallMayStillBeUp`, with the text in `Message` and the flag set too.
+  has the kind `iridium.ErrCallMayStillBeUp`, with the text in `Message` and the flag set too.
   The kind is also the one sentinel for the whole module:
-  `errors.Is(err, satlink.ErrCallMayStillBeUp)` matches an error of that kind or with the flag,
+  `errors.Is(err, iridium.ErrCallMayStillBeUp)` matches an error of that kind or with the flag,
   through any wrapping. `Error.Is` checks the flag before the kinds. An error that is passed on
   keeps its own text and flag; a caller never has to convert it.
 - mobile maps the kind to `SatlinkErrorHangUpFailed`, and sets the flag only where the bindings
@@ -494,13 +495,13 @@ One pattern in every package:
 - `ErrCancelled` ("the call setup was cancelled") is not `context.Canceled`: a context ending is
   not what stopped the call, a `Cancellation` is (below).
 - Transports may return any error. The handset wraps it as
-  `&satlink.Error{Kind: ErrTransport, Err: err}` and passes a `*satlink.Error` through unchanged.
+  `&iridium.Error{Kind: ErrTransport, Err: err}` and passes an `*iridium.Error` through unchanged.
 - Never ignore an error silently. Where an error is deliberately discarded, write `_ = …` with
   a comment saying why that is safe.
 
 ### Cancellation
 
-- `DataCallSettings.Cancellation` is a `*satlink.Cancellation` that the app can cancel. Copies
+- `DataCallSettings.Cancellation` is an `*iridium.Cancellation` that the app can cancel. Copies
   of the settings share the pointer. `DefaultDataCallSettings`, and so `satnet.NewConfig`,
   makes a fresh one each time, so two defaults are not `==`.
 - A nil `Cancellation` means that the setup cannot be cancelled: `Cancelled` on nil is false,
@@ -543,7 +544,7 @@ remaining `int` values (lengths, ports, indices, levels, enumerations) never nee
 ### Ownership: the handset is never moved
 
 A `DataCall` and a `satnet.Link` do not take the handset away from its caller. In Go the caller
-keeps its `*satlink.Handset` throughout:
+keeps its `*iridium.Handset` throughout:
 
 - `Handset.DialData` and `AnswerData` claim the handset. While a `DataCall` (and so a
   `satnet.Link`) holds it, the handset's methods that talk to it fail at once with `ErrBusy`,
@@ -568,7 +569,7 @@ keeps its `*satlink.Handset` throughout:
     driver thread panicked");
   - `Establish`'s error when the link did not come up and its hang-up failed too. The error still
     says why the link did not come up: for a setup cancelled before or after CONNECT, it is
-    `ErrHandset` wrapping `satlink.ErrCancelled`.
+    `ErrHandset` wrapping `iridium.ErrCancelled`.
 
   `Link.Status().CallMayStillBeUp` says so too. mobile reports `SatlinkErrorHangUpFailed` for
   `HangUp`, for an `Establish…` that failed so, and for the handset's errors of kind
@@ -585,7 +586,7 @@ keeps its `*satlink.Handset` throughout:
 | Resource | Release in Go |
 |---|---|
 | `sim.Handset` drops DTR | `sim.Handset.Close` (idempotent). A `Handset` collected without `Close` drops DTR the same way (`runtime.AddCleanup` on the `Handset`). |
-| `serial.Transport` closes the port (DTR drops) | `serial.Transport.Close`, which waits up to a second for a write or DTR change under way. `satlink.Handset.Close` closes any `io.Closer` transport. A `Transport` collected without `Close` closes its port all the same (`runtime.AddCleanup` on the `Transport`, holding the library's port, as for `sim.Handset`; `Close` stops it). `serial.Connect` closes the port it opened on every way out but success, a panic out of `Initialize` included (a deferred close guarded by `initialized`). A port that mobile opened itself (`OpenSerialHandset`, `EstablishSerialLink`) is closed too when a panic is recovered during the setup (`closeUnlessHandedOn`). Go has no destructors, so each close is deferred explicitly. |
+| `serial.Transport` closes the port (DTR drops) | `serial.Transport.Close`, which waits up to a second for a write or DTR change under way. `iridium.Handset.Close` closes any `io.Closer` transport. A `Transport` collected without `Close` closes its port all the same (`runtime.AddCleanup` on the `Transport`, holding the library's port, as for `sim.Handset`; `Close` stops it). `serial.Connect` closes the port it opened on every way out but success, a panic out of `Initialize` included (a deferred close guarded by `initialized`). A port that mobile opened itself (`OpenSerialHandset`, `EstablishSerialLink`) is closed too when a panic is recovered during the setup (`closeUnlessHandedOn`). Go has no destructors, so each close is deferred explicitly. |
 | `DataCall` holds the handset and its transport | A `DataCall` dropped without `HangUp` ends nothing and leaves the handset busy. Its doc says to hang up in a deferred function. `Handset.Close`, or the collection of the serial `Transport`, closes the port. A transport's panic out of `HangUp` or out of a call's setup pulses DTR (section 4, Hanging up). |
 | `satnet.Link` hangs up in the background | `satnet.Link.Close` waits; `RequestClose` does not. A Link collected without Close still hangs up (`runtime.AddCleanup`). |
 | `TCPConn` closes gracefully | `TCPConn.Close` (graceful, never waits). A connection collected without Close is closed the same way. |
@@ -617,7 +618,7 @@ and DTR changes.
   it, closing a connection to interrupt a handshake or a request). `go test -race` passes.
 - Use the typed atomics (`atomic.Int64`, `atomic.Uint64`, `atomic.Bool`, `atomic.Pointer[T]`),
   never `atomic.LoadInt64` and friends on plain fields. gomobile builds android/arm, where a 64-bit
-  atomic on a field that is not 8-byte aligned panics. `portability_test.go` type-checks every
+  atomic on a field that is not 8-byte aligned panics. `internal/portability` type-checks every
   package and its tests for linux/386 and linux/arm. Running the tests on such a platform
   (`GOARCH=386 go test` on the packages without cgo) needs a machine that runs its binaries.
 
@@ -713,7 +714,7 @@ Logging in tests:
 
 Coverage by file:
 
-- `satlink` (core): the dial, data-call and hang-up paths, including the stranded-call
+- `iridium` (core): the dial, data-call and hang-up paths, including the stranded-call
   and call-may-still-be-up cases, and the `ErrCallMayStillBeUp` contract.
 - `ppp`: `endpoint_*_test.go` split by concept (`api`, `lifecycle`, `framing`, `rejects`,
   `lcp`, `ipcp`, `auth`), `fsm_test.go` for the negotiation automaton, `auth_test.go` for
@@ -776,12 +777,12 @@ underlying library would do by default. Those are noted with the library's behav
 
 **Handset ownership**
 
-- The handset is never moved. It stays with its `satlink.Handset` (or the `IridiumHandset`
+- The handset is never moved. It stays with its `iridium.Handset` (or the `IridiumHandset`
   that wraps it), is released automatically when the call ends, and a use after release
   fails with `ErrBusy`. Go has no moves, so failing fast replaces a compile-time guarantee.
 - A `DataCall` dropped without `HangUp` ends nothing and leaves the handset busy.
 - A failure that may leave a call up is a plain error with a `CallMayStillBeUp` field. It
-  matches `satlink.ErrCallMayStillBeUp` through `errors.Is`. An error passed on keeps its
+  matches `iridium.ErrCallMayStillBeUp` through `errors.Is`. An error passed on keeps its
   own text and flag. Go has no `?` conversion to turn a failure into that error kind.
 - `DataCallSettings.Cancellation` may be nil. The setup then cannot be cancelled, and calling
   `Cancel` on a nil pointer panics. A pointer lets copies of the settings share one request.
@@ -1000,7 +1001,7 @@ underlying library would do by default. Those are noted with the library's behav
   hanging up takes, an idle time under 25 s, and a data limit under 2048 bytes.
 - `sim.LinkProfile.BytesPerSecond` zero means unlimited. A negative value means one byte per
   second.
-- `satlink.Handset` is safe for concurrent use, and its calls are serialised. Go callers in
+- `iridium.Handset` is safe for concurrent use, and its calls are serialised. Go callers in
   `mobile` and `satnet` share it across goroutines.
 - DTR is an optional interface with `RaiseDTR` and `DropDTR`, which `mobile.ByteTransport` also
   has. An optional interface replaces a default method, and the API takes no boolean flag
@@ -1062,7 +1063,7 @@ underlying library would do by default. Those are noted with the library's behav
   platforms `go.bug.st/serial` supports. It does not build on NetBSD, DragonFly, Solaris,
   illumos, AIX or Plan 9, which the serial library lacks, nor on js/wasm or wasip1, which have no
   signals to catch. On 32-bit platforms an SMS index or a baud rate above 2147483647 wraps when
-  it is converted to `int`, because `satlink.Handset` and `serial.Open` take `int`.
+  it is converted to `int`, because `iridium.Handset` and `serial.Open` take `int`.
 
 **mobile (Android and Apple bindings)**
 
@@ -1113,7 +1114,7 @@ underlying library would do by default. Those are noted with the library's behav
 
 ## 4. Implementation notes per package
 
-### satlink (core)
+### iridium (core)
 
 - **Handset internals.** One `sync.Mutex` serialises exchanges (the line buffer, the URC
   queue, transport I/O). A separate claim makes the handset busy. `DialData` and
@@ -1515,7 +1516,7 @@ underlying library would do by default. Those are noted with the library's behav
   Validation checks, in order: the MTU, the link rate, the TCP buffers, the host names (and, in
   Go, the IPv4 host addresses), and the durations. Durations must not be negative and must be at
   most a year (`maxDuration`). Then comes the escape guard, which must be at most 10 s
-  ("the escape guard must be at most 10s", using `satlink.MaxEscapeGuard` with `%v`). Last are
+  ("the escape guard must be at most 10s", using `iridium.MaxEscapeGuard` with `%v`). Last are
   the limits, which refuse values too small to be of use:
   - a call time limit that leaves time to bring PPP up (`linkSetupTime`, 20 s: 7 to 10 s of
     round trips for LCP, authentication and IPCP, with room to use the link afterwards) and to
@@ -1557,7 +1558,7 @@ underlying library would do by default. Those are noted with the library's behav
   The configuration's `Call.Cancellation` (nil-safe) also stops a link that is still negotiating,
   with `CloseReasonRequested` (`setupCancelled`). Nothing written could still need delivering.
   When the cancellation is set and the link did not come up, `Establish`'s `setupFailure` reports
-  `ErrHandset` wrapping `&satlink.Error{Kind: satlink.ErrCancelled}`. That is the same error as a
+  `ErrHandset` wrapping `&iridium.Error{Kind: iridium.ErrCancelled}`. That is the same error as a
   dial cancelled before CONNECT. It keeps `CallMayStillBeUp` from the hang-up.
 
   A panic can also get past the run. It may come from the connections aborted as the hang-up
@@ -2181,13 +2182,13 @@ underlying library would do by default. Those are noted with the library's behav
   library `Write` that takes nothing and reports no error fails with
   `ErrTransport` wrapping `io.ErrShortWrite`, so the write loop cannot spin.
 - **Discover.** It calls `enumerator.GetDetailedPortsList()` and keeps the USB
-  ports whose VID parses (hex, any case) to `satlink.IridiumUSBVendorID`. There
+  ports whose VID parses (hex, any case) to `iridium.USBVendorID`. There
   are no active-probe filters, so no device is probed. A port whose PID does not
   parse is still reported, with `ProductID` 0 and `Model` "" (`parseUSBID`
   returns 0 explicitly). On macOS the enumerator reports only each port's callout
   node (`IOCalloutDevice`, `/dev/cu.*`), so no filter for `/dev/tty.*` is needed.
   On Linux it reads sysfs, so libudev is not needed.
-- **Errors.** Errors are `&satlink.Error{Kind: satlink.ErrTransport, Err: err}`,
+- **Errors.** Errors are `&iridium.Error{Kind: iridium.ErrTransport, Err: err}`,
   or carry a `Message` for "no Iridium handset found on USB" and "several
   handsets found, choose one: a, b". An error number from the operating system
   (`syscall.Errno`) is wrapped so that it reads as the C library writes it, with
@@ -2336,7 +2337,7 @@ underlying library would do by default. Those are noted with the library's behav
 - **Error mapping.** Errors are mapped in this order:
   1. `errors.As` a `*SatlinkError` passes through unchanged.
   2. `*satnet.Error` is mapped by its kind (below).
-  3. `*satlink.Error` is mapped by its kind.
+  3. `*iridium.Error` is mapped by its kind.
   4. `*satnet.ParseRuleError` maps to InvalidArgument.
   5. `errors.Is(err, net.ErrClosed)` maps to InvalidArgument "the connection is
      closed".
@@ -2344,7 +2345,7 @@ underlying library would do by default. Those are noted with the library's behav
      `SatlinkErrorInternal` with its text.
 
   The satnet checks come before the `net.ErrClosed` check, because satnet's
-  errors also match the standard errors. `satlink` kinds map one to one: `ErrBusy`
+  errors also match the standard errors. `iridium` kinds map one to one: `ErrBusy`
   becomes `SatlinkErrorHandsetBusy`, and the Reason or Result is the core error's
   `Message`, followed by ": " and its cause when there is one. `satnet` kinds map
   as follows:
@@ -2362,11 +2363,11 @@ underlying library would do by default. Those are noted with the library's behav
   whose call may still be up becomes `SatlinkErrorHangUpFailed`, with the close
   reason's text.
 
-  The establishing functions check `errors.Is(err, satlink.ErrCallMayStillBeUp)`
+  The establishing functions check `errors.Is(err, iridium.ErrCallMayStillBeUp)`
   before the mapping. Such a failure is `SatlinkErrorHangUpFailed`, with the
-  error's text as its Reason. `satlink.ErrCallMayStillBeUp` maps to
+  error's text as its Reason. `iridium.ErrCallMayStillBeUp` maps to
   `SatlinkErrorHangUpFailed` with the core error's `Message`.
-  `satlink.ErrCancelled`, also when it sits inside satnet's `ErrHandset`, maps to
+  `iridium.ErrCancelled`, also when it sits inside satnet's `ErrHandset`, maps to
   `SatlinkErrorCancelled`, "the call setup was cancelled".
   `SatlinkErrorCancelled` is declared after `SatlinkErrorInternal`, so that no
   existing constant changes value. The general mapping ignores the flag on errors
@@ -2384,15 +2385,15 @@ underlying library would do by default. Those are noted with the library's behav
 - **Foreign transport adapter.** Timeouts in milliseconds are clamped to [1,
   2147483647]. At most `len(p)` bytes are copied from what `Read` returns, and
   `Write` is never called with empty data. A host error that is a `SatlinkError`
-  of kind Transport gives its Reason. A `*satlink.Error` of kind `ErrTransport`
+  of kind Transport gives its Reason. An `*iridium.Error` of kind `ErrTransport`
   from a Go transport passes unchanged. Anything else becomes `ErrTransport` with
-  `err.Error()`. The adapter asserts `satlink.Transport` and
-  `satlink.DTRController` at compile time.
+  `err.Error()`. The adapter asserts `iridium.Transport` and
+  `iridium.DTRController` at compile time.
 - **TLS settings.** `NewTLSConnector` reports problems in this order: a PEM bundle
   that does not parse, then a pin that is not 32 bytes ("a SHA-256 pin is 32
   bytes"), then settings that trust nothing. satnet checks the first and the last
   in one call, so the pins are checked in between.
-- **Lending** (`EstablishLinkWithHandset`). The IridiumHandset's `*satlink.Handset`
+- **Lending** (`EstablishLinkWithHandset`). The IridiumHandset's `*iridium.Handset`
   goes to `satnet.Establish`. Busy and the release come from the core.
 
   `lend` returns the setup's `handsetLoan`. Through it, `EstablishLinkWithHandset`
@@ -2459,7 +2460,7 @@ underlying library would do by default. Those are noted with the library's behav
   The IridiumHandset learns how a lent link ended lazily, at its next method call,
   through the link's `Watcher().Status()` (state `LinkStateClosed`, then
   `CallMayStillBeUp`).
-- **Cancellation.** `mobile.Cancellation` holds a `satlink.Cancellation` by value,
+- **Cancellation.** `mobile.Cancellation` holds an `iridium.Cancellation` by value,
   so its zero value, which gomobile's constructor makes, is usable too.
   `NewCancellation` is the constructor (Java `new Cancellation()`). `Cancel` and
   `Cancelled` recover panics with `survivePanic`. The establish functions take the
@@ -2573,7 +2574,7 @@ The command is built on these packages: `serial.Discover`, `ChoosePort`, `Open` 
 with `config.Call.Cancellation`, `Status`, `Watcher().Status()` (`Usage` and
 `CallMayStillBeUp`), `Resolve`, `Dial`, `DialTLS`, `NewTLSConnector(satnet.TLSOptions{})`,
 the `TCPConn` and `TLSConn` methods, `Link.RequestClose` and `Link.Close`; and
-`errors.Is` with `satlink.ErrCallMayStillBeUp`, `satnet.ErrTLSTruncated` and
+`errors.Is` with `iridium.ErrCallMayStillBeUp`, `satnet.ErrTLSTruncated` and
 `satnet.ErrTimedOut`. The battery and registration statuses print through their
 `String()` methods.
 
@@ -2767,7 +2768,7 @@ the `TCPConn` and `TLSConn` methods, `Link.RequestClose` and `Link.Close`; and
   Windows the exit status is 130.
 - **net, the call** (`netcall.go`). `establish` writes "Dialling ..." to standard
   error, and a failed write fails the command. A failed `Establish` that matches
-  `satlink.ErrCallMayStillBeUp` prints the hang-up warning, without traffic details,
+  `iridium.ErrCallMayStillBeUp` prints the hang-up warning, without traffic details,
   before the error.
 
   Once the link is up, the command runs inside a function that recovers a panic and
@@ -2942,15 +2943,15 @@ the `TCPConn` and `TLSConn` methods, `Link.RequestClose` and `Link.Close`; and
 These are the messages that the code produces in situations a maintainer may not
 expect, with the text as the code writes it. For each one the table gives the
 package, the situation, the error kind (where there is one) and the text. A dash
-means the message is not wrapped in a `satlink.Error` kind. The messages that
+means the message is not wrapped in an `iridium.Error` kind. The messages that
 ipstack produces are listed in IPSTACK.md, section 9.
 
 | Package | Situation | Kind | Text |
 |---|---|---|---|
-| satlink | negative SMS index | `ErrInvalidArgument` | `%d is not a message index` |
-| satlink | an `SMSFilter` without a constant | `ErrInvalidArgument` | `%d is not an SMS filter` |
-| satlink | a `DataCall` used after `HangUp` | `ErrCall` | `the data call is over` |
-| satlink | a method of a handset that a data call holds | `ErrBusy` | `the handset is in a data call` |
+| iridium | negative SMS index | `ErrInvalidArgument` | `%d is not a message index` |
+| iridium | an `SMSFilter` without a constant | `ErrInvalidArgument` | `%d is not an SMS filter` |
+| iridium | a `DataCall` used after `HangUp` | `ErrCall` | `the data call is over` |
+| iridium | a method of a handset that a data call holds | `ErrBusy` | `the handset is in a data call` |
 | ppp | a server address that is not IPv4 (the zero `Addr` included) | `ErrInvalidAddress` | `the server's addresses must be IPv4, not %v` |
 | ppp | a server authentication protocol without a constant | `ErrInvalidAuthProtocol` | `%d is not an authentication protocol` |
 | satnet | a negative duration in the configuration | `ErrInvalidConfig` | `durations must not be negative` |
@@ -2961,12 +2962,12 @@ ipstack produces are listed in IPSTACK.md, section 9.
 | satnet | a PEM section that does not decode | `ErrTLS` | `invalid PEM: a section is malformed` |
 | satnet | use of a closed connection, or a call that it woke | - | `net.ErrClosed` |
 | satnet | `DialContext` with another network, a malformed address, or a context that ended first | - | `net.UnknownNetworkError`, `*net.AddrError`, and `&net.OpError{Op: "dial", Net: network, Err: ctx.Err()}`, respectively |
-| sim | I/O or DTR after `Close` | `satlink.ErrTransport` | `the simulated handset is closed` |
+| sim | I/O or DTR after `Close` | `iridium.ErrTransport` | `the simulated handset is closed` |
 | sim | a `Hosts` entry whose address is not IPv4 (logged; the call fails with NO CARRIER) | - | `%q in hosts needs an IPv4 address` |
 | sim | `Control.RestartPPP` with an address that is not IPv4 (nothing changes). The address is a `netip.Addr`, which can hold other families | `*sim.ConfigError`, wrapping ppp's `ErrInvalidAddress` | `the server's addresses must be IPv4, not %v` |
-| serial | I/O or DTR after `Close` | `satlink.ErrTransport` | `the serial port is closed` |
-| serial | a library write that takes nothing and reports no error | `satlink.ErrTransport` wrapping `io.ErrShortWrite` | `transport error: short write` |
-| serial | a library read that panics with a runtime error on a port with a descriptor of 1024 or more | `satlink.ErrTransport` wrapping the runtime error | `transport error: the serial library cannot wait for this port (select(2) watches no descriptor from 1024 up): runtime error: ...` |
+| serial | I/O or DTR after `Close` | `iridium.ErrTransport` | `the serial port is closed` |
+| serial | a library write that takes nothing and reports no error | `iridium.ErrTransport` wrapping `io.ErrShortWrite` | `transport error: short write` |
+| serial | a library read that panics with a runtime error on a port with a descriptor of 1024 or more | `iridium.ErrTransport` wrapping the runtime error | `transport error: the serial library cannot wait for this port (select(2) watches no descriptor from 1024 up): runtime error: ...` |
 | mobile | a stream's (TCP or TLS) `maxLen` below 1 | InvalidArgument | `maxLen must be at least 1` |
 | mobile | a negative `maxLen` for `UDPConnection.Receive` | InvalidArgument | `maxLen must not be negative` |
 | mobile | a closed `IridiumHandset` used for any method but `Close` (`EstablishLinkWithHandset` included) | InvalidArgument | `the handset is closed` |

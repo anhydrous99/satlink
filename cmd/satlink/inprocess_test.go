@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/serial"
 	"github.com/anhydrous99/satlink/sim"
@@ -57,7 +57,7 @@ type world struct {
 	discoveryFails bool
 	// handset makes the handset that --simulate asks for, from the
 	// configuration the command chose; nil makes a plain simulated one.
-	handset func(t *testing.T, config sim.Config) satlink.Transport
+	handset func(t *testing.T, config sim.Config) iridium.Transport
 	// interruptions, if not nil, are the Ctrl-C, SIGTERM and SIGHUP the
 	// command gets, relayed once it catches them, and quit what quitting
 	// at once does instead of ending the process; a nil quit fails the test.
@@ -142,11 +142,11 @@ func (w world) environment(t *testing.T, args []string) (environment, *lockedBuf
 		installLogger: func(slog.Handler) {},
 		discoverHandsets: func() ([]serial.Port, error) {
 			if w.discoveryFails {
-				return nil, &satlink.Error{Kind: satlink.ErrTransport, Message: "no USB here"}
+				return nil, &iridium.Error{Kind: iridium.ErrTransport, Message: "no USB here"}
 			}
 			return w.ports, nil
 		},
-		simulateHandset:     func(config sim.Config) satlink.Transport { return makeHandset(t, config) },
+		simulateHandset:     func(config sim.Config) iridium.Transport { return makeHandset(t, config) },
 		notifyInterruptions: w.notifyInterruptions,
 		quitInterrupted:     w.quitter(t),
 	}
@@ -184,14 +184,14 @@ func runInProcess(t *testing.T, w world, args ...string) outcome {
 
 // plainSimulator is a simulated handset made with config, closed when the
 // test ends if the command left it open.
-func plainSimulator(t *testing.T, config sim.Config) satlink.Transport {
+func plainSimulator(t *testing.T, config sim.Config) iridium.Transport {
 	return simtest.NewSimulator(t, config)
 }
 
 // inboxHolding returns simulated handsets whose inbox holds a message from
 // each sender, with the text "Hello from <sender>", the first at index 1.
-func inboxHolding(senders ...string) func(*testing.T, sim.Config) satlink.Transport {
-	return func(t *testing.T, config sim.Config) satlink.Transport {
+func inboxHolding(senders ...string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
 		simulator := simtest.NewSimulator(t, config)
 		for _, sender := range senders {
 			simulator.Control().ReceiveSMS(sender, "Hello from "+sender)
@@ -202,8 +202,8 @@ func inboxHolding(senders ...string) func(*testing.T, sim.Config) satlink.Transp
 
 // smsArrivingOn returns simulated handsets that receive an SMS as command
 // is written to them, so that its announcement comes during the command.
-func smsArrivingOn(command string) func(*testing.T, sim.Config) satlink.Transport {
-	return func(t *testing.T, config sim.Config) satlink.Transport {
+func smsArrivingOn(command string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
 		return &smsOnCommand{Handset: simtest.NewSimulator(t, config), command: command}
 	}
 }
@@ -224,7 +224,7 @@ func (h *smsOnCommand) WriteAll(p []byte) error {
 }
 
 // unplugged is a simulated handset whose cable has been pulled.
-func unplugged(t *testing.T, config sim.Config) satlink.Transport {
+func unplugged(t *testing.T, config sim.Config) iridium.Transport {
 	faulty := simtest.NewFaultyTransport(simtest.NewSimulator(t, config))
 	faulty.Unplugged.Store(true)
 	return faulty
@@ -244,7 +244,7 @@ func (brokenReader) Read([]byte) (int, error) {
 // the +++ escape, so that hanging up a data call fails. A handset deaf to the
 // escape and to DTR would fail it too, but only after some twenty seconds
 // with the default escape guard; the panic gives the same warning at once.
-func panickingOnEscape(t *testing.T, config sim.Config) satlink.Transport {
+func panickingOnEscape(t *testing.T, config sim.Config) iridium.Transport {
 	faulty := simtest.NewFaultyTransport(simtest.NewSimulator(t, config))
 	faulty.PanicsOnEscape.Store(true)
 	return faulty
@@ -255,8 +255,8 @@ func panickingOnEscape(t *testing.T, config sim.Config) satlink.Transport {
 // command starting with trigger is written — the first command, for "".
 // Each simulator made is handed to keep, so that the test can see what
 // became of it.
-func panickingAfter(trigger string, keep func(*sim.Handset)) func(*testing.T, sim.Config) satlink.Transport {
-	return func(t *testing.T, config sim.Config) satlink.Transport {
+func panickingAfter(trigger string, keep func(*sim.Handset)) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
 		simulator := simtest.NewSimulator(t, config)
 		keep(simulator)
 		return &panicTrap{FaultyTransport: simtest.NewFaultyTransport(simulator), trigger: []byte(trigger)}
@@ -287,7 +287,7 @@ func isClosed(simulator *sim.Handset) bool {
 // credentials that the command does not give, behind a transport that
 // panics on the +++ escape: the link does not come up, and its hang-up
 // fails.
-func refusingTheCredentials(t *testing.T, config sim.Config) satlink.Transport {
+func refusingTheCredentials(t *testing.T, config sim.Config) iridium.Transport {
 	config.Authentication = &sim.Authentication{
 		Protocol:    ppp.AuthProtocolPAP,
 		Credentials: ppp.Credentials{Username: "app", Password: "secret"},

@@ -13,8 +13,8 @@ import (
 
 	serialport "go.bug.st/serial"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/errnotext"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // DefaultBaud is the nominal baud rate: over USB CDC-ACM the rate means
@@ -59,7 +59,7 @@ const (
 type portOpener func(path string, mode *serialport.Mode) (serialport.Port, error)
 
 // Transport is an open serial port to a handset. It implements
-// satlink.Transport, satlink.DTRController and io.Closer, and is safe for
+// iridium.Transport, iridium.DTRController and io.Closer, and is safe for
 // one goroutine reading while another writes; Close may be called from any
 // goroutine and ends a read in progress.
 //
@@ -87,8 +87,8 @@ type Transport struct {
 
 // A Transport is a handset's port: data, the DTR line, and closing.
 var (
-	_ satlink.Transport     = (*Transport)(nil)
-	_ satlink.DTRController = (*Transport)(nil)
+	_ iridium.Transport     = (*Transport)(nil)
+	_ iridium.DTRController = (*Transport)(nil)
 	_ io.Closer             = (*Transport)(nil)
 )
 
@@ -100,7 +100,7 @@ var (
 // The operating system drops DTR again when the port closes, even if the
 // program crashes; with AT&D2 (which data calls set) the handset should
 // then end any call — not yet verified on hardware over USB, so
-// satlink.Handset.Initialize also ends a data call it finds still up. Child
+// iridium.Handset.Initialize also ends a data call it finds still up. Child
 // processes the program starts do not inherit the port, which would keep
 // it open, and DTR up, as long as they live.
 //
@@ -150,7 +150,7 @@ func closeAbandonedPort(port serialport.Port) {
 // WriteAll writes every byte of p and waits until they have left, so every
 // write starts with an empty output queue. The serial library has no write
 // timeout: a device that stops taking data blocks the write. After Close it
-// fails with a *satlink.Error of kind ErrTransport, "the serial port is
+// fails with an *iridium.Error of kind ErrTransport, "the serial port is
 // closed", without touching the device.
 func (t *Transport) WriteAll(p []byte) error {
 	for len(p) > 0 {
@@ -177,7 +177,7 @@ func (t *Transport) write(p []byte) (written int, err error) {
 }
 
 // ReadTimeout reads what has arrived, waiting at most timeout (at least a
-// millisecond) for the first byte, as satlink.Transport specifies. A read
+// millisecond) for the first byte, as iridium.Transport specifies. A read
 // that a signal interrupts (EINTR) waits out the rest of timeout, and so
 // does one that waits longer than the serial library can at once. An empty
 // p reads nothing, at once. After Close it fails as WriteAll does.
@@ -329,10 +329,10 @@ func (t *Transport) awaitCallsUnderWay() bool {
 
 // closedPortError reports I/O on a port already closed.
 func closedPortError() error {
-	return &satlink.Error{Kind: satlink.ErrTransport, Message: "the serial port is closed"}
+	return &iridium.Error{Kind: iridium.ErrTransport, Message: "the serial port is closed"}
 }
 
-// transportError reports err, the serial library's, as a *satlink.Error of
+// transportError reports err, the serial library's, as an *iridium.Error of
 // kind ErrTransport wrapping it. A nil err stays nil. An error number the
 // library passes on from the operating system reads as strerror(3) writes
 // it (see [systemError]).
@@ -343,7 +343,7 @@ func transportError(err error) error {
 	if errno, ok := err.(syscall.Errno); ok {
 		err = systemError{errno: errno}
 	}
-	return &satlink.Error{Kind: satlink.ErrTransport, Err: err}
+	return &iridium.Error{Kind: iridium.ErrTransport, Err: err}
 }
 
 // systemError is an error number from the operating system, written as

@@ -8,8 +8,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // ErrorKind classifies an [Error].
@@ -22,7 +22,7 @@ type ErrorKind int
 // The kinds of [Error], and the fields of Error each one fills.
 const (
 	// ErrHandset reports that the handset refused a command or the call
-	// failed; Err is the *satlink.Error.
+	// failed; Err is the *iridium.Error.
 	ErrHandset ErrorKind = iota
 
 	// ErrInvalidConfig reports a configuration that cannot work; Message
@@ -122,7 +122,7 @@ type Error struct {
 	Reason CloseReason
 	// Message describes the failure (ErrInvalidConfig, ErrTLS).
 	Message string
-	// Err is the underlying cause: the *satlink.Error (ErrHandset), the
+	// Err is the underlying cause: the *iridium.Error (ErrHandset), the
 	// *ppp.ConfigError of credentials PPP refuses (ErrInvalidConfig), or the
 	// crypto/tls or crypto/x509 error (ErrTLS).
 	Err error
@@ -132,7 +132,7 @@ type Error struct {
 	// set on the error of [Link.Close] when the hang-up failed, and on that
 	// of [Establish] when the link did not come up and hanging up failed
 	// too. It does not change the error's text; errors.Is(err,
-	// satlink.ErrCallMayStillBeUp) tests it.
+	// iridium.ErrCallMayStillBeUp) tests it.
 	CallMayStillBeUp bool
 }
 
@@ -164,10 +164,10 @@ var errorMessages = [...]func(e *Error) string{
 
 // Is reports whether target is e's kind, or the standard library's
 // equivalent of it listed in the package documentation, such as
-// os.ErrDeadlineExceeded for ErrTimedOut, or satlink.ErrCallMayStillBeUp
+// os.ErrDeadlineExceeded for ErrTimedOut, or iridium.ErrCallMayStillBeUp
 // when e.CallMayStillBeUp is set.
 func (e *Error) Is(target error) bool {
-	if target == satlink.ErrCallMayStillBeUp {
+	if target == iridium.ErrCallMayStillBeUp {
 		return e.CallMayStillBeUp
 	}
 	if kind, ok := target.(ErrorKind); ok {
@@ -247,5 +247,5 @@ const (
 // handsetError is the error of the handset's failure err, which carries
 // over whether the call may still be up.
 func handsetError(err error) *Error {
-	return &Error{Kind: ErrHandset, Err: err, CallMayStillBeUp: errors.Is(err, satlink.ErrCallMayStillBeUp)}
+	return &Error{Kind: ErrHandset, Err: err, CallMayStillBeUp: errors.Is(err, iridium.ErrCallMayStillBeUp)}
 }

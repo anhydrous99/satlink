@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -43,19 +43,19 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 }
 
 func TestAReportTheHandsetCannotGiveSaysWhy(t *testing.T) {
-	refused := &satlink.Error{Kind: satlink.ErrCommandFailed, Command: "AT+CBC"}
+	refused := &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+CBC"}
 
-	if got, want := describeBattery(satlink.Battery{}, refused), `unavailable (handset returned ERROR for "AT+CBC")`; got != want {
+	if got, want := describeBattery(iridium.Battery{}, refused), `unavailable (handset returned ERROR for "AT+CBC")`; got != want {
 		t.Errorf("battery: %q, want %q", got, want)
 	}
-	if got, want := describeRegistration(satlink.Registration{}, errors.New("no answer")), "unavailable (no answer)"; got != want {
+	if got, want := describeRegistration(iridium.Registration{}, errors.New("no answer")), "unavailable (no answer)"; got != want {
 		t.Errorf("registration: %q, want %q", got, want)
 	}
 }
 
 func TestAReportShowsTheLevelAndTheStatusByName(t *testing.T) {
-	battery := satlink.Battery{Status: satlink.ChargeStatus(7), Level: 55}
-	registration := satlink.Registration{Status: satlink.RegistrationStatusRoaming}
+	battery := iridium.Battery{Status: iridium.ChargeStatus(7), Level: 55}
+	registration := iridium.Registration{Status: iridium.RegistrationStatusRoaming}
 
 	if got, want := describeBattery(battery, nil), "55% (Unknown(7))"; got != want {
 		t.Errorf("battery: %q, want %q", got, want)

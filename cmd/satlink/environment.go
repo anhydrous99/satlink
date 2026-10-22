@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/serial"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -34,7 +34,7 @@ type environment struct {
 	// command given no port: serial.Discover.
 	discoverHandsets func() ([]serial.Port, error)
 	// simulateHandset returns a simulated handset made with config: sim.New.
-	simulateHandset func(config sim.Config) satlink.Transport
+	simulateHandset func(config sim.Config) iridium.Transport
 	// notifyInterruptions relays Ctrl-C, SIGTERM and SIGHUP to signals
 	// instead of letting them end the process, until the function it
 	// returns is called: notifyInterruptions for the process.
@@ -74,7 +74,7 @@ func environmentOf(args []string, files standardFiles, lookupEnv func(string) (s
 			slog.SetDefault(slog.New(handler))
 		},
 		discoverHandsets: serial.Discover,
-		simulateHandset: func(config sim.Config) satlink.Transport {
+		simulateHandset: func(config sim.Config) iridium.Transport {
 			return sim.New(config)
 		},
 		notifyInterruptions: notifyInterruptions,

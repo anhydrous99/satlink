@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func (c *cli) monitorCommand() *command {
 		Use:   "monitor",
 		Short: "Print unsolicited events (incoming SMS, RING, ...) until interrupted",
 		RunE: func(command *cobra.Command, _ []string) error {
-			return c.withHandset(func(handset *satlink.Handset) error {
+			return c.withHandset(func(handset *iridium.Handset) error {
 				return monitor(command.Context(), handset, c.streams.stdout)
 			})
 		},
@@ -31,7 +31,7 @@ func (c *cli) monitorCommand() *command {
 // monitor prints the handset's unsolicited result codes as they arrive,
 // until ctx ends; main's never does, so it runs until the process is
 // interrupted.
-func monitor(ctx context.Context, handset *satlink.Handset, stdout io.Writer) error {
+func monitor(ctx context.Context, handset *iridium.Handset, stdout io.Writer) error {
 	for ctx.Err() == nil {
 		urcs, err := handset.PollURCs(monitorPollTimeout)
 		if err != nil {

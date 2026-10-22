@@ -4,19 +4,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 func TestAResponseEndsWithItsFinalResult(t *testing.T) {
 	tests := []struct {
 		name     string
-		response satlink.Response
+		response iridium.Response
 		want     string
 	}{
-		{"OK", satlink.Response{Lines: []string{"+CSQ:4"}}, "+CSQ:4\nOK\n"},
-		{"CONNECT and its rate", satlink.Response{Connected: true, ConnectMessage: "19200"}, "CONNECT 19200\n"},
+		{"OK", iridium.Response{Lines: []string{"+CSQ:4"}}, "+CSQ:4\nOK\n"},
+		{"CONNECT and its rate", iridium.Response{Connected: true, ConnectMessage: "19200"}, "CONNECT 19200\n"},
 		// The CONNECT line with no rate after it.
-		{"a bare CONNECT", satlink.Response{Connected: true}, "CONNECT \n"},
+		{"a bare CONNECT", iridium.Response{Connected: true}, "CONNECT \n"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -30,7 +30,7 @@ func TestAResponseEndsWithItsFinalResult(t *testing.T) {
 }
 
 func TestAResponseThatCannotBeWrittenFailsTheCommand(t *testing.T) {
-	if err := printResponse(brokenWriter{}, satlink.Response{Lines: []string{"Iridium"}}); err == nil {
+	if err := printResponse(brokenWriter{}, iridium.Response{Lines: []string{"Iridium"}}); err == nil {
 		t.Error("printResponse succeeded on a broken standard output")
 	}
 }

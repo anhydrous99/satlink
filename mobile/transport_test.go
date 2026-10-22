@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // recordingTransport is a ByteTransport that records how it is called and
@@ -153,8 +153,8 @@ func TestHostErrorsBecomeTransportErrorsWithTheirMessage(t *testing.T) {
 
 			err := operation(newForeignTransport(host))
 
-			var core *satlink.Error
-			if !errors.As(err, &core) || core.Kind != satlink.ErrTransport || core.Message != "USB write failed (-1)" {
+			var core *iridium.Error
+			if !errors.As(err, &core) || core.Kind != iridium.ErrTransport || core.Message != "USB write failed (-1)" {
 				t.Errorf("error is %#v, want ErrTransport with the host's message", err)
 			}
 		})
@@ -162,21 +162,21 @@ func TestHostErrorsBecomeTransportErrorsWithTheirMessage(t *testing.T) {
 }
 
 func TestHostErrorsOfThisPackageKeepTheirReason(t *testing.T) {
-	core := &satlink.Error{Kind: satlink.ErrTransport, Message: "the simulated handset is closed"}
+	core := &iridium.Error{Kind: iridium.ErrTransport, Message: "the simulated handset is closed"}
 	cases := []struct {
 		name string
 		err  error
-		want *satlink.Error
+		want *iridium.Error
 	}{
 		{
 			name: "a transport SatlinkError gives its reason",
 			err:  &SatlinkError{Kind: SatlinkErrorTransport, Reason: "USB gone"},
-			want: &satlink.Error{Kind: satlink.ErrTransport, Message: "USB gone"},
+			want: &iridium.Error{Kind: iridium.ErrTransport, Message: "USB gone"},
 		},
 		{
 			name: "another SatlinkError gives its text",
 			err:  &SatlinkError{Kind: SatlinkErrorTimeout, Command: "bulkTransfer"},
-			want: &satlink.Error{Kind: satlink.ErrTransport, Message: "timed out waiting for bulkTransfer"},
+			want: &iridium.Error{Kind: iridium.ErrTransport, Message: "timed out waiting for bulkTransfer"},
 		},
 		{
 			name: "a handset's transport error passes unchanged",
@@ -185,13 +185,13 @@ func TestHostErrorsOfThisPackageKeepTheirReason(t *testing.T) {
 		},
 		{
 			name: "a handset error of another kind gives its text",
-			err:  &satlink.Error{Kind: satlink.ErrTimeout, Command: "AT"},
-			want: &satlink.Error{Kind: satlink.ErrTransport, Message: `timed out waiting for a response to "AT"`},
+			err:  &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT"},
+			want: &iridium.Error{Kind: iridium.ErrTransport, Message: `timed out waiting for a response to "AT"`},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			var got *satlink.Error
+			var got *iridium.Error
 			if !errors.As(hostError(c.err), &got) || *got != *c.want {
 				t.Errorf("hostError(%v) = %#v, want %#v", c.err, got, c.want)
 			}

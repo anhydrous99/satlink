@@ -3,7 +3,7 @@
 package mobile
 
 import (
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/serial"
 )
@@ -111,7 +111,7 @@ func EstablishSerialLink(path string, baud int, settings *LinkSettings, listener
 // establishPortLink brings a link up over port, a serial port the link owns
 // from now on: it is closed at once if the link does not come up, and
 // otherwise once the call has ended.
-func establishPortLink(port satlink.Transport, config satnet.Config, listener LinkListener) (*SatelliteLink, error) {
+func establishPortLink(port iridium.Transport, config satnet.Config, listener LinkListener) (*SatelliteLink, error) {
 	handset, err := initializedHandset(port)
 	if err != nil {
 		return nil, err

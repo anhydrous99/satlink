@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -109,7 +109,7 @@ func TestConfigurationsAreRefusedWithTheirMessages(t *testing.T) {
 		{"host address", func(c *Config) { c.Hosts["six.example"] = netip.MustParseAddr("2001:db8::1") }, `"six.example" in hosts needs an IPv4 address`},
 		{"negative duration", func(c *Config) { c.Call.ConnectTimeout = -time.Second }, "durations must not be negative"},
 		{"long duration", func(c *Config) { c.Tuning.TCPKeepalive = maxDuration + 1 }, "durations must be at most a year"},
-		{"escape guard", func(c *Config) { c.Call.EscapeGuard = satlink.MaxEscapeGuard + 1 }, "the escape guard must be at most 10s"},
+		{"escape guard", func(c *Config) { c.Call.EscapeGuard = iridium.MaxEscapeGuard + 1 }, "the escape guard must be at most 10s"},
 		{"negative limit", func(c *Config) { c.Limits.IdleTimeout = -time.Second }, "limits must not be negative; use 0 for no limit"},
 		{"long limit", func(c *Config) { c.Limits.IdleTimeout = maxDuration + 1 }, "limits must be at most a year"},
 		{"call time", func(c *Config) { c.Limits.MaxCallDuration = 23 * time.Second }, "the call time limit must leave time to bring PPP up and to hang up: at least 24s"},

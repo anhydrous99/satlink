@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -399,7 +399,7 @@ func TestACancellationStopsOnlyALinkStillComingUp(t *testing.T) {
 	now := time.Now()
 	negotiating := testEngine(now)
 	up := engineUpAt(t, now)
-	d := &driver{cancellation: satlink.NewCancellation()}
+	d := &driver{cancellation: iridium.NewCancellation()}
 	if d.setupCancelled(negotiating) {
 		t.Fatal("a setup nobody cancelled counts as cancelled")
 	}

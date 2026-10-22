@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack/tcp"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -40,7 +40,7 @@ func expectThePanickedDriversError(t *testing.T, err error) {
 
 // expectHungUpAndReleased checks that the call has ended and that the
 // handset is released: what a link reported closed promises, panic or not.
-func expectHungUpAndReleased(t *testing.T, handset *satlink.Handset, control *sim.Control) {
+func expectHungUpAndReleased(t *testing.T, handset *iridium.Handset, control *sim.Control) {
 	t.Helper()
 	if control.Stats().InDataCall {
 		t.Error("the call is still up")
@@ -95,7 +95,7 @@ func (b *brokenPanicTransport) WriteAll(p []byte) error {
 
 // brokenPanicHandset returns a handset whose transport panics with a broken
 // error on cue, the transport, and the simulator's control.
-func brokenPanicHandset(t *testing.T) (*satlink.Handset, *brokenPanicTransport, *sim.Control) {
+func brokenPanicHandset(t *testing.T) (*iridium.Handset, *brokenPanicTransport, *sim.Control) {
 	t.Helper()
 	simulator := simtest.NewSimulator(t, simtest.SimulatorConfig())
 	transport := &brokenPanicTransport{Handset: simulator}

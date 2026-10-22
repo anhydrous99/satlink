@@ -5,7 +5,7 @@ import (
 
 	"go.bug.st/serial/enumerator"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // Port is a serial port that looks like an Iridium handset.
@@ -29,7 +29,7 @@ type Port struct {
 type portLister func(activeUSBProbeFilters ...func(vid, pid string) bool) ([]*enumerator.PortDetails, error)
 
 // Discover lists the serial ports whose USB vendor ID is Iridium's
-// (satlink.IridiumUSBVendorID). On macOS the port is the callout node
+// (iridium.USBVendorID). On macOS the port is the callout node
 // (/dev/cu.*), which does not block waiting for carrier detect: the
 // enumerator reports no other. On Linux, discovery reads sysfs.
 func Discover() ([]Port, error) {
@@ -64,13 +64,13 @@ func handsetPort(detail *enumerator.PortDetails) (Port, bool) {
 		return Port{}, false
 	}
 	vendorID, ok := parseUSBID(detail.VID)
-	if !ok || vendorID != satlink.IridiumUSBVendorID {
+	if !ok || vendorID != iridium.USBVendorID {
 		return Port{}, false
 	}
 	// The vendor makes it a handset; a product ID the enumerator garbled
 	// leaves it unnamed, with ProductID 0.
 	productID, _ := parseUSBID(detail.PID)
-	model, _ := satlink.ModelForProductID(productID)
+	model, _ := iridium.ModelForProductID(productID)
 	return Port{
 		Path:         detail.Name,
 		ProductID:    productID,

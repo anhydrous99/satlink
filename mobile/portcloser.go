@@ -1,7 +1,7 @@
 package mobile
 
 import (
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -17,7 +17,7 @@ const portCloserGoroutine = "satlink-port-closer"
 
 // closeAfterCall closes handset in the background once the call of the
 // link that watcher follows has ended.
-func closeAfterCall(watcher *satnet.Watcher, handset *satlink.Handset) {
+func closeAfterCall(watcher *satnet.Watcher, handset *iridium.Handset) {
 	go labelled(portCloserGoroutine, func() {
 		closeWhenCallEnds(watcher, handset)
 	})
@@ -27,7 +27,7 @@ func closeAfterCall(watcher *satnet.Watcher, handset *satlink.Handset) {
 // follows has ended, however it ends. It holds neither the link nor its
 // SatelliteLink, so a link the app drops still hangs up and has its port
 // closed.
-func closeWhenCallEnds(watcher *satnet.Watcher, handset *satlink.Handset) {
+func closeWhenCallEnds(watcher *satnet.Watcher, handset *iridium.Handset) {
 	defer logPanic("the port closer")
 	for {
 		if _, closed := watcher.WaitClosed(listenerPoll); closed {

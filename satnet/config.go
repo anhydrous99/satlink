@@ -7,8 +7,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -57,8 +57,8 @@ const IridiumInternetNumber = "008816000025"
 
 // IridiumInternetBearer returns the bearer Iridium documents for its
 // gateway: 9600 bit/s V.110, error-corrected.
-func IridiumInternetBearer() satlink.BearerService {
-	return satlink.BearerService{Speed: 71, Name: 0, ConnectionElement: 1}
+func IridiumInternetBearer() iridium.BearerService {
+	return iridium.BearerService{Speed: 71, Name: 0, ConnectionElement: 1}
 }
 
 // Credentials are the PPP name and password; Iridium's gateway accepts any.
@@ -73,10 +73,10 @@ type Config struct {
 	Number string
 	// Call holds the bearer, call-setup timeout and escape guard for the
 	// data call, and its Cancellation, which stops [Establish] from another
-	// goroutine. The escape guard must be at most satlink.MaxEscapeGuard;
+	// goroutine. The escape guard must be at most iridium.MaxEscapeGuard;
 	// it sets how long hanging up takes, which a call time limit must allow
 	// for (see [Limits]).
-	Call satlink.DataCallSettings
+	Call iridium.DataCallSettings
 	// Credentials are the PPP credentials; Iridium's gateway accepts any.
 	Credentials Credentials
 	// Policy lists the destinations the app may reach. Nothing else is
@@ -95,12 +95,12 @@ type Config struct {
 
 // NewConfig returns a configuration for Iridium's internet gateway
 // ([IridiumInternetNumber] with [IridiumInternetBearer] and the default
-// call settings, a new satlink.Cancellation among them), no PPP
+// call settings, a new iridium.Cancellation among them), no PPP
 // credentials, [DefaultLimits], no local hosts, [DefaultTuning], and policy
 // deciding what the app may reach.
 func NewConfig(policy Policy) Config {
 	bearer := IridiumInternetBearer()
-	call := satlink.DefaultDataCallSettings()
+	call := iridium.DefaultDataCallSettings()
 	call.Bearer = &bearer
 	return Config{
 		Number:      IridiumInternetNumber,
@@ -247,15 +247,15 @@ func (c Config) Validate() error {
 	if err := validateDurations(c.durations()); err != nil {
 		return err
 	}
-	if c.Call.EscapeGuard > satlink.MaxEscapeGuard {
-		return invalidConfig(fmt.Sprintf("the escape guard must be at most %v", satlink.MaxEscapeGuard))
+	if c.Call.EscapeGuard > iridium.MaxEscapeGuard {
+		return invalidConfig(fmt.Sprintf("the escape guard must be at most %v", iridium.MaxEscapeGuard))
 	}
 	return c.Limits.validate(c.hangUpTime())
 }
 
 // hangUpTime is how long hanging up takes: silence, +++, silence again,
 // then ATH and its answer. Once the configuration is valid, the guard is
-// between zero and satlink.MaxEscapeGuard, so this is between 1 s and 21 s.
+// between zero and iridium.MaxEscapeGuard, so this is between 1 s and 21 s.
 func (c Config) hangUpTime() time.Duration {
 	return 2*c.Call.EscapeGuard + athAllowance
 }

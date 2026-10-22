@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // The simulated handset as the app sees it, a transport, and the control
@@ -28,9 +28,9 @@ const closedMessage = "the simulated handset is closed"
 
 // Handset is a simulated Iridium 9555/9575 handset.
 //
-// It speaks the AT command set as a satlink.Transport, stores and sends
+// It speaks the AT command set as an iridium.Transport, stores and sends
 // SMS, and connects data calls to a PPP gateway with a small internet
-// behind it. It also implements satlink.DTRController and io.Closer. Steer
+// behind it. It also implements iridium.DTRController and io.Closer. Steer
 // it with the handle from [Handset.Control]. A Handset is safe for use by
 // several goroutines. The zero Handset is not usable; create one with
 // [New].
@@ -46,8 +46,8 @@ type Handset struct {
 
 // A Handset is a transport with a DTR line that closes like a port.
 var (
-	_ satlink.Transport     = (*Handset)(nil)
-	_ satlink.DTRController = (*Handset)(nil)
+	_ iridium.Transport     = (*Handset)(nil)
+	_ iridium.DTRController = (*Handset)(nil)
 	_ io.Closer             = (*Handset)(nil)
 )
 
@@ -101,7 +101,7 @@ func (h *Handset) Control() *Control {
 }
 
 // WriteAll hands p to the handset, which takes everything at once and
-// never blocks. After Close it fails with a *satlink.Error of kind
+// never blocks. After Close it fails with an *iridium.Error of kind
 // ErrTransport, "the simulated handset is closed".
 func (h *Handset) WriteAll(p []byte) error {
 	if h.closed.Load() {
@@ -236,5 +236,5 @@ func (l *lockedModem) shutDown() {
 
 // closedError returns what I/O on a closed Handset fails with.
 func closedError() error {
-	return &satlink.Error{Kind: satlink.ErrTransport, Message: closedMessage}
+	return &iridium.Error{Kind: iridium.ErrTransport, Message: closedMessage}
 }

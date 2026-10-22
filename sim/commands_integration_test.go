@@ -9,17 +9,17 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// The AT command set through satlink.Handset, as an app uses it.
+// The AT command set through iridium.Handset, as an app uses it.
 
-// assertHandsetError fails the test unless err is a *satlink.Error like
+// assertHandsetError fails the test unless err is an *iridium.Error like
 // want, in kind and texts.
-func assertHandsetError(t *testing.T, err error, want satlink.Error) {
+func assertHandsetError(t *testing.T, err error, want iridium.Error) {
 	t.Helper()
-	var got *satlink.Error
+	var got *iridium.Error
 	if !errors.As(err, &got) || got.Kind != want.Kind || got.Code != want.Code || got.Message != want.Message {
 		t.Errorf("got %v; want %v", err, &want)
 	}
@@ -46,7 +46,7 @@ func TestTheHandsetAndItsControlCanBeUsedFromSeveralGoroutines(t *testing.T) {
 	}
 	wait.Wait()
 
-	if inbox, err := handset.ListSMS(satlink.SMSFilterAll); err != nil || len(inbox) != senders {
+	if inbox, err := handset.ListSMS(iridium.SMSFilterAll); err != nil || len(inbox) != senders {
 		t.Errorf("ListSMS = %d messages, %v; want %d", len(inbox), err, senders)
 	}
 }
@@ -67,7 +67,7 @@ func TestIdentifiesItselfAsConfigured(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := satlink.DeviceInfo{
+	want := iridium.DeviceInfo{
 		Manufacturer: "Iridium",
 		Model:        "9555",
 		Revision:     "Call Processor Version: SIM-1.0",
@@ -94,10 +94,10 @@ func TestReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 		t.Errorf("SignalQuality() = %d; want 2", bars)
 	}
 	assertLines(t, handset, "AT+CSQF", "+CSQF:2")
-	if battery.Status != satlink.ChargeStatusExternalPower || battery.Level != 80 {
+	if battery.Status != iridium.ChargeStatusExternalPower || battery.Level != 80 {
 		t.Errorf("Battery() = %+v; want external power at 80", battery)
 	}
-	if registration.Status != satlink.RegistrationStatusHome {
+	if registration.Status != iridium.RegistrationStatusHome {
 		t.Errorf("Registration() = %+v; want Home", registration)
 	}
 	if shape := digitsAsNines(clock); shape != "99/99/99,99:99:99+99" {
@@ -149,8 +149,8 @@ func TestAnnouncesIncomingSMSAndKeepsThemUntilDeleted(t *testing.T) {
 	}
 	control.ReceiveSMS("+12025550100", "hi")
 
-	unread := mustListSMS(t, handset, satlink.SMSFilterUnread, 2)
-	assertMessage(t, unread[0], satlink.SMSMessage{Index: 1, Status: "REC UNREAD", Address: "+881631111111", Text: "first line\nsecond line"})
+	unread := mustListSMS(t, handset, iridium.SMSFilterUnread, 2)
+	assertMessage(t, unread[0], iridium.SMSMessage{Index: 1, Status: "REC UNREAD", Address: "+881631111111", Text: "first line\nsecond line"})
 	if !strings.HasSuffix(unread[0].Timestamp, "+00") {
 		t.Errorf("the first message was received at %q", unread[0].Timestamp)
 	}
@@ -158,7 +158,7 @@ func TestAnnouncesIncomingSMSAndKeepsThemUntilDeleted(t *testing.T) {
 		t.Errorf("the second message is %+v", unread[1])
 	}
 	// Listing marks them read.
-	mustListSMS(t, handset, satlink.SMSFilterUnread, 0)
+	mustListSMS(t, handset, iridium.SMSFilterUnread, 0)
 
 	message, err := handset.ReadSMS(2)
 	assertNoErrors(t, err)
@@ -166,16 +166,16 @@ func TestAnnouncesIncomingSMSAndKeepsThemUntilDeleted(t *testing.T) {
 		t.Errorf("ReadSMS(2) = %+v", message)
 	}
 	assertNoErrors(t, handset.DeleteSMS(1))
-	mustListSMS(t, handset, satlink.SMSFilterAll, 1)
+	mustListSMS(t, handset, iridium.SMSFilterAll, 1)
 	_, readErr := handset.ReadSMS(1)
-	assertHandsetError(t, readErr, satlink.Error{Kind: satlink.ErrSMS, Code: "321"})
-	assertHandsetError(t, handset.DeleteSMS(1), satlink.Error{Kind: satlink.ErrSMS, Code: "321"})
-	mustListSMS(t, handset, satlink.SMSFilterSent, 0)
+	assertHandsetError(t, readErr, iridium.Error{Kind: iridium.ErrSMS, Code: "321"})
+	assertHandsetError(t, handset.DeleteSMS(1), iridium.Error{Kind: iridium.ErrSMS, Code: "321"})
+	mustListSMS(t, handset, iridium.SMSFilterSent, 0)
 }
 
 // mustListSMS returns the messages filter lists, failing the test unless
 // there are count of them.
-func mustListSMS(t *testing.T, handset *satlink.Handset, filter satlink.SMSFilter, count int) []satlink.SMSMessage {
+func mustListSMS(t *testing.T, handset *iridium.Handset, filter iridium.SMSFilter, count int) []iridium.SMSMessage {
 	t.Helper()
 	messages, err := handset.ListSMS(filter)
 	if err != nil || len(messages) != count {
@@ -186,7 +186,7 @@ func mustListSMS(t *testing.T, handset *satlink.Handset, filter satlink.SMSFilte
 
 // assertMessage fails the test unless got matches want in everything but
 // the timestamp.
-func assertMessage(t *testing.T, got, want satlink.SMSMessage) {
+func assertMessage(t *testing.T, got, want iridium.SMSMessage) {
 	t.Helper()
 	want.Timestamp = got.Timestamp
 	if got != want {
@@ -240,7 +240,7 @@ func TestAnsweringWithoutACallFails(t *testing.T) {
 	t.Parallel()
 	handset, _ := readyHandset(t, fastConfig())
 
-	assertHandsetError(t, handset.Answer(), satlink.Error{Kind: satlink.ErrCall, Message: "NO CARRIER"})
+	assertHandsetError(t, handset.Answer(), iridium.Error{Kind: iridium.ErrCall, Message: "NO CARRIER"})
 }
 
 func TestKeepsSettingsAndRefusesUnknownCommands(t *testing.T) {
@@ -257,14 +257,14 @@ func TestKeepsSettingsAndRefusesUnknownCommands(t *testing.T) {
 			t.Errorf("%s: %v", accepted, err)
 		}
 	}
-	if _, err := handset.Command("AT+BOGUS"); !errors.Is(err, satlink.ErrCommandFailed) {
+	if _, err := handset.Command("AT+BOGUS"); !errors.Is(err, iridium.ErrCommandFailed) {
 		t.Errorf("AT+BOGUS: %v; want ErrCommandFailed", err)
 	}
 	assertLines(t, handset, "AT+CEER", "+CEER: No report available")
 }
 
 // assertLines fails the test unless command answers exactly the line want.
-func assertLines(t *testing.T, handset *satlink.Handset, command, want string) {
+func assertLines(t *testing.T, handset *iridium.Handset, command, want string) {
 	t.Helper()
 	response, err := handset.Command(command)
 	if err != nil || !slices.Equal(response.Lines, []string{want}) {

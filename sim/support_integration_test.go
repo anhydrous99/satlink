@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack"
 	"github.com/anhydrous99/satlink/internal/ipstack/dns"
 	"github.com/anhydrous99/satlink/internal/ipstack/tcp"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -78,10 +78,10 @@ func fastConfig() sim.Config {
 
 // readyHandset returns a handset initialised the way an app starts — echo
 // off, text-mode SMS — over a simulator that closes when the test ends.
-func readyHandset(t *testing.T, config sim.Config) (*satlink.Handset, *sim.Control) {
+func readyHandset(t *testing.T, config sim.Config) (*iridium.Handset, *sim.Control) {
 	t.Helper()
 	simulator := sim.New(config)
-	handset := satlink.NewHandset(simulator)
+	handset := iridium.NewHandset(simulator)
 	// Closing a simulator, which is what closing its handset does, cannot
 	// fail.
 	t.Cleanup(func() { _ = handset.Close() })
@@ -93,22 +93,22 @@ func readyHandset(t *testing.T, config sim.Config) (*satlink.Handset, *sim.Contr
 
 // callSettings returns Iridium's documented bearer and a guard time the
 // simulator accepts.
-func callSettings() satlink.DataCallSettings {
-	settings := satlink.DefaultDataCallSettings()
-	settings.Bearer = &satlink.BearerService{Speed: 71, Name: 0, ConnectionElement: 1}
+func callSettings() iridium.DataCallSettings {
+	settings := iridium.DefaultDataCallSettings()
+	settings.Bearer = &iridium.BearerService{Speed: 71, Name: 0, ConnectionElement: 1}
 	settings.ConnectTimeout = patience
 	settings.EscapeGuard = clientGuard
 	return settings
 }
 
 // dial places a data call to the Iridium internet with callSettings.
-func dial(t *testing.T, handset *satlink.Handset) *satlink.DataCall {
+func dial(t *testing.T, handset *iridium.Handset) *iridium.DataCall {
 	t.Helper()
 	return dialWith(t, handset, callSettings())
 }
 
 // dialWith places a data call to the Iridium internet with settings.
-func dialWith(t *testing.T, handset *satlink.Handset, settings satlink.DataCallSettings) *satlink.DataCall {
+func dialWith(t *testing.T, handset *iridium.Handset, settings iridium.DataCallSettings) *iridium.DataCall {
 	t.Helper()
 	call, err := handset.DialData(iridiumInternetNumber, settings)
 	if err != nil {
@@ -120,13 +120,13 @@ func dialWith(t *testing.T, handset *satlink.Handset, settings satlink.DataCallS
 // pppClient is a PPP client endpoint driven over a data call.
 type pppClient struct {
 	t        *testing.T
-	call     *satlink.DataCall
+	call     *iridium.DataCall
 	endpoint *ppp.Endpoint
 }
 
 // startPPP starts negotiating at once, as a dial-up client does after
 // CONNECT.
-func startPPP(t *testing.T, call *satlink.DataCall, credentials ppp.Credentials) *pppClient {
+func startPPP(t *testing.T, call *iridium.DataCall, credentials ppp.Credentials) *pppClient {
 	t.Helper()
 	config := ppp.NewConfig(ppp.ClientRole(credentials))
 	// Keep CR and LF out of the server's frames, so the handset's NO
@@ -239,7 +239,7 @@ func (c *pppClient) flush() {
 
 // readUntil reads from transport until needle has arrived, and returns all
 // it read.
-func readUntil(t *testing.T, transport satlink.Transport, needle string) []byte {
+func readUntil(t *testing.T, transport iridium.Transport, needle string) []byte {
 	t.Helper()
 	deadline := time.Now().Add(patience)
 	var received []byte
@@ -355,7 +355,7 @@ func connectNetwork(t *testing.T, config sim.Config) *clientNetwork {
 
 // connectNetworkThrough brings PPP up over call, a data call to the
 // simulator that control steers.
-func connectNetworkThrough(t *testing.T, call *satlink.DataCall, control *sim.Control) *clientNetwork {
+func connectNetworkThrough(t *testing.T, call *iridium.DataCall, control *sim.Control) *clientNetwork {
 	t.Helper()
 	client := startPPP(t, call, ppp.Credentials{})
 	settings := client.expectUp()

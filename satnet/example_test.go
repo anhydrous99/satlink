@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -13,7 +13,7 @@ import (
 // then hangs up. It needs an initialised handset, such as package serial
 // connects, so it is compiled but not run.
 func Example() {
-	var handset *satlink.Handset // satlink.NewHandset over a serial.Transport, initialised
+	var handset *iridium.Handset // iridium.NewHandset over a serial.Transport, initialised
 	if err := greet(handset); err != nil {
 		log.Print(err)
 	}
@@ -22,7 +22,7 @@ func Example() {
 // greet is the example's work. It closes the link on every path, including
 // early returns, rather than relying on a dropped link to hang up: a link left
 // to the garbage collector hangs up only once it runs.
-func greet(handset *satlink.Handset) error {
+func greet(handset *iridium.Handset) error {
 	policy, err := satnet.ParsePolicy("relay.example.com:443")
 	if err != nil {
 		return err

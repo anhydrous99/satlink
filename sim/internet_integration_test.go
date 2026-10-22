@@ -14,12 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack"
 	"github.com/anhydrous99/satlink/internal/ipstack/dns"
 	"github.com/anhydrous99/satlink/internal/ipstack/tcp"
 	"github.com/anhydrous99/satlink/internal/ipstack/udp"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -579,7 +579,7 @@ func TestATLSSessionEndsWithASimulatorNobodyHolds(t *testing.T) {
 func startSessionAndLetGo(t *testing.T) {
 	t.Helper()
 	simulator := sim.New(fastConfig())
-	handset := satlink.NewHandset(simulator)
+	handset := iridium.NewHandset(simulator)
 	if err := handset.Initialize(); err != nil {
 		t.Fatal(err)
 	}

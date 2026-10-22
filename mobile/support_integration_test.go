@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/mobile"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -66,9 +66,9 @@ type noDTRUSB struct {
 func newNoDTRUSB(t *testing.T) *noDTRUSB {
 	t.Helper()
 	simulator := simtest.NewSimulator(t, sim.DefaultConfig())
-	// Behind a bare satlink.Transport, the simulator's DTR line is out of
+	// Behind a bare iridium.Transport, the simulator's DTR line is out of
 	// reach: DTR changes fail, as on a transport without control lines.
-	faulty := simtest.NewFaultyTransport(struct{ satlink.Transport }{simulator})
+	faulty := simtest.NewFaultyTransport(struct{ iridium.Transport }{simulator})
 	return &noDTRUSB{ByteTransport: simtest.NewByteTransport(faulty), faulty: faulty, control: simulator.Control()}
 }
 

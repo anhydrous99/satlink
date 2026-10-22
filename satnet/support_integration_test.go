@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -80,7 +80,7 @@ func delayedLink(oneWayDelay time.Duration) sim.Config {
 
 // establish brings a link up over handset, failing the test otherwise. The
 // test's end closes it, before the simulator closes.
-func establish(t *testing.T, handset *satlink.Handset, config satnet.Config) *satnet.Link {
+func establish(t *testing.T, handset *iridium.Handset, config satnet.Config) *satnet.Link {
 	t.Helper()
 	link, err := satnet.Establish(handset, config)
 	if err != nil {
@@ -126,7 +126,7 @@ func linkWithASilentDNSServer(t *testing.T, rules ...string) *satnet.Link {
 // faultyHandset returns a handset over a simulator made with config,
 // behind a transport that fails on cue, with a short timeout so that a
 // hang-up the handset ignores fails fast.
-func faultyHandset(t *testing.T, config sim.Config) (*satlink.Handset, *sim.Control, *simtest.FaultyTransport) {
+func faultyHandset(t *testing.T, config sim.Config) (*iridium.Handset, *sim.Control, *simtest.FaultyTransport) {
 	t.Helper()
 	simulator := simtest.NewSimulator(t, config)
 	faulty := simtest.NewFaultyTransport(simulator)
@@ -136,7 +136,7 @@ func faultyHandset(t *testing.T, config sim.Config) (*satlink.Handset, *sim.Cont
 }
 
 // faultyLink returns a link over a faulty handset.
-func faultyLink(t *testing.T) (*satnet.Link, *satlink.Handset, *sim.Control, *simtest.FaultyTransport) {
+func faultyLink(t *testing.T) (*satnet.Link, *iridium.Handset, *sim.Control, *simtest.FaultyTransport) {
 	t.Helper()
 	handset, control, faulty := faultyHandset(t, simtest.SimulatorConfig())
 	return establish(t, handset, linkConfig(t)), handset, control, faulty
@@ -266,16 +266,16 @@ func expectKind(t *testing.T, err error, kind satnet.ErrorKind) {
 }
 
 // expectNotBusy checks that the handset no longer serves a data call: its
-// methods may fail, but not with satlink.ErrBusy.
-func expectNotBusy(t *testing.T, handset *satlink.Handset) {
+// methods may fail, but not with iridium.ErrBusy.
+func expectNotBusy(t *testing.T, handset *iridium.Handset) {
 	t.Helper()
-	if _, err := handset.SignalQuality(); errors.Is(err, satlink.ErrBusy) {
+	if _, err := handset.SignalQuality(); errors.Is(err, iridium.ErrBusy) {
 		t.Errorf("the handset is still busy: %v", err)
 	}
 }
 
 // expectCommandMode checks that the handset answers AT again.
-func expectCommandMode(t *testing.T, handset *satlink.Handset) {
+func expectCommandMode(t *testing.T, handset *iridium.Handset) {
 	t.Helper()
 	if _, err := handset.Command("AT"); err != nil {
 		t.Errorf("AT commands fail: %v", err)

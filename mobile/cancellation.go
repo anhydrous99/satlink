@@ -1,6 +1,6 @@
 package mobile
 
-import "github.com/anhydrous99/satlink"
+import "github.com/anhydrous99/satlink/iridium"
 
 // Stopping a link while it is being set up.
 
@@ -15,7 +15,7 @@ type Cancellation struct {
 	// core is the handset's own cancellation, which the link's call
 	// settings point to. Its zero value is ready to use, and so is a zero
 	// Cancellation, such as gomobile's constructor would make.
-	core satlink.Cancellation
+	core iridium.Cancellation
 }
 
 // NewCancellation returns a Cancellation that has not been cancelled.

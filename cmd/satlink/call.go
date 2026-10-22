@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +14,7 @@ func (c *cli) dialCommand() *command {
 		Use:   "dial",
 		Short: "Place a voice call",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				if err := handset.Dial(number); err != nil {
 					return err
 				}
@@ -30,7 +30,7 @@ func (c *cli) answerCommand() *command {
 		Use:   "answer",
 		Short: "Answer an incoming call",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents((*satlink.Handset).Answer))
+			return c.withHandset(c.reportingEvents((*iridium.Handset).Answer))
 		},
 	})
 }
@@ -43,7 +43,7 @@ func (c *cli) hangUpCommand() *command {
 		Use:   "hangup",
 		Short: "End the current call",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents((*satlink.Handset).HangUp))
+			return c.withHandset(c.reportingEvents((*iridium.Handset).HangUp))
 		},
 	})
 }

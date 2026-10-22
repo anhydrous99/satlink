@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -169,7 +169,7 @@ func TestClosingAHandsetDoesNotWaitForACommandInProgress(t *testing.T) {
 
 func TestAFaultWhileTakingTheHandsetBackLeavesItsLockFree(t *testing.T) {
 	// A lent handset with no link to follow: taking it back panics.
-	handset := &IridiumHandset{handset: satlink.NewHandset(newForeignTransport(&recordingTransport{})), slot: slotLent}
+	handset := &IridiumHandset{handset: iridium.NewHandset(newForeignTransport(&recordingTransport{})), slot: slotLent}
 
 	for attempt := range 2 {
 		err := returnsWithin(t, "SignalQuality after a fault", func() error {

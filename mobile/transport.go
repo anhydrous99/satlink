@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // ByteTransport is the byte stream to the handset, implemented by the host
@@ -44,7 +44,7 @@ type ByteTransport interface {
 	DropDTR() error
 }
 
-// foreignTransport is the handset's satlink.Transport over the app's
+// foreignTransport is the handset's iridium.Transport over the app's
 // ByteTransport. It never closes the ByteTransport, which stays the app's.
 type foreignTransport struct {
 	transport ByteTransport
@@ -53,11 +53,11 @@ type foreignTransport struct {
 // A foreignTransport is a handset's port with a DTR line, as the app's
 // transport is.
 var (
-	_ satlink.Transport     = (*foreignTransport)(nil)
-	_ satlink.DTRController = (*foreignTransport)(nil)
+	_ iridium.Transport     = (*foreignTransport)(nil)
+	_ iridium.DTRController = (*foreignTransport)(nil)
 )
 
-// newForeignTransport returns the satlink.Transport over transport.
+// newForeignTransport returns the iridium.Transport over transport.
 func newForeignTransport(transport ByteTransport) *foreignTransport {
 	return &foreignTransport{transport: transport}
 }
@@ -95,20 +95,20 @@ func (f *foreignTransport) DropDTR() error {
 // hostError reports err, the app transport's failure, as the handset
 // reports a transport's: ErrTransport with the failure's message. A
 // SatlinkError of kind SatlinkErrorTransport gives its Reason, and a
-// *satlink.Error of kind ErrTransport — from a
+// *iridium.Error of kind ErrTransport — from a
 // transport written in Go — passes unchanged, as the handset passes it. A
 // nil err stays nil.
 func hostError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var core *satlink.Error
-	if errors.As(err, &core) && core.Kind == satlink.ErrTransport {
+	var core *iridium.Error
+	if errors.As(err, &core) && core.Kind == iridium.ErrTransport {
 		return core
 	}
 	var own *SatlinkError
 	if errors.As(err, &own) && own.Kind == SatlinkErrorTransport {
-		return &satlink.Error{Kind: satlink.ErrTransport, Message: own.Reason}
+		return &iridium.Error{Kind: iridium.ErrTransport, Message: own.Reason}
 	}
-	return &satlink.Error{Kind: satlink.ErrTransport, Message: err.Error()}
+	return &iridium.Error{Kind: iridium.ErrTransport, Message: err.Error()}
 }

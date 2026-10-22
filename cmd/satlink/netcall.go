@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -23,7 +23,7 @@ var errCommandPanicked = errors.New("internal error: the command panicked")
 // runNet answers the subcommand without a call when it can; otherwise it
 // dials, runs the subcommand during the call, and hangs up. From the dial
 // on, it catches interruptions (interrupt.go).
-func (c *cli) runNet(handset *satlink.Handset, arguments netArguments) error {
+func (c *cli) runNet(handset *iridium.Handset, arguments netArguments) error {
 	if address, ok := arguments.action.literalAddress(); ok {
 		// An address needs no lookup, so no call either.
 		return writef(c.streams.stdout, "%s\n", address)
@@ -43,7 +43,7 @@ func (c *cli) runNet(handset *satlink.Handset, arguments netArguments) error {
 // establish announces the dial and brings the link up, unless interrupted
 // ends first, which cancels the setup. When the link does not come up and
 // its call may still be up, it says what to do.
-func (c *cli) establish(handset *satlink.Handset, config satnet.Config, interrupted context.Context) (*satnet.Link, error) {
+func (c *cli) establish(handset *iridium.Handset, config satnet.Config, interrupted context.Context) (*satnet.Link, error) {
 	stopCancelling := context.AfterFunc(interrupted, config.Call.Cancellation.Cancel)
 	defer stopCancelling()
 	err := writef(c.streams.stderr, "Dialling %s — call setup over Iridium takes about half a minute…\n", config.Number)
@@ -51,7 +51,7 @@ func (c *cli) establish(handset *satlink.Handset, config satnet.Config, interrup
 		return nil, err
 	}
 	link, err := satnet.Establish(handset, config)
-	if errors.Is(err, satlink.ErrCallMayStillBeUp) {
+	if errors.Is(err, iridium.ErrCallMayStillBeUp) {
 		warnCallMayStillBeUp(c.streams.stderr, "")
 	}
 	return link, err

@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
@@ -357,7 +357,7 @@ type setup struct {
 // establishInBackground starts establishing a link with config over
 // handset in another goroutine, and returns the channel its outcome
 // arrives on.
-func establishInBackground(handset *satlink.Handset, config satnet.Config) <-chan setup {
+func establishInBackground(handset *iridium.Handset, config satnet.Config) <-chan setup {
 	outcome := make(chan setup, 1)
 	go func() {
 		link, err := satnet.Establish(handset, config)
@@ -410,10 +410,10 @@ func awaitLink(t *testing.T, outcome <-chan setup) *satnet.Link {
 func expectCancelled(t *testing.T, err error) {
 	t.Helper()
 	var linkErr *satnet.Error
-	if !errors.As(err, &linkErr) || linkErr.Kind != satnet.ErrHandset || !errors.Is(err, satlink.ErrCancelled) {
+	if !errors.As(err, &linkErr) || linkErr.Kind != satnet.ErrHandset || !errors.Is(err, iridium.ErrCancelled) {
 		t.Errorf("err = %v, want the handset's ErrCancelled", err)
 	}
-	if errors.Is(err, satlink.ErrCallMayStillBeUp) {
+	if errors.Is(err, iridium.ErrCallMayStillBeUp) {
 		t.Errorf("%v says the call may still be up", err)
 	}
 }
@@ -748,7 +748,7 @@ func (l *unpluggingLine) WriteAll(p []byte) error {
 	if len(p) > 0 && p[0] == pppFlag {
 		if during := l.whileFailing.Swap(nil); during != nil {
 			(*during)()
-			return &satlink.Error{Kind: satlink.ErrTransport, Message: "unplugged"}
+			return &iridium.Error{Kind: iridium.ErrTransport, Message: "unplugged"}
 		}
 	}
 	return l.Handset.WriteAll(p)
@@ -893,7 +893,7 @@ func TestALinkThatFailsAndCannotHangUpSaysTheCallMayStillBeUp(t *testing.T) {
 	// The gateway refuses our credentials.
 	expectLinkDown(t, err, satnet.CloseReasonPPP)
 	var linkErr *satnet.Error
-	if !errors.Is(err, satlink.ErrCallMayStillBeUp) || !errors.As(err, &linkErr) || !linkErr.CallMayStillBeUp {
+	if !errors.Is(err, iridium.ErrCallMayStillBeUp) || !errors.As(err, &linkErr) || !linkErr.CallMayStillBeUp {
 		t.Errorf("%v does not say the call may still be up", err)
 	}
 	if !control.Stats().InDataCall {
@@ -905,7 +905,7 @@ func TestALinkThatFailsAndCannotHangUpSaysTheCallMayStillBeUp(t *testing.T) {
 // TestAPanicWhileHangingUpStillReportsTheLinkClosed checks that a panic while
 // hanging up still reports the link closed. The handset is never moved into
 // the link, so it cannot go down with the panic; instead it is released, its
-// methods no longer failing with satlink.ErrBusy.
+// methods no longer failing with iridium.ErrBusy.
 func TestAPanicWhileHangingUpStillReportsTheLinkClosed(t *testing.T) {
 	t.Parallel()
 	link, handset, control, faulty := faultyLink(t)
@@ -965,7 +965,7 @@ func TestAHangUpThatCannotBeConfirmedIsReported(t *testing.T) {
 	if !control.Stats().InDataCall {
 		t.Error("the simulated call is not still up")
 	}
-	if err := link.Close(); !errors.Is(err, satlink.ErrCallMayStillBeUp) {
+	if err := link.Close(); !errors.Is(err, iridium.ErrCallMayStillBeUp) {
 		t.Errorf("Close() = %v, want the failed hang-up", err)
 	}
 	expectNotBusy(t, handset)

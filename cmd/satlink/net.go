@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/spf13/cobra"
 )
@@ -267,7 +267,7 @@ func (r resolveAction) execute(link netLink, s streams) error {
 // during a call.
 func (c *cli) netCommand() *command {
 	return newNetCommand(func(arguments netArguments) error {
-		return c.withHandset(func(handset *satlink.Handset) error {
+		return c.withHandset(func(handset *iridium.Handset) error {
 			return c.runNet(handset, arguments)
 		})
 	})

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -171,7 +171,7 @@ func (h *recordingHandset) Close() error {
 func TestAPanicDuringTheCallHangsUpAndFailsTheCommand(t *testing.T) {
 	t.Parallel()
 	handset := &recordingHandset{}
-	w := world{handset: func(t *testing.T, config sim.Config) satlink.Transport {
+	w := world{handset: func(t *testing.T, config sim.Config) iridium.Transport {
 		handset.Handset = simtest.NewSimulator(t, config)
 		return handset
 	}}
@@ -238,7 +238,7 @@ type controlledWorld struct {
 
 func newControlledWorld() *controlledWorld {
 	w := &controlledWorld{}
-	w.handset = func(t *testing.T, config sim.Config) satlink.Transport {
+	w.handset = func(t *testing.T, config sim.Config) iridium.Transport {
 		simulator := simtest.NewSimulator(t, config)
 		w.control.Store(simulator.Control())
 		return simulator

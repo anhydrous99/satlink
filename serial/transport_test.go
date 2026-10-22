@@ -15,7 +15,7 @@ import (
 
 	serialport "go.bug.st/serial"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // errPort is what a failing fakePort reports.
@@ -480,7 +480,7 @@ func TestWriteAllStopsAtAWriteThatTakesNothing(t *testing.T) {
 
 	err := transport.WriteAll([]byte("AT\r"))
 
-	if !errors.Is(err, satlink.ErrTransport) || !errors.Is(err, io.ErrShortWrite) {
+	if !errors.Is(err, iridium.ErrTransport) || !errors.Is(err, io.ErrShortWrite) {
 		t.Errorf("WriteAll = %v, want ErrTransport wrapping io.ErrShortWrite", err)
 	}
 }
@@ -526,7 +526,7 @@ func TestCloseEndsABlockedRead(t *testing.T) {
 
 	select {
 	case err := <-readEnded:
-		if !errors.Is(err, satlink.ErrTransport) {
+		if !errors.Is(err, iridium.ErrTransport) {
 			t.Errorf("the read ended with %v, want ErrTransport", err)
 		}
 	case <-time.After(5 * time.Second):
@@ -664,7 +664,7 @@ func TestPortErrorsAreTransportErrors(t *testing.T) {
 	errs := []error{transport.WriteAll([]byte("AT\r")), readErr, transport.RaiseDTR(), transport.DropDTR()}
 
 	for _, err := range errs {
-		if !errors.Is(err, satlink.ErrTransport) || !errors.Is(err, errPort) {
+		if !errors.Is(err, iridium.ErrTransport) || !errors.Is(err, errPort) {
 			t.Errorf("error = %v, want ErrTransport wrapping the port's", err)
 		}
 	}
@@ -721,7 +721,7 @@ func TestAPortThatDoesNotOpenIsATransportError(t *testing.T) {
 
 	_, err := open("/dev/ttyACM0", DefaultBaud, opener)
 
-	if !errors.Is(err, satlink.ErrTransport) || !errors.Is(err, errPort) {
+	if !errors.Is(err, iridium.ErrTransport) || !errors.Is(err, errPort) {
 		t.Errorf("open = %v, want ErrTransport wrapping the library's error", err)
 	}
 }
@@ -847,8 +847,8 @@ func openerOf(port serialport.Port) portOpener {
 // whose message is want.
 func assertTransportMessage(t *testing.T, err error, want string) {
 	t.Helper()
-	var transportErr *satlink.Error
-	if !errors.As(err, &transportErr) || transportErr.Kind != satlink.ErrTransport || transportErr.Message != want {
+	var transportErr *iridium.Error
+	if !errors.As(err, &transportErr) || transportErr.Kind != iridium.ErrTransport || transportErr.Message != want {
 		t.Errorf("error = %v, want ErrTransport %q", err, want)
 	}
 }

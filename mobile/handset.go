@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -121,12 +121,12 @@ type KnownProduct struct {
 // IridiumUSBVendorID returns Iridium's USB vendor ID (0x1EDD), for USB
 // device filters.
 func IridiumUSBVendorID() int {
-	return int(satlink.IridiumUSBVendorID)
+	return int(iridium.USBVendorID)
 }
 
 // KnownProducts returns the products the official Iridium driver supports.
 func KnownProducts() *KnownProductList {
-	products := satlink.KnownProducts()
+	products := iridium.KnownProducts()
 	list := &KnownProductList{items: make([]KnownProduct, len(products))}
 	for i, product := range products {
 		list.items[i] = KnownProduct{ProductID: int(product.ProductID), Model: product.Model}
@@ -155,7 +155,7 @@ func KnownProducts() *KnownProductList {
 type IridiumHandset struct {
 	// handset is the handset itself, which stays here whatever a link does
 	// with it; nil in a zero value.
-	handset *satlink.Handset
+	handset *iridium.Handset
 
 	// mu serialises the methods but Close, and every change of the slot.
 	mu sync.Mutex
@@ -187,7 +187,7 @@ func NewIridiumHandset(transport ByteTransport) (handset *IridiumHandset, err er
 }
 
 // newIridiumHandset returns an IridiumHandset over transport, initialised.
-func newIridiumHandset(transport satlink.Transport) (*IridiumHandset, error) {
+func newIridiumHandset(transport iridium.Transport) (*IridiumHandset, error) {
 	handset, err := initializedHandset(transport)
 	if err != nil {
 		return nil, err
@@ -198,8 +198,8 @@ func newIridiumHandset(transport satlink.Transport) (*IridiumHandset, error) {
 // initializedHandset returns a handset over transport, initialised. If that
 // fails, a panic included, the handset is closed: a serial port it opened
 // is released, and a ByteTransport stays the app's.
-func initializedHandset(transport satlink.Transport) (*satlink.Handset, error) {
-	handset := satlink.NewHandset(transport)
+func initializedHandset(transport iridium.Transport) (*iridium.Handset, error) {
+	handset := iridium.NewHandset(transport)
 	initialized := false
 	defer closeUnlessHandedOn(handset, &initialized)
 	if err := handset.Initialize(); err != nil {
@@ -215,7 +215,7 @@ func initializedHandset(transport satlink.Transport) (*satlink.Handset, error) {
 // port that function opened: the port is free again, and closing it drops DTR, which ends a call left
 // up. What went wrong is what the app needs to hear; closing only lets go
 // of the port.
-func closeUnlessHandedOn(handset *satlink.Handset, handedOn *bool) {
+func closeUnlessHandedOn(handset *iridium.Handset, handedOn *bool) {
 	if !*handedOn {
 		_ = handset.Close()
 	}
@@ -253,8 +253,8 @@ func (h *IridiumHandset) Reinitialize() (err error) {
 // up, and ends the call: it may be held in online-command mode, which only
 // firmware with +CPAS reveals to Initialize, and ATH answers OK when there
 // is none. Until both succeed the call may still be up, whatever failed, so
-// every error it returns is of kind satlink.ErrCallMayStillBeUp.
-func endStrandedCall(handset *satlink.Handset) error {
+// every error it returns is of kind iridium.ErrCallMayStillBeUp.
+func endStrandedCall(handset *iridium.Handset) error {
 	if err := handset.Initialize(); err != nil {
 		return asCallMayStillBeUp(err)
 	}
@@ -265,17 +265,17 @@ func endStrandedCall(handset *satlink.Handset) error {
 }
 
 // isCallMayStillBeUp reports whether err is the handset's
-// satlink.ErrCallMayStillBeUp: a data call it could not end may still be
+// iridium.ErrCallMayStillBeUp: a data call it could not end may still be
 // up. That kind, which the app hears as SatlinkErrorHangUpFailed, strands
 // the handset. The CallMayStillBeUp flag that other kinds may carry is not
 // returned by any IridiumHandset method.
 func isCallMayStillBeUp(err error) bool {
-	var core *satlink.Error
-	return errors.As(err, &core) && core.Kind == satlink.ErrCallMayStillBeUp
+	var core *iridium.Error
+	return errors.As(err, &core) && core.Kind == iridium.ErrCallMayStillBeUp
 }
 
 // asCallMayStillBeUp returns err, which says what failed while a data call
-// may still be up, as an error of kind satlink.ErrCallMayStillBeUp:
+// may still be up, as an error of kind iridium.ErrCallMayStillBeUp:
 // unchanged if it is one, otherwise with its text as the message.
 func asCallMayStillBeUp(err error) error {
 	if isCallMayStillBeUp(err) {
@@ -285,10 +285,10 @@ func asCallMayStillBeUp(err error) error {
 }
 
 // callMayStillBeUpError reports a data call that could not be ended, as the
-// handset reports one: kind satlink.ErrCallMayStillBeUp, whose errors always
+// handset reports one: kind iridium.ErrCallMayStillBeUp, whose errors always
 // carry the flag, with message saying what failed.
-func callMayStillBeUpError(message string) *satlink.Error {
-	return &satlink.Error{Kind: satlink.ErrCallMayStillBeUp, Message: message, CallMayStillBeUp: true}
+func callMayStillBeUpError(message string) *iridium.Error {
+	return &iridium.Error{Kind: iridium.ErrCallMayStillBeUp, Message: message, CallMayStillBeUp: true}
 }
 
 // Command sends a raw AT command, such as "AT+CSQ", and waits up to
@@ -296,7 +296,7 @@ func callMayStillBeUpError(message string) *satlink.Error {
 func (h *IridiumHandset) Command(command string, timeoutMillis int64) (response *CommandResponse, err error) {
 	defer recoverPanic(&err)
 	timeout := timeoutFromMillis(timeoutMillis)
-	answer, err := withHandset(h, func(handset *satlink.Handset) (satlink.Response, error) {
+	answer, err := withHandset(h, func(handset *iridium.Handset) (iridium.Response, error) {
 		return handset.CommandTimeout(command, timeout)
 	})
 	if err != nil {
@@ -312,7 +312,7 @@ func (h *IridiumHandset) Command(command string, timeoutMillis int64) (response 
 // Info reports manufacturer, model, firmware revision and IMEI.
 func (h *IridiumHandset) Info() (info *DeviceInfo, err error) {
 	defer recoverPanic(&err)
-	reported, err := withHandset(h, (*satlink.Handset).Info)
+	reported, err := withHandset(h, (*iridium.Handset).Info)
 	if err != nil {
 		return nil, err
 	}
@@ -327,19 +327,19 @@ func (h *IridiumHandset) Info() (info *DeviceInfo, err error) {
 // IMSI reports the subscriber identity, which requires a SIM.
 func (h *IridiumHandset) IMSI() (imsi string, err error) {
 	defer recoverPanic(&err)
-	return withHandset(h, (*satlink.Handset).IMSI)
+	return withHandset(h, (*iridium.Handset).IMSI)
 }
 
 // SignalQuality reports the signal bars, 0 to 5.
 func (h *IridiumHandset) SignalQuality() (bars int, err error) {
 	defer recoverPanic(&err)
-	return withHandset(h, (*satlink.Handset).SignalQuality)
+	return withHandset(h, (*iridium.Handset).SignalQuality)
 }
 
 // Battery reports the charge status and level.
 func (h *IridiumHandset) Battery() (battery *Battery, err error) {
 	defer recoverPanic(&err)
-	reported, err := withHandset(h, (*satlink.Handset).Battery)
+	reported, err := withHandset(h, (*iridium.Handset).Battery)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (h *IridiumHandset) Battery() (battery *Battery, err error) {
 // Registration reports the network registration.
 func (h *IridiumHandset) Registration() (registration *Registration, err error) {
 	defer recoverPanic(&err)
-	reported, err := withHandset(h, (*satlink.Handset).Registration)
+	reported, err := withHandset(h, (*iridium.Handset).Registration)
 	if err != nil {
 		return nil, err
 	}
@@ -363,14 +363,14 @@ func (h *IridiumHandset) Registration() (registration *Registration, err error) 
 // Clock reports the handset's clock (yy/MM/dd,hh:mm:ss±zz).
 func (h *IridiumHandset) Clock() (clock string, err error) {
 	defer recoverPanic(&err)
-	return withHandset(h, (*satlink.Handset).Clock)
+	return withHandset(h, (*iridium.Handset).Clock)
 }
 
 // SendSMS sends a text message and returns the network's message
 // reference. Submission can take over a minute.
 func (h *IridiumHandset) SendSMS(number, text string) (reference int, err error) {
 	defer recoverPanic(&err)
-	return withHandset(h, func(handset *satlink.Handset) (int, error) {
+	return withHandset(h, func(handset *iridium.Handset) (int, error) {
 		return handset.SendSMS(number, text)
 	})
 }
@@ -378,13 +378,13 @@ func (h *IridiumHandset) SendSMS(number, text string) (reference int, err error)
 // ListSMS lists the stored messages filter, one of the SMSFilter
 // constants, selects; listing marks unread messages read. Another filter
 // value fails with SatlinkErrorInvalidArgument, "%d is not an SMS filter",
-// as satlink.Handset.ListSMS reports it.
+// as iridium.Handset.ListSMS reports it.
 func (h *IridiumHandset) ListSMS(filter int) (messages *SMSMessageList, err error) {
 	defer recoverPanic(&err)
-	// The SMSFilter constants have the values of satlink's, which refuses
+	// The SMSFilter constants have the values of iridium's, which refuses
 	// any other.
-	stored, err := withHandset(h, func(handset *satlink.Handset) ([]satlink.SMSMessage, error) {
-		return handset.ListSMS(satlink.SMSFilter(filter))
+	stored, err := withHandset(h, func(handset *iridium.Handset) ([]iridium.SMSMessage, error) {
+		return handset.ListSMS(iridium.SMSFilter(filter))
 	})
 	if err != nil {
 		return nil, err
@@ -399,7 +399,7 @@ func (h *IridiumHandset) ListSMS(filter int) (messages *SMSMessageList, err erro
 // ReadSMS reads the message stored at index, which marks it read.
 func (h *IridiumHandset) ReadSMS(index int) (message *SMSMessage, err error) {
 	defer recoverPanic(&err)
-	stored, err := withHandset(h, func(handset *satlink.Handset) (satlink.SMSMessage, error) {
+	stored, err := withHandset(h, func(handset *iridium.Handset) (iridium.SMSMessage, error) {
 		return handset.ReadSMS(index)
 	})
 	if err != nil {
@@ -412,7 +412,7 @@ func (h *IridiumHandset) ReadSMS(index int) (message *SMSMessage, err error) {
 // DeleteSMS deletes the message stored at index.
 func (h *IridiumHandset) DeleteSMS(index int) (err error) {
 	defer recoverPanic(&err)
-	return h.perform(func(handset *satlink.Handset) error {
+	return h.perform(func(handset *iridium.Handset) error {
 		return handset.DeleteSMS(index)
 	})
 }
@@ -420,7 +420,7 @@ func (h *IridiumHandset) DeleteSMS(index int) (err error) {
 // Dial starts a voice call.
 func (h *IridiumHandset) Dial(number string) (err error) {
 	defer recoverPanic(&err)
-	return h.perform(func(handset *satlink.Handset) error {
+	return h.perform(func(handset *iridium.Handset) error {
 		return handset.Dial(number)
 	})
 }
@@ -431,7 +431,7 @@ func (h *IridiumHandset) Dial(number string) (err error) {
 // until Reinitialize ends the call.
 func (h *IridiumHandset) Answer() (err error) {
 	defer recoverPanic(&err)
-	return h.perform((*satlink.Handset).Answer)
+	return h.perform((*iridium.Handset).Answer)
 }
 
 // HangUp ends a call: a voice call, or a data call held in online-command
@@ -441,7 +441,7 @@ func (h *IridiumHandset) Answer() (err error) {
 // IridiumHandset on the same transport ends the call with it.
 func (h *IridiumHandset) HangUp() (err error) {
 	defer recoverPanic(&err)
-	return h.perform((*satlink.Handset).HangUp)
+	return h.perform((*iridium.Handset).HangUp)
 }
 
 // TakeEvents returns the unsolicited events already received, such as
@@ -451,7 +451,7 @@ func (h *IridiumHandset) HangUp() (err error) {
 func (h *IridiumHandset) TakeEvents() (events *StringList) {
 	events = &StringList{}
 	defer survivePanic("IridiumHandset.TakeEvents")
-	taken, err := withHandset(h, func(handset *satlink.Handset) ([]string, error) {
+	taken, err := withHandset(h, func(handset *iridium.Handset) ([]string, error) {
 		return handset.TakeURCs(), nil
 	})
 	if err != nil {
@@ -469,7 +469,7 @@ func (h *IridiumHandset) TakeEvents() (events *StringList) {
 func (h *IridiumHandset) PollEvents(timeoutMillis int64) (events *StringList, err error) {
 	defer recoverPanic(&err)
 	timeout := timeoutFromMillis(timeoutMillis)
-	polled, err := withHandset(h, func(handset *satlink.Handset) ([]string, error) {
+	polled, err := withHandset(h, func(handset *iridium.Handset) ([]string, error) {
 		return handset.PollURCs(timeout)
 	})
 	if err != nil {
@@ -501,9 +501,9 @@ func (h *IridiumHandset) Close() (err error) {
 
 // withHandset runs query on the handset, unless the handset cannot be used
 // now, and returns its result.
-func withHandset[T any](h *IridiumHandset, query func(*satlink.Handset) (T, error)) (T, error) {
+func withHandset[T any](h *IridiumHandset, query func(*iridium.Handset) (T, error)) (T, error) {
 	var result T
-	err := h.perform(func(handset *satlink.Handset) error {
+	err := h.perform(func(handset *iridium.Handset) error {
 		var err error
 		result, err = query(handset)
 		return err
@@ -516,7 +516,7 @@ func withHandset[T any](h *IridiumHandset, query func(*satlink.Handset) (T, erro
 // stranded — and reports its error as the app sees it. An operation that
 // leaves a data call that may still be up — Answer's, taken by mistake —
 // strands the handset.
-func (h *IridiumHandset) perform(operation func(*satlink.Handset) error) error {
+func (h *IridiumHandset) perform(operation func(*iridium.Handset) error) error {
 	handset, err := made(h.handset, "IridiumHandset")
 	if err != nil {
 		return err
@@ -536,15 +536,15 @@ func (h *IridiumHandset) perform(operation func(*satlink.Handset) error) error {
 
 // chargeStatuses are the ChargeStatus constants of the handset's charge
 // statuses; any other is ChargeStatusUnknown.
-var chargeStatuses = map[satlink.ChargeStatus]int{
-	satlink.ChargeStatusOnBattery:     ChargeStatusOnBattery,
-	satlink.ChargeStatusExternalPower: ChargeStatusExternalPower,
-	satlink.ChargeStatusNoBattery:     ChargeStatusNoBattery,
-	satlink.ChargeStatusPowerFault:    ChargeStatusPowerFault,
+var chargeStatuses = map[iridium.ChargeStatus]int{
+	iridium.ChargeStatusOnBattery:     ChargeStatusOnBattery,
+	iridium.ChargeStatusExternalPower: ChargeStatusExternalPower,
+	iridium.ChargeStatusNoBattery:     ChargeStatusNoBattery,
+	iridium.ChargeStatusPowerFault:    ChargeStatusPowerFault,
 }
 
 // chargeStatusOf returns the ChargeStatus constant of status.
-func chargeStatusOf(status satlink.ChargeStatus) int {
+func chargeStatusOf(status iridium.ChargeStatus) int {
 	if constant, ok := chargeStatuses[status]; ok {
 		return constant
 	}
@@ -553,18 +553,18 @@ func chargeStatusOf(status satlink.ChargeStatus) int {
 
 // registrationStatuses are the RegistrationStatus constants of the
 // handset's registration statuses.
-var registrationStatuses = map[satlink.RegistrationStatus]int{
-	satlink.RegistrationStatusNotRegistered: RegistrationStatusNotRegistered,
-	satlink.RegistrationStatusHome:          RegistrationStatusHome,
-	satlink.RegistrationStatusSearching:     RegistrationStatusSearching,
-	satlink.RegistrationStatusDenied:        RegistrationStatusDenied,
-	satlink.RegistrationStatusUnknown:       RegistrationStatusUnknown,
-	satlink.RegistrationStatusRoaming:       RegistrationStatusRoaming,
+var registrationStatuses = map[iridium.RegistrationStatus]int{
+	iridium.RegistrationStatusNotRegistered: RegistrationStatusNotRegistered,
+	iridium.RegistrationStatusHome:          RegistrationStatusHome,
+	iridium.RegistrationStatusSearching:     RegistrationStatusSearching,
+	iridium.RegistrationStatusDenied:        RegistrationStatusDenied,
+	iridium.RegistrationStatusUnknown:       RegistrationStatusUnknown,
+	iridium.RegistrationStatusRoaming:       RegistrationStatusRoaming,
 }
 
 // registrationStatusOf returns the RegistrationStatus constant of status;
 // the handset reports no other statuses, and any would be unknown.
-func registrationStatusOf(status satlink.RegistrationStatus) int {
+func registrationStatusOf(status iridium.RegistrationStatus) int {
 	if constant, ok := registrationStatuses[status]; ok {
 		return constant
 	}
@@ -572,7 +572,7 @@ func registrationStatusOf(status satlink.RegistrationStatus) int {
 }
 
 // smsMessageOf returns the app's copy of a stored message.
-func smsMessageOf(message satlink.SMSMessage) SMSMessage {
+func smsMessageOf(message iridium.SMSMessage) SMSMessage {
 	return SMSMessage{
 		Index:     message.Index,
 		Status:    message.Status,

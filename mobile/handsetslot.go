@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
 // Where an IridiumHandset's handset is: here, lent to a link, or stranded
 // by a data call that could not be ended. The handset itself never leaves
 // the IridiumHandset: while a link has it, its own methods fail with
-// satlink.ErrBusy. It therefore cannot be lost with its link, and needs no
+// iridium.ErrBusy. It therefore cannot be lost with its link, and needs no
 // transport opened again to be reached. An IridiumHandset closed while a
 // link has its handset leaves the port open for that link, which hangs up
 // through it, until the call has ended; and once closed, it refuses to work,
@@ -109,14 +109,14 @@ func unavailableIn(slot handsetSlot) error {
 // reinitialization returns how Reinitialize gets the handset talking again
 // where it is now — Initialize for a ready one, endStrandedCall for a
 // stranded one — or why it cannot.
-func (h *IridiumHandset) reinitialization() (func(*satlink.Handset) error, error) {
+func (h *IridiumHandset) reinitialization() (func(*iridium.Handset) error, error) {
 	h.slotMu.Lock()
 	defer h.slotMu.Unlock()
 	switch {
 	case h.closed:
 		return nil, invalidArgument(handsetClosed)
 	case h.slot == slotHere:
-		return (*satlink.Handset).Initialize, nil
+		return (*iridium.Handset).Initialize, nil
 	case h.slot == slotStranded:
 		return endStrandedCall, nil
 	default:
@@ -189,7 +189,7 @@ func (l *handsetLoan) lentTo(borrower *satnet.Watcher) {
 // come up, failing with establishing: the handset is back, stranded if the
 // call may still be up.
 func (l *handsetLoan) returnedAfter(establishing error) {
-	l.owner.endDialling(errors.Is(establishing, satlink.ErrCallMayStillBeUp))
+	l.owner.endDialling(errors.Is(establishing, iridium.ErrCallMayStillBeUp))
 	l.settled = true
 }
 
