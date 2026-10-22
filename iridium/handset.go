@@ -69,12 +69,57 @@ func (s ChargeStatus) String() string {
 	}
 }
 
-// Battery is what +CBC reports.
+// ChargerStatus is the charger connection status field of +CBC, which
+// 9555(A) and 9575 handsets report. Its value is the code the handset
+// reported; codes without a constant are unknown statuses.
+type ChargerStatus int
+
+// The charger statuses +CBC defines (ISU AT Command Reference, +CBC).
+const (
+	// ChargerStatusUnreported means the handset reported no charger status,
+	// as only 9555(A) and 9575 handsets do.
+	ChargerStatusUnreported ChargerStatus = 0
+	// ChargerStatusCharging means a charger is connected and charging.
+	ChargerStatusCharging ChargerStatus = 1
+	// ChargerStatusNotCharging means a charger is connected, not charging.
+	ChargerStatusNotCharging ChargerStatus = 2
+	// ChargerStatusNotConnected means no charger is connected.
+	ChargerStatusNotConnected ChargerStatus = 3
+)
+
+// String returns the status's name, such as "Charging", or "Unknown(7)"
+// for a code without a constant.
+func (s ChargerStatus) String() string {
+	switch s {
+	case ChargerStatusUnreported:
+		return "Unreported"
+	case ChargerStatusCharging:
+		return "Charging"
+	case ChargerStatusNotCharging:
+		return "NotCharging"
+	case ChargerStatusNotConnected:
+		return "NotConnected"
+	default:
+		return fmt.Sprintf("Unknown(%d)", int(s))
+	}
+}
+
+// Battery is what +CBC reports: +CBC: <bcs>,<bcl>[,<ccs>,<bal>].
 type Battery struct {
-	// Status is the charge status.
+	// Status is the battery connection status.
 	Status ChargeStatus
-	// Level is the charge level, 0 to 100.
+	// Bars is the charge as the handset's battery indicator shows it: 0 to
+	// 4 on 9555(A) and 9575 handsets, 0 to 3 on the others.
+	Bars int
+	// Charger is the charger's status: ChargerStatusUnreported but on
+	// 9555(A) and 9575 handsets.
+	Charger ChargerStatus
+	// Level is the charge in percent, 0 to 100, from the battery's
+	// accumulator. Only 9555(A) and 9575 handsets report it, as
+	// LevelReported says: on the others it is zero.
 	Level int
+	// LevelReported reports that the handset reported Level.
+	LevelReported bool
 }
 
 // RegistrationStatus is the network registration status of +CREG. The
@@ -271,8 +316,9 @@ func NewHandset(transport Transport) *Handset {
 }
 
 // SetTimeout sets how long ordinary commands wait for their final result;
-// the default is five seconds. Commands with their own timeout (SMS
-// submission, dialling, [Handset.CommandTimeout]) are not affected. A
+// the default is five seconds. Commands with their own timeout (signal
+// readings, SMS submission, dialling, [Handset.CommandTimeout]) are not
+// affected. A
 // timeout of zero or less waits for nothing: every command it bounds is
 // sent and fails with ErrTimeout at once, even when its answer has
 // arrived. The longest, math.MaxInt64, means no deadline.
@@ -522,15 +568,38 @@ func (h *Handset) battery() (Battery, error) {
 	if err != nil {
 		return Battery{}, err
 	}
+	return parseBattery(fields)
+}
+
+// batteryFieldsWithLevel is how many fields +CBC has when it reports the
+// charger and the charge in percent: <bcs>,<bcl>,<ccs>,<bal>.
+const batteryFieldsWithLevel = 4
+
+// parseBattery parses the fields of +CBC: <bcs>,<bcl>[,<ccs>,<bal>]. The
+// charger and the level are read only when both are there.
+func parseBattery(fields []string) (Battery, error) {
 	status, err := parseNumber(fields, 0, "+CBC", byteField)
 	if err != nil {
 		return Battery{}, err
 	}
-	level, err := parseNumber(fields, 1, "+CBC", byteField)
+	bars, err := parseNumber(fields, 1, "+CBC", byteField)
 	if err != nil {
 		return Battery{}, err
 	}
-	return Battery{Status: ChargeStatus(status), Level: level}, nil
+	battery := Battery{Status: ChargeStatus(status), Bars: bars}
+	if len(fields) < batteryFieldsWithLevel {
+		return battery, nil
+	}
+	charger, err := parseNumber(fields, 2, "+CBC", byteField)
+	if err != nil {
+		return Battery{}, err
+	}
+	level, err := parseNumber(fields, 3, "+CBC", byteField)
+	if err != nil {
+		return Battery{}, err
+	}
+	battery.Charger, battery.Level, battery.LevelReported = ChargerStatus(charger), level, true
+	return battery, nil
 }
 
 // registration is Registration, with the handset's lock held.

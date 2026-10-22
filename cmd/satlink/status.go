@@ -43,13 +43,17 @@ func printStatus(w io.Writer, handset *iridium.Handset) error {
 	return writef(w, "Registration: %s\n", describeRegistration(handset.Registration()))
 }
 
-// describeBattery is the charge level and status, or why they are
-// unavailable.
+// describeBattery is the charge in percent and the status, with the
+// charger's, or the bars and the status from a handset that reports no
+// percentage; or why they are unavailable.
 func describeBattery(battery iridium.Battery, err error) string {
 	if err != nil {
 		return fmt.Sprintf("unavailable (%v)", err)
 	}
-	return fmt.Sprintf("%d%% (%s)", battery.Level, battery.Status)
+	if !battery.LevelReported {
+		return fmt.Sprintf("%d bars (%s)", battery.Bars, battery.Status)
+	}
+	return fmt.Sprintf("%d%% (%s, charger %s)", battery.Level, battery.Status, battery.Charger)
 }
 
 // describeRegistration is the registration status, or why it is

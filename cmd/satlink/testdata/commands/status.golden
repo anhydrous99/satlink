@@ -2,6 +2,6 @@ $ satlink --simulate=instant status
 exit status 0
 --- stdout
 Signal:       4/5
-Battery:      80% (ExternalPower)
+Battery:      80% (ExternalPower, charger Charging)
 Registration: Home
 --- stderr

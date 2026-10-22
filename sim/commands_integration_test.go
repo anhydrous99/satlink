@@ -94,8 +94,10 @@ func TestReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 		t.Errorf("SignalQuality() = %d; want 2", bars)
 	}
 	assertLines(t, handset, "AT+CSQF", "+CSQF:2")
-	if battery.Status != iridium.ChargeStatusExternalPower || battery.Level != 80 {
-		t.Errorf("Battery() = %+v; want external power at 80", battery)
+	wantBattery := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Bars: 3,
+		Charger: iridium.ChargerStatusCharging, Level: 80, LevelReported: true}
+	if battery != wantBattery {
+		t.Errorf("Battery() = %+v; want %+v", battery, wantBattery)
 	}
 	if registration.Status != iridium.RegistrationStatusHome {
 		t.Errorf("Registration() = %+v; want Home", registration)

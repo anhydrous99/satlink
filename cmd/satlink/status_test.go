@@ -42,6 +42,14 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 	}
 }
 
+func TestABatteryWithoutAPercentageShowsItsBars(t *testing.T) {
+	battery := iridium.Battery{Status: iridium.ChargeStatusOnBattery, Bars: 3}
+
+	if got, want := describeBattery(battery, nil), "3 bars (OnBattery)"; got != want {
+		t.Errorf("battery: %q, want %q", got, want)
+	}
+}
+
 func TestAReportTheHandsetCannotGiveSaysWhy(t *testing.T) {
 	refused := &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+CBC"}
 
@@ -54,10 +62,11 @@ func TestAReportTheHandsetCannotGiveSaysWhy(t *testing.T) {
 }
 
 func TestAReportShowsTheLevelAndTheStatusByName(t *testing.T) {
-	battery := iridium.Battery{Status: iridium.ChargeStatus(7), Level: 55}
+	battery := iridium.Battery{Status: iridium.ChargeStatus(7), Bars: 2, Charger: iridium.ChargerStatusNotConnected,
+		Level: 55, LevelReported: true}
 	registration := iridium.Registration{Status: iridium.RegistrationStatusRoaming}
 
-	if got, want := describeBattery(battery, nil), "55% (Unknown(7))"; got != want {
+	if got, want := describeBattery(battery, nil), "55% (Unknown(7), charger NotConnected)"; got != want {
 		t.Errorf("battery: %q, want %q", got, want)
 	}
 	if got, want := describeRegistration(registration, nil), "Roaming"; got != want {

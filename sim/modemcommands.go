@@ -13,8 +13,9 @@ const (
 	// imsi is Iridium's mobile country and network codes (901 03) and an
 	// obviously made-up subscriber number.
 	imsi = "901039999999999"
-	// batteryReport is on external power, 80 % charged.
-	batteryReport = "+CBC: 1,080"
+	// batteryReport is on external power and charging: three bars, 80 %
+	// charged, in the four fields of a 9575's +CBC.
+	batteryReport = "+CBC: 001,003,001,080"
 	// registrationReport is registered on the home network, with
 	// unsolicited registration reports off.
 	registrationReport = "+CREG: 0,1"

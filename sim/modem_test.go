@@ -160,7 +160,7 @@ func TestReportsTheOtherQueries(t *testing.T) {
 	assertAnswer(t, runCommand(m, "AT+CSQ", now), "\r\n+CSQ:0\r\n\r\nOK\r\n")
 	assertAnswer(t, runCommand(m, "AT+CGMR", now), "\r\nCall Processor Version: SIM-1.0\r\n\r\nOK\r\n")
 	assertAnswer(t, runCommand(m, "AT+CIMI", now), "\r\n901039999999999\r\n\r\nOK\r\n")
-	assertAnswer(t, runCommand(m, "AT+CBC", now), "\r\n+CBC: 1,080\r\n\r\nOK\r\n")
+	assertAnswer(t, runCommand(m, "AT+CBC", now), "\r\n+CBC: 001,003,001,080\r\n\r\nOK\r\n")
 	assertAnswer(t, runCommand(m, "AT+CMGF=1", now), "\r\nOK\r\n")
 }
 

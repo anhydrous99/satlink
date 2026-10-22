@@ -41,6 +41,21 @@ func TestEveryChargeStatusHasItsConstant(t *testing.T) {
 	}
 }
 
+func TestEveryChargerStatusHasItsConstant(t *testing.T) {
+	cases := map[iridium.ChargerStatus]int{
+		iridium.ChargerStatusUnreported:   ChargerStatusUnreported,
+		iridium.ChargerStatusCharging:     ChargerStatusCharging,
+		iridium.ChargerStatusNotCharging:  ChargerStatusNotCharging,
+		iridium.ChargerStatusNotConnected: ChargerStatusNotConnected,
+		iridium.ChargerStatus(7):          ChargerStatusUnknown,
+	}
+	for status, want := range cases {
+		if got := chargerStatusOf(status); got != want {
+			t.Errorf("chargerStatusOf(%v) = %d, want %d", status, got, want)
+		}
+	}
+}
+
 func TestEveryRegistrationStatusHasItsConstant(t *testing.T) {
 	cases := map[iridium.RegistrationStatus]int{
 		iridium.RegistrationStatusNotRegistered: RegistrationStatusNotRegistered,

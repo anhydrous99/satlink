@@ -146,7 +146,7 @@ func TestACommandWaitsForTheHandsetToSettleAfterItsLastAnswer(t *testing.T) {
 func TestSignalBatteryRegistration(t *testing.T) {
 	handset := newTestHandset(newScripted(
 		step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"},
-		step{"AT+CBC\r", "\r\n+CBC: 1,080\r\n\r\nOK\r\n"},
+		step{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK\r\n"},
 		step{"AT+CREG?\r", "\r\n+CREG: 0,1\r\n\r\nOK\r\n"},
 	))
 
@@ -155,13 +155,43 @@ func TestSignalBatteryRegistration(t *testing.T) {
 		t.Errorf("SignalQuality = %d, %v; want 4", bars, err)
 	}
 	battery, err := handset.Battery()
-	want := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Level: 80}
+	want := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Bars: 3}
 	if err != nil || battery != want {
 		t.Errorf("Battery = %+v, %v; want %+v", battery, err, want)
 	}
 	registration, err := handset.Registration()
 	if err != nil || registration.Status != iridium.RegistrationStatusHome {
 		t.Errorf("Registration = %+v, %v; want Home", registration, err)
+	}
+}
+
+func TestA9555ABatteryReportGivesTheBarsTheChargerAndThePercentage(t *testing.T) {
+	// What a 9555A on its battery, 94% charged, answers.
+	handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n+CBC:000,004,003,094\r\n\r\nOK\r\n"}))
+
+	battery, err := handset.Battery()
+
+	want := iridium.Battery{
+		Status:        iridium.ChargeStatusOnBattery,
+		Bars:          4,
+		Charger:       iridium.ChargerStatusNotConnected,
+		Level:         94,
+		LevelReported: true,
+	}
+	if err != nil || battery != want {
+		t.Errorf("Battery = %+v, %v; want %+v", battery, err, want)
+	}
+}
+
+func TestABatteryReportWithABadFieldIsRefused(t *testing.T) {
+	for _, report := range []string{"+CBC: 0", "+CBC: 0,x", "+CBC: 0,4,x,94", "+CBC: 0,4,3,-1"} {
+		handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n" + report + "\r\n\r\nOK\r\n"}))
+
+		_, err := handset.Battery()
+
+		if !errors.Is(err, iridium.ErrParse) {
+			t.Errorf("Battery for %q: %v, want ErrParse", report, err)
+		}
 	}
 }
 

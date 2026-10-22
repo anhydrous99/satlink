@@ -54,7 +54,8 @@ func TestAHandsetReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 	if barsErr != nil || bars != 4 {
 		t.Errorf("SignalQuality() = %d, %v, want 4", bars, barsErr)
 	}
-	if want := (mobile.Battery{Status: mobile.ChargeStatusExternalPower, Level: 80}); batteryErr != nil || *battery != want {
+	if want := (mobile.Battery{Status: mobile.ChargeStatusExternalPower, Bars: 3, Charger: mobile.ChargerStatusCharging,
+		Level: 80, LevelReported: true}); batteryErr != nil || *battery != want {
 		t.Errorf("Battery() = %+v, %v, want %+v", battery, batteryErr, want)
 	}
 	if want := (mobile.Registration{Status: mobile.RegistrationStatusHome}); registrationErr != nil || *registration != want {

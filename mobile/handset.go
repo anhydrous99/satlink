@@ -24,6 +24,21 @@ const (
 	ChargeStatusUnknown
 )
 
+// The charger statuses of [Battery].Charger.
+const (
+	// ChargerStatusUnreported means the handset reported no charger status,
+	// as only 9555(A) and 9575 handsets do.
+	ChargerStatusUnreported = iota
+	// ChargerStatusCharging means a charger is connected and charging.
+	ChargerStatusCharging
+	// ChargerStatusNotCharging means a charger is connected, not charging.
+	ChargerStatusNotCharging
+	// ChargerStatusNotConnected means no charger is connected.
+	ChargerStatusNotConnected
+	// ChargerStatusUnknown is any other status the handset reports.
+	ChargerStatusUnknown
+)
+
 // The registration statuses of [Registration].Status.
 const (
 	// RegistrationStatusNotRegistered means not registered and not
@@ -67,12 +82,21 @@ type DeviceInfo struct {
 	IMEI string
 }
 
-// Battery is the charge status and level.
+// Battery is the battery's status and charge.
 type Battery struct {
 	// Status is one of the ChargeStatus constants.
 	Status int
-	// Level is the charge level, 0 to 100.
+	// Bars is the charge as the handset's battery indicator shows it: 0 to
+	// 4 on 9555(A) and 9575 handsets, 0 to 3 on the others.
+	Bars int
+	// Charger is one of the ChargerStatus constants: ChargerStatusUnreported
+	// but on 9555(A) and 9575 handsets.
+	Charger int
+	// Level is the charge in percent, 0 to 100. Only 9555(A) and 9575
+	// handsets report it, as LevelReported says: on the others it is zero.
 	Level int
+	// LevelReported reports that the handset reported Level.
+	LevelReported bool
 }
 
 // Registration is the network registration.
@@ -343,7 +367,13 @@ func (h *IridiumHandset) Battery() (battery *Battery, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Battery{Status: chargeStatusOf(reported.Status), Level: reported.Level}, nil
+	return &Battery{
+		Status:        chargeStatusOf(reported.Status),
+		Bars:          reported.Bars,
+		Charger:       chargerStatusOf(reported.Charger),
+		Level:         reported.Level,
+		LevelReported: reported.LevelReported,
+	}, nil
 }
 
 // Registration reports the network registration.
@@ -541,6 +571,23 @@ var chargeStatuses = map[iridium.ChargeStatus]int{
 	iridium.ChargeStatusExternalPower: ChargeStatusExternalPower,
 	iridium.ChargeStatusNoBattery:     ChargeStatusNoBattery,
 	iridium.ChargeStatusPowerFault:    ChargeStatusPowerFault,
+}
+
+// chargerStatuses are the ChargerStatus constants of the handset's charger
+// statuses.
+var chargerStatuses = map[iridium.ChargerStatus]int{
+	iridium.ChargerStatusUnreported:   ChargerStatusUnreported,
+	iridium.ChargerStatusCharging:     ChargerStatusCharging,
+	iridium.ChargerStatusNotCharging:  ChargerStatusNotCharging,
+	iridium.ChargerStatusNotConnected: ChargerStatusNotConnected,
+}
+
+// chargerStatusOf returns the ChargerStatus constant of status.
+func chargerStatusOf(status iridium.ChargerStatus) int {
+	if constant, ok := chargerStatuses[status]; ok {
+		return constant
+	}
+	return ChargerStatusUnknown
 }
 
 // chargeStatusOf returns the ChargeStatus constant of status.
