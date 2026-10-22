@@ -165,6 +165,29 @@ func TestSignalBatteryRegistration(t *testing.T) {
 	}
 }
 
+func TestASignalReadingWaitsLongerThanTheCommandTimeout(t *testing.T) {
+	// AT+CSQ is answered once the handset has a new reading, which can take
+	// seconds.
+	transport := newScripted(step{"AT+CSQ\r", "\r\n+CSQ:3\r\n\r\nOK\r\n"}).answersLate("AT+CSQ\r", 4*commandTimeout)
+	handset := newTestHandset(transport)
+
+	bars, err := handset.SignalQuality()
+
+	if err != nil || bars != 3 {
+		t.Errorf("SignalQuality = %d, %v; want 3", bars, err)
+	}
+}
+
+func TestTheLastSignalReadingIsAskedForWithCSQF(t *testing.T) {
+	handset := newTestHandset(newScripted(step{"AT+CSQF\r", "\r\n+CSQF:2\r\n\r\nOK\r\n"}))
+
+	bars, err := handset.LastSignalQuality()
+
+	if err != nil || bars != 2 {
+		t.Errorf("LastSignalQuality = %d, %v; want 2", bars, err)
+	}
+}
+
 func TestA9555ABatteryReportGivesTheBarsTheChargerAndThePercentage(t *testing.T) {
 	// What a 9555A on its battery, 94% charged, answers.
 	handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n+CBC:000,004,003,094\r\n\r\nOK\r\n"}))
@@ -595,18 +618,18 @@ func TestALateAnswerArrivingDuringInitializeDoesNotHideAHeldCall(t *testing.T) {
 }
 
 func TestAPartialAnswerLeftBeforeInitializeDoesNotHideAHeldCall(t *testing.T) {
-	// AT+CSQ timed out before the line end of its answer's OK came: what it
+	// AT+CBC timed out before the line end of its answer's OK came: what it
 	// left in the line buffer must not run into AT+CPAS's answer and pass
 	// for it, leaving the call held in online-command mode unseen.
 	transport := newScripted(slices.Concat([]step{
-		{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK"},
+		{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK"},
 		{"AT\r", okReply},
 		{"AT+CPAS\r", dataCallStatusReply},
 		{"ATH\r", okReply},
 	}, configuration())...)
 	handset := newTestHandset(transport)
-	if _, err := handset.SignalQuality(); !errors.Is(err, iridium.ErrTimeout) {
-		t.Fatalf("SignalQuality = %v, want a timeout: its answer never ended", err)
+	if _, err := handset.Battery(); !errors.Is(err, iridium.ErrTimeout) {
+		t.Fatalf("Battery = %v, want a timeout: its answer never ended", err)
 	}
 
 	if err := handset.Initialize(); err != nil {
@@ -669,12 +692,12 @@ func TestAnATAnsweredASecondLateStillSynchronises(t *testing.T) {
 func TestAZeroTimeoutFailsACommandWithoutWaitingForItsAnswer(t *testing.T) {
 	// As SetTimeout says: the command is sent, and nothing
 	// is read for it, not even an answer that has arrived.
-	handset := newTestHandset(newScripted(step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"}))
+	handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK\r\n"}))
 	handset.SetTimeout(0)
 
-	_, err := handset.SignalQuality()
+	_, err := handset.Battery()
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CSQ"})
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CBC"})
 }
 
 // longestPromisedRead is the longest a read of a handset waits for data at a

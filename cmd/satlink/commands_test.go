@@ -56,7 +56,7 @@ func handsetCases() []goldenCase {
 		{name: "commands/info-unplugged", args: []string{instant, "info"}, world: world{handset: unplugged}},
 		{name: "commands/status", args: []string{instant, "status"}},
 		{name: "commands/status-with-event", args: []string{instant, "status"},
-			world: world{handset: smsArrivingOn("AT+CSQ")}},
+			world: world{handset: smsArrivingOn("AT+CSQF")}},
 		{name: "commands/sms-send", args: []string{instant, "sms", "send", "+881631234567", "hello from the field"}},
 		{name: "commands/sms-list", args: []string{instant, "sms", "list"}, world: twoMessages},
 		{name: "commands/sms-list-read", args: []string{instant, "sms", "list", "read"}, world: twoMessages},
@@ -323,7 +323,7 @@ func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 // The "(event)" lines are not best effort either: an event that standard error
 // cannot take fails the command.
 func TestAnEventThatCannotBeReportedFailsTheCommand(t *testing.T) {
-	env, stdout, _ := world{handset: smsArrivingOn("AT+CSQ")}.environment(t, []string{instant, "status"})
+	env, stdout, _ := world{handset: smsArrivingOn("AT+CSQF")}.environment(t, []string{instant, "status"})
 	env.stderr = brokenWriter{}
 
 	status := run(context.Background(), env)

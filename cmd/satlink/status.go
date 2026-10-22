@@ -30,7 +30,8 @@ func (c *cli) statusCommand() *command {
 // Each is asked for once the lines before it are written: output that nobody
 // can read costs no further exchange.
 func printStatus(w io.Writer, handset *iridium.Handset) error {
-	bars, err := handset.SignalQuality()
+	// The last reading: a new one may take the handset fifty seconds.
+	bars, err := handset.LastSignalQuality()
 	if err != nil {
 		return err
 	}

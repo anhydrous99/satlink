@@ -29,6 +29,8 @@
 // passed:
 //   - ordinary commands wait five seconds by default ([Handset.SetTimeout]
 //     changes that);
+//   - a signal reading waits up to a minute, as the handset answers AT+CSQ
+//     only once it has a new one;
 //   - SMS submission waits up to two minutes, as it goes over the satellite
 //     link;
 //   - dialling waits up to ninety seconds.

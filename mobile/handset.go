@@ -354,13 +354,25 @@ func (h *IridiumHandset) IMSI() (imsi string, err error) {
 	return withHandset(h, (*iridium.Handset).IMSI)
 }
 
-// SignalQuality reports the signal bars, 0 to 5.
+// SignalQuality reports the signal bars, 0 to 5, from a new reading. The
+// handset answers once it has one, usually within two seconds, so this
+// waits up to a minute. One that is not registered may take fifty seconds
+// and then fail: check Registration first, or use LastSignalQuality.
 func (h *IridiumHandset) SignalQuality() (bars int, err error) {
 	defer recoverPanic(&err)
 	return withHandset(h, (*iridium.Handset).SignalQuality)
 }
 
-// Battery reports the charge status and level.
+// LastSignalQuality reports the last signal bars the handset measured, 0
+// to 5, at once: what its signal indicator shows.
+func (h *IridiumHandset) LastSignalQuality() (bars int, err error) {
+	defer recoverPanic(&err)
+	return withHandset(h, (*iridium.Handset).LastSignalQuality)
+}
+
+// Battery reports the battery's status and charge: the bars of the
+// handset's indicator on every handset, and the charger and the charge in
+// percent on 9555(A) and 9575 handsets.
 func (h *IridiumHandset) Battery() (battery *Battery, err error) {
 	defer recoverPanic(&err)
 	reported, err := withHandset(h, (*iridium.Handset).Battery)

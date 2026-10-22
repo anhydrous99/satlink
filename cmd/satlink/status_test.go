@@ -22,9 +22,9 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 		// asked are the commands the status sends.
 		asked []string
 	}{
-		{"Signal", 0, []string{"AT+CSQ"}},
-		{"Battery", 1, []string{"AT+CSQ", "AT+CBC"}},
-		{"Registration", 2, []string{"AT+CSQ", "AT+CBC", "AT+CREG?"}},
+		{"Signal", 0, []string{"AT+CSQF"}},
+		{"Battery", 1, []string{"AT+CSQF", "AT+CBC"}},
+		{"Registration", 2, []string{"AT+CSQF", "AT+CBC", "AT+CREG?"}},
 	}
 	for _, test := range tests {
 		t.Run(test.failingLine, func(t *testing.T) {

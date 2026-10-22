@@ -237,6 +237,14 @@ const (
 	// dialTimeout bounds voice dialling and answering: satellite call setup
 	// is slow.
 	dialTimeout = 90 * time.Second
+	// signalQualityTimeout bounds AT+CSQ, which waits for a new reading:
+	// usually within two seconds, within ten while the handset acquires the
+	// system or hands over between satellites, and over fifty, ending in
+	// ERROR, while it is not registered (ISU AT Command Reference, +CSQ). A
+	// shorter wait would leave its late answer to pass for the next
+	// command's: a 9555A asked again within 4.5 s holds the second AT+CSQ,
+	// and drops every other command, until then.
+	signalQualityTimeout = 60 * time.Second
 	// maxHangUpTimeout is the longest wait for ATH's answer, whatever the
 	// handset's timeout: what follows when none comes — dropping DTR, or
 	// reporting that the call may still be up — must not be put off for
@@ -403,12 +411,24 @@ func (h *Handset) IMSI() (string, error) {
 }
 
 // SignalQuality reports the signal strength in bars, 0 to 5 on Iridium
-// handsets (AT+CSQ).
+// handsets, from a new reading (AT+CSQ). The handset answers once it has
+// one, usually within two seconds, so SignalQuality waits up to a minute,
+// whatever SetTimeout says. One that is not registered may take fifty
+// seconds and then fail with ErrCommandFailed: check [Handset.Registration]
+// first, or use [Handset.LastSignalQuality].
 func (h *Handset) SignalQuality() (int, error) {
 	return exchange(h, h.signalQuality)
 }
 
-// Battery reports the charge status and level (AT+CBC).
+// LastSignalQuality reports the last signal strength the handset measured,
+// in bars, 0 to 5, at once (AT+CSQF): what its signal indicator shows.
+func (h *Handset) LastSignalQuality() (int, error) {
+	return exchange(h, h.lastSignalQuality)
+}
+
+// Battery reports the battery's status and charge (AT+CBC): the bars of
+// the handset's indicator on every handset, and the charger and the charge
+// in percent on 9555(A) and 9575 handsets.
 func (h *Handset) Battery() (Battery, error) {
 	return exchange(h, h.battery)
 }
@@ -555,11 +575,29 @@ func (h *Handset) info() (DeviceInfo, error) {
 
 // signalQuality is SignalQuality, with the handset's lock held.
 func (h *Handset) signalQuality() (int, error) {
-	fields, err := h.queryFields("AT+CSQ", "+CSQ")
+	response, err := h.commandWithTimeout("AT+CSQ", signalQualityTimeout)
 	if err != nil {
 		return 0, err
 	}
-	return parseNumber(fields, 0, "+CSQ", byteField)
+	return parseSignalBars(response, "+CSQ")
+}
+
+// lastSignalQuality is LastSignalQuality, with the handset's lock held.
+func (h *Handset) lastSignalQuality() (int, error) {
+	response, err := h.command("AT+CSQF")
+	if err != nil {
+		return 0, err
+	}
+	return parseSignalBars(response, "+CSQF")
+}
+
+// parseSignalBars returns the bars that follow "<prefix>:" in response.
+func parseSignalBars(response Response, prefix string) (int, error) {
+	fields, err := fieldsWithPrefix(response, prefix)
+	if err != nil {
+		return 0, err
+	}
+	return parseNumber(fields, 0, prefix, byteField)
 }
 
 // battery is Battery, with the handset's lock held.
