@@ -729,8 +729,8 @@ Rules every test follows:
   FIN-WAIT-1 and FIN-WAIT-2.
 - **Go-specific**:
   - the zero/negative duration options; `SetKeepAlive` of zero or less
-    arming no keep-alive, which satnet's close relies on
-    (`TestSetKeepAliveOffArmsNoKeepAlive`), and turning keep-alive off
+    arming no keep-alive, as only turning keep-alive on arms one, due at
+    once (`TestSetKeepAliveOffArmsNoKeepAlive`), and turning keep-alive off
     letting a keep-alive already timed go out, as smoltcp's
     `set_keep_alive` does (`TestTurningKeepAliveOffLetsTheKeepAliveAlreadyTimedGo`);
   - `LocalEndpoint`/`RemoteEndpoint`: the zero `AddrPort` before `Connect`,
@@ -822,6 +822,7 @@ Rules every test follows:
     FIN once closed (`TestAFastRetransmissionOfTheLastDataEndsItAsItsFirstTransmissionDid`);
     and the deviations of §9 (`TestTheWindowOfASYNReachesNoFurtherThanTheBuffer`,
     `TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce`,
+    `TestASYNACKToASocketWithoutAReceiveBufferIsAcknowledgedAtOnce`,
     `TestAFINAfterDataCutAtTheWindowsEndWaitsForTheRest`,
     `TestAFINAfterDataCutAtTheWindowsEndIsIgnoredInEveryStateThatTakesAFIN`,
     `TestAWindowThatEndsBeforeItStartsTakesNoSegmentHalfTheSequenceSpaceAway`,
@@ -852,9 +853,12 @@ Rules every test follows:
   buffer that needs a window scale; listen or connect; Nagle, ACK delay,
   timeout and keep-alive; the socket's initial sequence numbers in the
   lower half, from `localSeq`, or in the upper half, `configUpperHalfISN`).
-  The peer's segments may also come from 2³¹ − 1 past the receive window
-  (`peerFlagHalfSpaceSeq`), which the run keeps out of its account of the
-  peer's stream, as that account compares modulo 2³². Besides never panicking,
+  The peer's segments may also come from about half the sequence space past
+  the receive window's start (`peerFlagHalfSpaceSeq` adds 2³¹ − 1 to a
+  segment's offset from the sequence number the socket expects next, so
+  that with the signed offset octet it reaches 2³¹ too), which the run
+  keeps out of its account of the peer's stream, as that account compares
+  modulo 2³². Besides never panicking,
   and `PollAt` working
   in every state, it checks that the application reads only the peer's
   octets at their sequence numbers, up to the FIN; that a FIN is taken
@@ -1448,7 +1452,17 @@ workspace inherits the first, the third and the fourth; the second is in
   from `window_to_update` in `poll_at`: smoltcp panics. The port's
   `lastScaledWindow` counts no window left and returns 0, so the socket's
   SYN|ACK is due at once, which its dispatch did anyway
-  (`TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce`). smoltcp's
+  (`TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce`). A SYN|ACK that
+  answers a SYN which announced a zero window, from a socket without a
+  receive buffer, leaves the same state — `remote_last_ack` the peer's
+  sequence number, `remote_last_win` 0 — and `poll_at` panics the same
+  way: in a probe against smoltcp 0.14.0, after the SYN|ACK is processed
+  with `poll_ingress_single`, `Interface::poll_at` panics at `:782`, reached
+  from `:2423` and `:2874`. The port's `PollAt` says the ACK is due at once
+  (`TestASYNACKToASocketWithoutAReceiveBufferIsAcknowledgedAtOnce`). A FIN
+  right at the window's end (the next bullet) leaves no such panic: it
+  leaves a state for which `window_to_update` never calls
+  `last_scaled_window`. smoltcp's
   `dispatch` checks for an ACK to send before `window_to_update`
   (`:2524-2529`), whether its `emit` then succeeds or not, so only
   `poll_at` (`:2860-2876`) panics, and only when an application calls it,
@@ -1458,7 +1472,8 @@ workspace inherits the first, the third and the fourth; the second is in
   `Stack` answers such a SYN with its SYN|ACK in the same poll, the line
   busy or not. satnet and sim never call `Interface.PollAt` either; in
   satlink the deviation keeps `PollAt` from panicking as ipstack's own
-  tests and fuzz target call it.
+  tests call it, and as its fuzz target does for the early SYN
+  (every receive buffer in `fuzzBuffers` holds octets).
 - **A receive window that ends before it starts.** `process` checks a
   segment against a window that runs from `remote_seq_no +
   rx_buffer.len()` to `remote_last_ack + (remote_last_win <<
@@ -1473,21 +1488,35 @@ workspace inherits the first, the third and the fourth; the second is in
   at the window's end (`:1945`, `:1993`, `:2009`, `:2023`; a full window,
   or `test_zero_window_fin`), which needs no race: it lasts until the
   socket's ACK of the FIN goes out. The acceptability tests (`:1720-1770`)
-  compare modulo 2³², so in such a window they take a segment that starts
-  or ends 2³¹ − 1 after the window's start for one inside it. smoltcp then
-  panics as it cuts the payload (`:1782`, "attempt to subtract sequence
-  numbers with underflow": an empty segment there, or data that ends
-  there), places data that starts there 2³¹ − 1 octets into the assembler,
-  beyond the receive buffer, where the next SACK block overflows (`:1512`,
-  "attempt to add to sequence number with unsigned overflow"), or takes a
-  RST with data from there and ends the connection; a RST needs no
-  acknowledgement number, so its sender needs only the peer's sequence
-  numbers. The port finds every segment outside such a window
+  compare modulo 2³², where of two numbers 2³¹ apart each compares as
+  before the other. So in such a window they take a segment that starts or
+  ends 2³¹ − 1 or 2³¹ after the window's start, which is 2³¹ after the
+  window's end or its start, for one inside it. smoltcp then panics as it
+  cuts the payload ("attempt to subtract sequence numbers with
+  underflow"): on an empty segment at either place, on data that ends
+  2³¹ − 1 after the start (`overlap_end - segment_start`, `:1782`), and on
+  data that starts 2³¹ after it (`overlap_start - window_start`, `:1783`).
+  It places data that starts 2³¹ − 1 after the start, or ends 2³¹ after it,
+  that far into the assembler (2³¹ − 1 octets, or 2³¹ less its length),
+  beyond the receive buffer, where, if the peer allowed SACK, the next SACK
+  block overflows (`:1512`, "attempt to add to sequence number with
+  unsigned overflow"). And it takes a RST carrying such data and ends the
+  connection; a RST needs no acknowledgement number, so its sender needs
+  only the peer's sequence numbers. With smoltcp's debug assertions on, as
+  in a debug build, the `debug_assert`s at `:1777` (data that ends 2³¹ − 1
+  after the start) and `:2233` (data placed beyond the buffer) fire first.
+  Probes against smoltcp 0.14.0 through its `Interface` show each case:
+  after "abcdef" and a FIN fill a 6-octet window, the peer allowing SACK,
+  and after data and a FIN fill a 64-octet one, without SACK.
+  The port finds every segment outside such a window
   (`windowEndsBeforeItStarts`): it drops a RST and answers anything else
   with an ACK, as smoltcp answers any segment outside its window. Only
-  segments 2³¹ − 1 away fare differently: an empty segment at the window's
-  start still gets smoltcp's challenge ACK, and the socket takes nothing
-  from it (`TestAWindowThatEndsBeforeItStartsTakesNoSegmentHalfTheSequenceSpaceAway`,
+  segments half the sequence space away fare differently: an empty segment
+  at the window's start still gets smoltcp's challenge ACK, and the socket
+  takes nothing from it
+  (`TestAWindowThatEndsBeforeItStartsTakesNoSegmentHalfTheSequenceSpaceAway`,
+  whose twelve segments, six 2³¹ − 1 and six 2³¹ after the window's start,
+  meet each of the three ways into such a window,
   `TestAWindowThatEndsBeforeItStartsAnswersASegmentAtItsStartWithAChallengeACK`,
   and the fuzz target's flag `peerFlagHalfSpaceSeq` with its seed
   `farSegmentsAfterAFINAtTheWindowsEndScript`). The RFCs agree: no

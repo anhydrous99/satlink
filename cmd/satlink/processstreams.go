@@ -18,10 +18,11 @@ import (
 // processStream is one of the process's standard streams. A read or write
 // that the operating system fails with an error number returns it as an
 // osError; the end of the stream stays io.EOF. As in Rust's standard
-// library, a stream whose descriptor is not open for the direction — on
-// Unix, a standard output opened read-only, say — fails with EBADF, which
-// reads as the end of the stream and takes every write: the Rust version
-// then ended standard input there and dropped its output without an error.
+// library, a failure with badDescriptor — on Unix, a descriptor not open
+// for the direction, such as a standard output opened read-only; on
+// Windows, a NULL handle — reads as the end of the stream and takes every
+// write: the Rust version then ended standard input there and dropped its
+// output without an error.
 type processStream struct {
 	file *os.File
 }
@@ -44,10 +45,10 @@ func (s processStream) Write(p []byte) (int, error) {
 	return count, withOSErrorText(err)
 }
 
-// isBadDescriptor reports whether err is EBADF, which Rust's standard
-// streams take for an empty input and a sink (std's handle_ebadf).
+// isBadDescriptor reports whether err is badDescriptor, which Rust's
+// standard streams take for an empty input and a sink (std's handle_ebadf).
 func isBadDescriptor(err error) bool {
-	return errors.Is(err, syscall.EBADF)
+	return errors.Is(err, badDescriptor)
 }
 
 // withOSErrorText returns err as an osError when an error number from the

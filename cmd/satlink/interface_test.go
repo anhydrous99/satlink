@@ -269,11 +269,12 @@ func TestHelpShowsAVariableThatIsNotUTF8Lossily(t *testing.T) {
 }
 
 // Go only. clap's help and errors went to a stream that shows no styles
-// through anstream, which took out every escape sequence and control
-// character but white space, those that tokens and variables brought in
-// with clap's own styles; a stream that shows styles got them all. Golden
-// files would hold the control characters themselves, so the output is
-// written out here, as the Rust CLI wrote it for the same command line.
+// through anstream, which took out the sequences that ESC starts, and the
+// C0 control characters and DEL but for tab, line feed, form feed and
+// carriage return: clap's own styles, and those that tokens and variables
+// brought in. A stream that shows styles got them all. Golden files would
+// hold the control characters themselves, so the output is written out
+// here, as the Rust CLI wrote it for the same command line.
 func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing.T) {
 	refused := func(problem, usage string) string {
 		return "error: " + problem + "\n\nUsage: " + usage + "\n\nFor more information, try '--help'.\n"

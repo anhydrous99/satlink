@@ -45,6 +45,11 @@ func (s *TLSSettings) AddRootCertificatesPEM(pem string) {
 // AddPinnedPublicKeySHA256 also requires, once any pin is added, the
 // server's key to match one of the pins: the SHA-256 of its DER
 // SubjectPublicKeyInfo, 32 bytes. It is checked when the connector is made.
+//
+// Pin the key of every certificate the server holds: one that holds
+// several may send satlink another one than it sends the Rust version, as
+// crypto/tls asks for ML-DSA, then RSA-PSS, signatures before ECDSA ones,
+// where rustls asks for ECDSA first (see satnet.TLSOptions.PinnedPublicKeys).
 func (s *TLSSettings) AddPinnedPublicKeySHA256(sha256 []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

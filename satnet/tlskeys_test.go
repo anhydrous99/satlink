@@ -54,7 +54,7 @@ func TestTheKeysAServersChainMayHold(t *testing.T) {
 				t.Errorf("secure = %v, want the server trusted", err)
 			}
 			if !c.trusted {
-				expectTLSError(t, err, "TLS: "+errRefusedKey.Error())
+				expectTLSError(t, err, "TLS: invalid peer certificate: a key in the chain is RSA of under 2041 or over 8192 bits, or ECDSA on P-224")
 			}
 		})
 	}

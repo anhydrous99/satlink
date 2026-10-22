@@ -8,12 +8,14 @@ import (
 
 // What a stream that shows no styles kept of clap's help and errors. clap
 // built them in its styles whatever stream they went to, and wrote them
-// through anstream, which took out of the text for such a stream every
-// escape sequence and control character a terminal would act on: the
-// styles, and whatever of the kind the command line or the environment
-// brought in. This is anstream 1.0.0's StripBytes (adapter/strip.rs) over
-// the state table of anstyle-parse 1.0.0 (state/codegen.rs), the parser of
-// DEC's terminals that Paul Williams described.
+// through anstream, which took out of the text for such a stream the
+// sequences that ESC starts, and the C0 control characters and DEL but for
+// tab, line feed, form feed and carriage return: the styles, and whatever
+// of the kind the command line or the environment brought in. A C1
+// control, two bytes in UTF-8, stayed, as anstream kept every UTF-8
+// character whole. This is anstream 1.0.0's StripBytes (adapter/strip.rs)
+// over the state table of anstyle-parse 1.0.0 (state/codegen.rs), the
+// parser of DEC's terminals that Paul Williams described.
 
 // vtState is a state of the terminal parser. They are named as in
 // anstyle-parse: the ground, where characters show, and the parts of the
@@ -165,10 +167,11 @@ func vtTransition(state vtState, b byte) (vtState, vtAction) {
 }
 
 // stripStyles returns text as anstream's StripStream passed it on to a
-// stream that shows no styles: without its escape sequences — CSI, OSC,
-// DCS, SOS, PM and APC alike — and without its control characters but for
-// tab, line feed, form feed and carriage return. text is UTF-8, as clap's
-// always was.
+// stream that shows no styles: without the sequences that ESC starts —
+// CSI, OSC, DCS, SOS, PM and APC alike — and without its C0 control
+// characters and DEL but for tab, line feed, form feed and carriage return.
+// A C1 control, two bytes in UTF-8, stays, as anstream kept every UTF-8
+// character whole. text is UTF-8, as clap's always was.
 func stripStyles(text string) string {
 	var kept strings.Builder
 	state := vtGround
@@ -197,7 +200,9 @@ func droppedLength(text string, state *vtState) int {
 
 // printableLength returns how many bytes at the start of text StripStream
 // kept: it judged each as if the parser were on the ground, kept a UTF-8
-// character whole, and moved the parser only as those judgements did.
+// character whole, and moved the parser only as those judgements did, so
+// that a byte kept leaves the parser where it was, even inside a sequence,
+// and a character of more than one byte returns it to the ground.
 func printableLength(text string, state *vtState) int {
 	for i := 0; i < len(text); {
 		next, action := vtTransition(vtGround, text[i])
