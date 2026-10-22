@@ -16,7 +16,7 @@ func TestClassifiesFinalResults(t *testing.T) {
 		{"+CME ERROR: 10", FinalResult{Kind: FinalResultCME, Code: "10"}, true},
 		{"CONNECT 2400", FinalResult{Kind: FinalResultConnect, ConnectMessage: "2400"}, true},
 		{"+CSQ:5", FinalResult{}, false},
-		// Go only: the remaining codes.
+		// The remaining codes.
 		{"ERROR", FinalResult{Kind: FinalResultError}, true},
 		{"+CMS ERROR: 321", FinalResult{Kind: FinalResultCMS, Code: "321"}, true},
 		{"CONNECT", FinalResult{Kind: FinalResultConnect}, true},
@@ -42,7 +42,7 @@ func TestResponsePrefixes(t *testing.T) {
 		"at+creg?":     "+CREG",
 		`AT+CMGS="+1"`: "+CMGS",
 		"ATE0":         "",
-		// Go only: too short to be a command.
+		// Too short to be a command.
 		"A": "",
 	}
 	for command, want := range tests {
@@ -98,11 +98,11 @@ func TestLineBufferMakesInvalidUTF8Valid(t *testing.T) {
 	assertNextLine(t, &buffer, "caf�")
 }
 
-func TestLineBufferReplacesEachIllFormedSequenceAsRustDoes(t *testing.T) {
+func TestLineBufferReplacesEachIllFormedSubpart(t *testing.T) {
 	var buffer lineBuffer
 
-	// Two Latin-1 letters: Rust's String::from_utf8_lossy gives two
-	// U+FFFD, where Go's strings.ToValidUTF8 would give one.
+	// Two Latin-1 letters are two ill-formed subparts, each replaced by its
+	// own U+FFFD; strings.ToValidUTF8 would replace them with one.
 	buffer.push([]byte("caf\xe9\xe9 \xe2\x82!\r\n"))
 
 	assertNextLine(t, &buffer, "caf\uFFFD\uFFFD \uFFFD!")
@@ -130,7 +130,7 @@ func TestCSVSplit(t *testing.T) {
 	}
 }
 
-func TestParsesNumericFieldsAsTheRustVersionDoes(t *testing.T) {
+func TestParseNumberAcceptsPlusSignAndChecksWidth(t *testing.T) {
 	tests := []struct {
 		field  string
 		width  fieldWidth
@@ -165,7 +165,7 @@ func TestAMissingNumericFieldIsAParseError(t *testing.T) {
 	}
 }
 
-func TestDebugListWritesRustsDebugOfAList(t *testing.T) {
+func TestDebugListQuotesEachItem(t *testing.T) {
 	tests := []struct {
 		items []string
 		want  string
@@ -173,7 +173,7 @@ func TestDebugListWritesRustsDebugOfAList(t *testing.T) {
 		{nil, "[]"},
 		{[]string{"a"}, `["a"]`},
 		{[]string{"a", `say "hi"`}, `["a", "say \"hi\""]`},
-		// Rust's {:?} of a str, where Go's %q would write "\v" and "\x00".
+		// Control characters are escaped as \u{b} and \0, not as \v and \x00.
 		{[]string{"a\vb", "\x00"}, `["a\u{b}b", "\0"]`},
 	}
 	for _, test := range tests {

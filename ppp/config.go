@@ -402,9 +402,9 @@ func (c Config) Format(state fmt.State, verb rune) {
 	writeRedacted(state, verb, c)
 }
 
-// validate checks the configuration in Rust's order — MRU, timers,
-// keepalive, credentials — then a server's Go-only checks: addresses, then
-// the authentication protocol.
+// validate checks the configuration in a fixed order: MRU, timers,
+// keepalive, credentials, then a server's addresses, then its authentication
+// protocol.
 func (c Config) validate() error {
 	if c.MRU < MinMRU {
 		return &ConfigError{Kind: ErrMRUTooSmall, MRU: c.MRU}
@@ -504,12 +504,10 @@ const (
 	ErrCredentialTooLong
 	// ErrInvalidAddress reports a server address — LocalAddress,
 	// PeerAddress or a DNS server — that is not IPv4, the zero Addr
-	// included; the error's Address field holds it. Go only: Rust's
-	// Ipv4Addr could not hold such a value.
+	// included; the error's Address field holds it.
 	ErrInvalidAddress
 	// ErrInvalidAuthProtocol reports a server authentication protocol
 	// without a constant of its own; the error's Protocol field holds it.
-	// Go only, as ErrInvalidAddress.
 	ErrInvalidAuthProtocol
 )
 

@@ -94,8 +94,8 @@ func (f *foreignTransport) DropDTR() error {
 
 // hostError reports err, the app transport's failure, as the handset
 // reports a transport's: ErrTransport with the failure's message. A
-// SatlinkError of kind SatlinkErrorTransport gives its Reason, as the Rust
-// bindings unwrapped it, and a *satlink.Error of kind ErrTransport — from a
+// SatlinkError of kind SatlinkErrorTransport gives its Reason, and a
+// *satlink.Error of kind ErrTransport — from a
 // transport written in Go — passes unchanged, as the handset passes it. A
 // nil err stays nil.
 func hostError(err error) error {

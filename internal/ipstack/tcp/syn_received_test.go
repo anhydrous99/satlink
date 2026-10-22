@@ -1,9 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the SYN-RECEIVED state
-// (src/socket/tcp.rs, lines 3561-3835). test_syn_paused_ack is not ported:
-// it tests the omitted socket-tcp-pause-synack feature (PORTING-ipstack.md,
-// sections 3 and 6).
+// Tests of the SYN-RECEIVED state.
 
 import (
 	"fmt"
@@ -98,7 +95,7 @@ func TestSynReceivedNoWindowScaling(t *testing.T) {
 
 func TestSynReceivedWindowScaling(t *testing.T) {
 	t.Parallel()
-	// smoltcp tries every scale below RFC 7323's largest, 14.
+	// It tries every scale below RFC 7323's largest, 14.
 	const scales = 14
 	for scale := range uint8(scales) {
 		t.Run(fmt.Sprint(scale), func(t *testing.T) {

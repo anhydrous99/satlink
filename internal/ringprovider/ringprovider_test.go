@@ -6,9 +6,8 @@ import (
 	"testing"
 )
 
-// The lists are rustls 0.23.46's, written out from src/crypto/ring/mod.rs:
-// the TLS 1.2 part of ALL_CIPHER_SUITES, and ALL_KX_GROUPS, which the
-// provider's defaults are.
+// The lists are the defaults of rustls's ring provider: its TLS 1.2 cipher
+// suites and its key exchange groups, written out in the provider's order.
 
 func TestTheTLS12CipherSuitesAreTheProvidersInItsOrder(t *testing.T) {
 	t.Parallel()

@@ -120,8 +120,7 @@ func DefaultDataCallSettings() DataCallSettings {
 // HangUp ends nothing: the handset stays busy, [Handset.EndDataCall]
 // included, and the call up and billing until [Handset.Close] — which for
 // a serial port drops DTR, ending the call after AT&D2 — or the program's
-// end. (The Rust version's DataCall held the handset, and so its port:
-// dropping the call closed the port.)
+// end.
 //
 // A DataCall is used by one goroutine at a time. Once HangUp has been
 // called, WriteAll, ReadTimeout, RaiseDTR, DropDTR and HangUp itself fail
@@ -319,8 +318,8 @@ func (c *DataCall) DropDTR() error {
 // it for its own methods whatever the outcome, even when the transport
 // panics. A transport's panic is passed on once DTR has been dropped for
 // 150 ms and raised again, best effort, which after AT&D2 ends the call
-// all the same: the Rust version's hang-up owned the handset, and its
-// unwinding dropped the transport, which dropped DTR.
+// all the same, since unwinding does not close the transport and so does not
+// drop DTR.
 //
 // The +++ escape is used even after NO CARRIER: that text could have come
 // from the remote end, and in command mode the escape is harmless. Silence
@@ -535,12 +534,10 @@ func validateEscapeGuard(guard time.Duration) error {
 	return nil
 }
 
-// debugDuration writes d, which is not negative, as the Rust version's
-// {:?} of a Duration does. Duration.String writes the same from a
-// nanosecond to a minute, but Rust writes zero as "0ns"; from a second up,
-// Rust writes whole seconds, then up to nine fractional digits without
-// trailing zeros, then "s": "10s", "10.5s", and "90s" where String writes
-// "1m30s".
+// debugDuration writes d, which is not negative, as Duration.String does
+// below a minute, except for zero, written "0ns". From a second up it writes
+// whole seconds, then up to nine fractional digits without trailing zeros,
+// then "s": "10s", "10.5s", and "90s" where String writes "1m30s".
 func debugDuration(d time.Duration) string {
 	switch {
 	case d == 0:

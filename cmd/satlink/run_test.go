@@ -9,7 +9,7 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// As in the Rust version, whose main flushed the log before it returned.
+// The log is flushed before the run returns.
 func TestTheLastLogLinesOfARunReachStandardErrorBeforeItEnds(t *testing.T) {
 	stderr := newFirstWriteHolder()
 	c := newCLI(environment{}, stderr)
@@ -31,13 +31,11 @@ func TestTheLastLogLinesOfARunReachStandardErrorBeforeItEnds(t *testing.T) {
 	}
 }
 
-// As in the Rust version, whose panics ended it with the Rust runtime's
-// status, 101, once unwinding had dropped — and so closed — the handset. A
-// bug must not pass for a command line that does not parse, which is what
-// Go's runtime would make of it, with status 2. No error follows the
-// report, as none followed Rust's panic hook. (A panic while the link is up
-// hangs up and fails the command instead:
-// TestAPanicDuringTheCallHangsUpAndFailsTheCommand.)
+// A panic ends the run with status 101, once unwinding has dropped — and so
+// closed — the handset. A bug must not pass for a command line that does not
+// parse, which is what Go's runtime would make of it, with status 2. No error
+// follows the report. (A panic while the link is up hangs up and fails the
+// command instead: TestAPanicDuringTheCallHangsUpAndFailsTheCommand.)
 func TestAPanicEndsTheRunWithStatus101OnceTheHandsetIsClosed(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -83,9 +81,8 @@ func checkEndedByThePanic(t *testing.T, got outcome) {
 	}
 }
 
-// As in the Rust version, whose panic left main before it could end as
-// interrupted. The run stops catching interruptions, as every run does at
-// its end.
+// A panic that leaves main before the run can end as interrupted. The run
+// stops catching interruptions, as every run does at its end.
 func TestAPanicOutranksAnInterruption(t *testing.T) {
 	var relay recordedRelay
 	var stderr lockedBuffer

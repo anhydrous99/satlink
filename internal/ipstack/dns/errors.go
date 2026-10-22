@@ -2,11 +2,9 @@ package dns
 
 import "errors"
 
-// The errors a socket's operations return. smoltcp has one enum per
-// operation (StartQueryError, and GetQueryResultError for TakeQueryResult)
-// with these variants; each operation documents which of them it returns.
-// smoltcp capitalises their texts ("Invalid name"); Go error strings start in
-// lower case.
+// The errors a socket's operations return. Each operation documents which of
+// them it returns. Their texts begin in lower case, as Go error strings do,
+// where smoltcp capitalises them ("Invalid name").
 var (
 	// ErrInvalidName reports a name to look up that is empty or has an
 	// empty label or one longer than 63 octets.

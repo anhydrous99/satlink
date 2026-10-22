@@ -25,8 +25,7 @@ const (
 )
 
 // splitName splits the name at the start of buffer from the octets that
-// follow it, without following compression pointers (smoltcp's
-// parse_name_part). The name shares the buffer's storage.
+// follow it, without following compression pointers. The name shares the buffer's storage.
 func splitName(buffer []byte) (name, rest []byte, err error) {
 	nameLen, err := encodedNameLen(buffer)
 	if err != nil {
@@ -63,7 +62,7 @@ func encodedNameLen(buffer []byte) (int, error) {
 }
 
 // NameLabels returns the labels of the name encoded at the start of name,
-// following compression pointers into the packet (smoltcp's parse_name).
+// following compression pointers into the packet.
 // name may lie inside the packet or outside it. The first pointer may point
 // anywhere in the packet, every later one only before the octets the one
 // before it pointed to, which rules out loops. The sequence yields one label

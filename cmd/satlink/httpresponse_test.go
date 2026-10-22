@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Rust: reads_the_status_code.
+// It reads the status code.
 func TestReadsTheStatusCode(t *testing.T) {
 	tests := []struct {
 		head   string
@@ -35,7 +35,7 @@ func TestAStatusLineNeedsAVersionAndThreeDigits(t *testing.T) {
 	}
 }
 
-// Rust: responses_that_never_carry_a_body_need_no_length.
+// Responses that never carry a body need no length.
 func TestResponsesThatNeverCarryABodyNeedNoLength(t *testing.T) {
 	tests := []struct {
 		status int
@@ -54,7 +54,7 @@ func TestResponsesThatNeverCarryABodyNeedNoLength(t *testing.T) {
 	}
 }
 
-// Rust: framing_the_client_cannot_check_is_an_error.
+// Framing the client cannot check is an error.
 func TestFramingTheClientCannotCheckIsAnError(t *testing.T) {
 	for _, head := range []string{
 		"HTTP/1.0 200 OK\r\nContent-Length: 5, 5",
@@ -80,7 +80,7 @@ func TestFramingThatCannotBeCheckedSaysWhy(t *testing.T) {
 		{"HTTP/1.0 200 OK\r\nContent-Length: 18446744073709551616",
 			`the Content-Length "18446744073709551616" is not a length`},
 		{"HTTP/1.0 200 OK\r\nContent-Length:", `the Content-Length "" is not a length`},
-		// Rust's {:?} of a str, where Go's %q would write "\x1b" and "\x01".
+		// The escapes are \u{1b} and \u{1}, where %q would write "\x1b" and "\x01".
 		{"HTTP/1.1 200 OK\r\nTransfer-Encoding: x\x1by",
 			`the reply uses Transfer-Encoding "x\u{1b}y", which HTTP/1.0 does not allow`},
 		{"HTTP/1.0 200 OK\r\nContent-Length: 5\x01", `the Content-Length "5\u{1}" is not a length`},
@@ -116,7 +116,7 @@ func TestAHeaderFieldIsFoundByItsNameInAnyASCIICase(t *testing.T) {
 	}
 }
 
-// Rust: interim_responses_are_skipped_and_never_taken_for_the_final_one.
+// Interim responses are skipped and never taken for the final one.
 func TestInterimResponsesAreSkippedAndNeverTakenForTheFinalOne(t *testing.T) {
 	head, body, ok := finalResponse([]byte("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 103 Early Hints\r\n" +
 		"Link: </s.css>\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"))
@@ -129,7 +129,7 @@ func TestInterimResponsesAreSkippedAndNeverTakenForTheFinalOne(t *testing.T) {
 	}
 }
 
-// Rust: a_length_no_response_could_reach_never_ends_one_early.
+// A length no response could reach never ends one early.
 func TestALengthNoResponseCouldReachNeverEndsOneEarly(t *testing.T) {
 	head := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n", uint64(math.MaxUint64))
 
@@ -163,7 +163,7 @@ func TestAResponseEndsWhereItsFinalHeadSays(t *testing.T) {
 	}
 }
 
-// Rust: splits_http_head_from_body.
+// It splits the HTTP head from the body.
 func TestSplitsHTTPHeadFromBody(t *testing.T) {
 	head, body, ok := splitHTTPResponse([]byte("HTTP/1.0 200 OK\r\nA: b\r\n\r\nhello"))
 
@@ -172,7 +172,7 @@ func TestSplitsHTTPHeadFromBody(t *testing.T) {
 	}
 }
 
-func TestLinesSplitAsRustDoes(t *testing.T) {
+func TestLinesSplitAtLineEndings(t *testing.T) {
 	tests := []struct {
 		text string
 		want []string

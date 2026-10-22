@@ -9,7 +9,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
-// Reading the command line as the Rust version's clap read it. Each command
+// Reading the command line as clap reads it. Each command
 // takes the tokens up to the name of its subcommand, which takes the rest,
 // and global options can be given to any of them: the deepest one given
 // wins. A token is an option if it starts with '-' — so a value that does
@@ -219,8 +219,7 @@ func (p *parser) readShorts(lvl *level, cluster string) *commandLineExit {
 }
 
 // lossy is text from the command line or the environment as clap showed
-// it: read as Rust's to_string_lossy reads it, with U+FFFD for what is not
-// UTF-8.
+// it: with U+FFFD for each part that is not UTF-8.
 func lossy(text string) string {
 	return utf8lossy.String([]byte(text))
 }

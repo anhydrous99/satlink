@@ -60,7 +60,7 @@
 //
 // Every command shows a summary of what it takes with -h, and more with
 // --help or satlink help, as in satlink help net get. The command line is
-// read as the Rust version's clap read it, and its errors and help are clap's.
+// read as clap reads it, and its errors and help are clap's.
 //
 // The exit status is 0 on success, 1 when the command failed, 2 when the
 // command line is wrong, 101 when satlink panicked, and 130 — or death by

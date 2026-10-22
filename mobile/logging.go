@@ -43,12 +43,11 @@ type LogSink interface {
 // are dropped rather than letting a slow sink hold up the link.
 const logQueueLimit = 256
 
-// logGoroutine names the goroutine that delivers records to the sink, as
-// the Rust bindings named its thread.
+// logGoroutine names the goroutine that delivers records to the sink.
 const logGoroutine = "satlink-log"
 
 // logSinkSet records that SetLogSink has installed its bridge: the process
-// has one default logger, as Rust's log crate has one logger.
+// has one default logger.
 var logSinkSet atomic.Bool
 
 // SetLogSink sends the records at level and above, one of the LogLevel

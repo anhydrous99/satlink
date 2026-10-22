@@ -10,7 +10,7 @@ import (
 )
 
 // monitorPollTimeout is how long each wait for events lasts before the
-// next, as in the Rust version; the loop looks at its context between
+// next; the loop looks at its context between
 // waits. Ctrl-C ends the process as it does by default: monitor catches no
 // interruptions.
 const monitorPollTimeout = time.Second
@@ -30,7 +30,7 @@ func (c *cli) monitorCommand() *command {
 
 // monitor prints the handset's unsolicited result codes as they arrive,
 // until ctx ends; main's never does, so it runs until the process is
-// interrupted, as the Rust version's.
+// interrupted.
 func monitor(ctx context.Context, handset *satlink.Handset, stdout io.Writer) error {
 	for ctx.Err() == nil {
 		urcs, err := handset.PollURCs(monitorPollTimeout)

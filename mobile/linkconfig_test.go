@@ -118,7 +118,7 @@ func TestHostAddressesMustBeIPv4(t *testing.T) {
 
 			_, err := settings.config(nil)
 
-			// The Rust bindings' reason, which names no address.
+			// The reason, which names no address.
 			assertSatlinkError(t, err,
 				&SatlinkError{Kind: SatlinkErrorInvalidArgument, Reason: "invalid IPv4 address syntax"},
 				"invalid argument: invalid IPv4 address syntax")

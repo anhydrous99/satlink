@@ -206,7 +206,7 @@ func TestOneGoroutineReadsWhileAnotherWritesTLS(t *testing.T) {
 		}
 		received <- echoed
 	}()
-	// Rust sleeps 200 ms here so that the reader is waiting by the time the
+	// A fixed 200 ms sleep would have the reader waiting by the time the
 	// writer starts; AwaitWaitingCall waits for exactly that.
 	satnet.AwaitWaitingCall(t, link, timeout)
 
@@ -273,9 +273,8 @@ func TestAReaderKeepsSendingWhatATimedOutWriteLeft(t *testing.T) {
 	}
 }
 
-// TestAWriteThatTimesOutCountsWhatTheSessionTook is the Rust test in Go's
-// shape: Rust's io::Write::write returned what was taken and left the
-// timeout to flush, where Go's Write returns the count with the error.
+// TestAWriteThatTimesOutCountsWhatTheSessionTook checks that a write which
+// times out returns the count of what the session took, with the error.
 func TestAWriteThatTimesOutCountsWhatTheSessionTook(t *testing.T) {
 	t.Parallel()
 	link := tlsLink(t)
@@ -499,9 +498,9 @@ func TestAWriteAfterShutdownDoesNotCutOffWhatIsLeftToRead(t *testing.T) {
 	}
 }
 
-// TestAWaitingReadGetsWhatAPollingReadTookIn is the Rust test in Go's shape.
-// Go's reads are serialised, so the race the Rust fix closes cannot arise,
-// and no read need poll: the first read waits for the server holding the
+// TestAWaitingReadGetsWhatAPollingReadTookIn checks that a waiting read gets
+// what a polling read took in. Reads are serialised, so no read need poll:
+// the first read waits for the server holding the
 // session's read, and the second waits behind it. The first takes the
 // records in but returns a byte of them; the second must get the rest from
 // the session, rather than wait for it in TCP.
@@ -666,9 +665,9 @@ func TestAWriteOnceTheGoodbyeIsQueuedIsRefused(t *testing.T) {
 	setWriteDeadline(t, conn, 500*time.Millisecond)
 	expectKind(t, conn.CloseWrite(), satnet.ErrTimedOut)
 
-	// The server ignores whatever follows the close_notify. Rust's test
-	// asks for an error; its kind, as Rust's own, is a reset, as TCP
-	// refuses a write after its own shutdown.
+	// The server ignores whatever follows the close_notify. The write is
+	// expected to fail with a reset, as TCP refuses a write after its own
+	// shutdown.
 	setWriteDeadline(t, conn, 200*time.Millisecond)
 	_, err := conn.Write([]byte("after the goodbye\n"))
 	expectKind(t, err, satnet.ErrConnectionReset)
@@ -699,10 +698,11 @@ func TestAWriteRefusedOnceTheLinkClosedLeavesDeliveryConfirmed(t *testing.T) {
 // close grace, which the link then drains for in full.
 const drainingLine = 3_000
 
-// TestAWriteRefusedWhileTheLinkDrainsLeavesDeliveryConfirmed is Go only:
-// the Rust test just above writes once the link has closed, when the
-// aborted connection refuses the write anyway; here the link still drains
-// what was written before the close, and the connection still sends.
+// TestAWriteRefusedWhileTheLinkDrainsLeavesDeliveryConfirmed checks that a
+// write refused while the link drains leaves delivery confirmed. The test
+// above writes once the link has closed, when the aborted connection refuses
+// the write anyway; here the link still drains what was written before the
+// close, and the connection still sends.
 func TestAWriteRefusedWhileTheLinkDrainsLeavesDeliveryConfirmed(t *testing.T) {
 	t.Parallel()
 	config := linkConfig(t, "secure.test:443", "192.0.2.7:9")

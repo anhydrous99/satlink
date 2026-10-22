@@ -1,10 +1,6 @@
 package tcp
 
-// The test of smoltcp's socket/tcp.rs for the retransmission timer,
-// test_timer_retransmit, from its "Timer tests" section (src/socket/tcp.rs,
-// lines 9550-9606). The section's test_rtt_estimator is in
-// rtt_estimator_test.go. test_set_get_congestion_control is not ported:
-// congestion control is omitted (PORTING-ipstack.md, sections 3 and 6).
+// Tests of the retransmission timer.
 
 import (
 	"testing"

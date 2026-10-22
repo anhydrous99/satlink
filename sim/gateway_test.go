@@ -105,7 +105,7 @@ func TestTheInternetComesWithIPv4AndGoesWithPPP(t *testing.T) {
 
 // This test records the process-wide logger, so it does not run in
 // parallel.
-func TestTheGatewayLogsIPv4UpAsTheRustVersionLoggedIt(t *testing.T) {
+func TestTheGatewayLogsIPv4Up(t *testing.T) {
 	recorder := recordLogs(t)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
@@ -128,7 +128,7 @@ func TestTheGatewayLogsIPv4UpAsTheRustVersionLoggedIt(t *testing.T) {
 
 // This test records the process-wide logger, so it does not run in
 // parallel.
-func TestTheGatewayLogsPPPDownAsTheRustVersionLoggedIt(t *testing.T) {
+func TestTheGatewayLogsPPPDown(t *testing.T) {
 	recorder := recordLogs(t)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
@@ -152,7 +152,7 @@ func TestTheGatewayLogsPPPDownAsTheRustVersionLoggedIt(t *testing.T) {
 // negotiation ends, but the internet stays, so that a renegotiation that
 // keeps the MTU keeps its connections. This test records the process-wide
 // logger, so it does not run in parallel.
-func TestTheGatewayLogsADatagramPPPCannotSendAsTheRustVersionLoggedIt(t *testing.T) {
+func TestTheGatewayLogsADatagramPPPCannotSend(t *testing.T) {
 	recorder := recordLogs(t)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
@@ -214,9 +214,9 @@ func TestTheGatewayRepeatsItsRequestToASilentClient(t *testing.T) {
 	}
 }
 
-// Rust keeps the internet across a renegotiation that keeps the MTU, and
-// with it open connections; the internet is built for the MTU again only
-// when it changes.
+// The internet is kept across a renegotiation that keeps the MTU, and with
+// it open connections; the internet is built for the MTU again only when it
+// changes.
 func TestTheInternetOutlivesARenegotiationThatKeepsTheMTU(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -235,9 +235,9 @@ func TestTheInternetOutlivesARenegotiationThatKeepsTheMTU(t *testing.T) {
 }
 
 // A renegotiation that changes the MTU brings EventUp again, with no
-// EventDown before it. Rust then replaces the internet, which drops the
-// old one with its TLS sessions; Go has to close them, or their
-// goroutines would outlive it.
+// EventDown before it. The internet is then replaced, which drops the old
+// one: its TLS sessions have to be closed, or their goroutines would outlive
+// it.
 func TestARenegotiationThatChangesTheMTUBuildsANewInternet(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

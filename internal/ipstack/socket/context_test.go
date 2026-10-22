@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-// epoch is smoltcp's Instant::ZERO, from which every test time derives.
+// epoch is the zero time, from which every test time derives.
 var epoch = time.Time{}
 
-// newTestContext returns the context of smoltcp's tests::setup(Medium::Ip):
-// addresses 192.168.1.1/24 and 127.0.0.1/8, an MTU of 1500 and seed 0.
+// newTestContext returns a context with the addresses 192.168.1.1/24 and
+// 127.0.0.1/8, an MTU of 1500 and seed 0.
 func newTestContext(t *testing.T) *Context {
 	t.Helper()
 	cx := NewContext(epoch, 0, 1500)
@@ -35,8 +35,7 @@ func addr(text string) netip.Addr {
 	return netip.MustParseAddr(text)
 }
 
-// replaceFirstAddr does what smoltcp's tests do with update_ip_addrs and
-// iter_mut().next(): it replaces the first address, keeping the others.
+// replaceFirstAddr replaces the first address, keeping the others.
 func replaceFirstAddr(t *testing.T, cx *Context, prefix string) {
 	t.Helper()
 	addrs := cx.IPAddrs()
@@ -55,7 +54,6 @@ func assertBroadcasts(t *testing.T, cx *Context, broadcasts map[string]bool) {
 	}
 }
 
-// Ported from smoltcp's iface test test_local_subnet_broadcasts.
 func TestContextLocalSubnetBroadcasts(t *testing.T) {
 	t.Parallel()
 	cx := newTestContext(t)
@@ -89,7 +87,6 @@ func TestContextLocalSubnetBroadcasts(t *testing.T) {
 	})
 }
 
-// Ported from smoltcp's iface test get_source_address.
 func TestContextSourceAddress(t *testing.T) {
 	t.Parallel()
 	cx := newTestContext(t)
@@ -107,7 +104,6 @@ func TestContextSourceAddress(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's iface test get_source_address_empty_interface.
 func TestContextSourceAddressEmptyInterface(t *testing.T) {
 	t.Parallel()
 	cx := newTestContext(t)

@@ -9,8 +9,7 @@ import (
 )
 
 // anySocket is a socket of any kind the stack has, as the interface drives
-// it when sending: smoltcp's Socket enum, whose kinds each implement
-// dispatch and poll_at. Ingress needs no such abstraction, as each protocol
+// it when sending: each kind implements dispatch and poll_at. Ingress needs no such abstraction, as each protocol
 // reaches only its own kinds of socket.
 type anySocket interface {
 	// dispatch lets the socket send at most one packet through emit, and

@@ -19,10 +19,9 @@ func Example() {
 	}
 }
 
-// greet is the example's work. Where the Rust documentation returns early
-// and lets the dropped link hang up, it closes the link on every path: Go
-// drops nothing, and a link left to the garbage collector hangs up only
-// once it runs.
+// greet is the example's work. It closes the link on every path, including
+// early returns, rather than relying on a dropped link to hang up: a link left
+// to the garbage collector hangs up only once it runs.
 func greet(handset *satlink.Handset) error {
 	policy, err := satnet.ParsePolicy("relay.example.com:443")
 	if err != nil {

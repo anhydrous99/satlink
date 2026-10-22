@@ -24,8 +24,8 @@ const (
 	ICMPv4TimeExceeded ICMPv4Message = 11
 )
 
-// The message types smoltcp names although the stack neither parses nor
-// sends them (RFC 792, RFC 1256). They matter only for how a message of one
+// The message types the stack names although it neither parses nor sends
+// them (RFC 792, RFC 1256). They matter only for how a message of one
 // of these types is shown.
 const (
 	icmpv4Redirect       ICMPv4Message = 5
@@ -36,8 +36,8 @@ const (
 	icmpv4TimestampReply ICMPv4Message = 14
 )
 
-// icmpv4MessageNames are the descriptions smoltcp's Display gives the
-// message types it knows.
+// icmpv4MessageNames are the descriptions of the message types the stack
+// knows.
 var icmpv4MessageNames = map[ICMPv4Message]string{
 	ICMPv4EchoReply:      "echo reply",
 	ICMPv4DstUnreachable: "destination unreachable",
@@ -51,8 +51,8 @@ var icmpv4MessageNames = map[ICMPv4Message]string{
 	icmpv4TimestampReply: "timestamp reply",
 }
 
-// String describes the message type as smoltcp does ("echo request"), or
-// gives its number when smoltcp does not know it.
+// String describes the message type ("echo request"), or gives its number
+// when the type is unknown.
 func (m ICMPv4Message) String() string {
 	if name, ok := icmpv4MessageNames[m]; ok {
 		return name
@@ -70,7 +70,7 @@ const (
 )
 
 // icmpv4HeaderLen is the header length of every ICMPv4 message the stack
-// handles, and smoltcp's conservative assumption for every other: the type,
+// handles, and a conservative assumption for every other: the type,
 // the code and the checksum, then four octets whose meaning depends on the
 // type (RFC 792).
 const icmpv4HeaderLen = 8
@@ -92,7 +92,7 @@ const icmpv4EchoCode = 0
 
 // icmpv4MinQuotedPayloadLen is how much of the payload of the datagram an
 // error message is about it must quote. RFC 792 requires exactly eight
-// octets; smoltcp allows more, since there isn't a reason not to, but
+// octets; the stack allows more, since there isn't a reason not to, but
 // requires at least eight.
 const icmpv4MinQuotedPayloadLen = 8
 
@@ -215,7 +215,7 @@ type ICMPv4Repr struct {
 	// unchanged: when the stack builds an error, PayloadLen is that
 	// datagram's full payload length, which Emit writes into the quoted
 	// total-length field, however little of the payload Data quotes.
-	// ParseICMPv4Repr sets PayloadLen to len(Data), as smoltcp does.
+	// ParseICMPv4Repr sets PayloadLen to len(Data).
 	Header IPv4Repr
 	// Data is the payload of an echo message, or the start of the payload of
 	// the datagram an error message is about. ParseICMPv4Repr requires at
@@ -341,9 +341,8 @@ func (r ICMPv4Repr) emitEcho(packet ICMPv4Packet) {
 func (r ICMPv4Repr) emitError(packet ICMPv4Packet, checksums ChecksumCapabilities) {
 	packet.SetType(r.Message)
 	packet.SetCode(r.Code)
-	// smoltcp leaves the unused field as the buffer had it; zeroing it, as
-	// RFC 792 asks, makes the message independent of what the buffer held,
-	// as it is in smoltcp's zeroed buffers.
+	// Zeroing the unused field, as RFC 792 asks, makes the message independent
+	// of what the buffer held.
 	clear(packet[icmpv4UnusedOffset:icmpv4HeaderLen])
 	quoted := IPv4Packet(packet.Data())
 	r.Header.Emit(quoted, checksums)
@@ -370,7 +369,7 @@ func (r ICMPv4Repr) isError() bool {
 }
 
 // unrepresentable is the panic message for a Repr whose Message is none of
-// the four that smoltcp's Repr can hold.
+// the four that ICMPv4Repr can hold.
 func (r ICMPv4Repr) unrepresentable() string {
 	return fmt.Sprintf("wire: ICMPv4Repr does not represent %v (type %d) messages", r.Message, uint8(r.Message))
 }

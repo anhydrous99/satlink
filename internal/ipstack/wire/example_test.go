@@ -8,7 +8,7 @@ import (
 )
 
 // To emit an IP packet header into an octet buffer, and then parse it back
-// (the example of smoltcp's wire module).
+// (the example of the wire package).
 func Example() {
 	repr := wire.IPv4Repr{
 		SrcAddr:    netip.MustParseAddr("10.0.0.1"),

@@ -16,7 +16,7 @@ import (
 	"github.com/anhydrous99/satlink"
 )
 
-// Go only: the serial library on a real tty, a pseudo-terminal's slave
+// The serial library on a real tty, a pseudo-terminal's slave
 // standing in for the handset's device. Its master side sees the slave's
 // last close, which is when the line hangs up and DTR drops.
 

@@ -1,13 +1,13 @@
-package rustdebug_test
+package debugtext_test
 
 import (
 	"testing"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
-// The texts are those rustc 1.99.1 writes for {:?} of the same strings.
-func TestQuoteWritesAStrAsRustsDebugWritesIt(t *testing.T) {
+// Each want is the Debug-style text the quoting rules give for the string.
+func TestQuoteWritesStringsInDebugStyle(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -18,7 +18,7 @@ func TestQuoteWritesAStrAsRustsDebugWritesIt(t *testing.T) {
 		{"printable ASCII", "AT+CSQ", `"AT+CSQ"`},
 		{"the space", "a b", `"a b"`},
 		{"the characters escaped with a backslash", "\x00\t\r\n\\\"", `"\0\t\r\n\\\""`},
-		{"a single quote, which a str leaves alone", "it's", `"it's"`},
+		{"a single quote, which is left alone", "it's", `"it's"`},
 		// Go's %q writes these "\a", "\v", "\f", "\x1b" and "\x7f".
 		{"other control characters", "\a\v\f\x1b\x7f", `"\u{7}\u{b}\u{c}\u{1b}\u{7f}"`},
 		{"a vertical tab in a URL", "http://web.test/a\vb", `"http://web.test/a\u{b}b"`},
@@ -37,22 +37,21 @@ func TestQuoteWritesAStrAsRustsDebugWritesIt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := rustdebug.Quote(test.text); got != test.want {
+			if got := debugtext.Quote(test.text); got != test.want {
 				t.Errorf("Quote(%q) = %s, want %s", test.text, got, test.want)
 			}
 		})
 	}
 }
 
-// A Rust str cannot hold a byte that is not UTF-8, so this text is Quote's
-// own: the byte as \xNN, in lower case as Rust's u8::escape_ascii writes
-// it, where the replacement character before it, which is UTF-8, is
-// written as it is. The text after the byte is still quoted: its vertical
-// tab is written \u{b}.
+// Quote writes a byte that is not part of valid UTF-8 as \xNN, in lower
+// case, while the replacement character before it, which is valid UTF-8,
+// is written as it is. The text after the byte is still quoted: its
+// vertical tab is written \u{b}.
 func TestQuoteWritesAByteThatIsNotUTF8AsAnEscape(t *testing.T) {
 	t.Parallel()
 	text, want := "a\ufffdb\xff\v", "\"a\ufffdb\\xff\\u{b}\""
-	if got := rustdebug.Quote(text); got != want {
+	if got := debugtext.Quote(text); got != want {
 		t.Errorf("Quote(%q) = %s, want %s", text, got, want)
 	}
 }

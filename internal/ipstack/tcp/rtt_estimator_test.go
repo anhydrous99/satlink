@@ -1,10 +1,8 @@
 package tcp
 
-// The test of smoltcp's socket/tcp.rs for the RTT estimator,
-// test_rtt_estimator, from its "Timer tests" section (src/socket/tcp.rs,
-// lines 9572-9585), and Go tests of what smoltcp's tests leave out: the
-// bounds of the RTO and its smallest margin, what a measurement measures,
-// that it ends its sample, and the estimate's reset after repeated backoffs.
+// Tests of the RTT estimator: the bounds of the RTO and its smallest margin,
+// what a measurement measures, that it ends its sample, and the estimate's
+// reset after repeated backoffs.
 
 import (
 	"testing"
@@ -71,8 +69,8 @@ func TestRTTEstimatorKeepsAMarginOfFiveMilliseconds(t *testing.T) {
 	}
 }
 
-// smoltcp's Instant - Instant is the distance between the two (its
-// src/time.rs), so even a clock that steps back gives a round-trip time.
+// The distance between two instants is their difference, so even a clock that
+// steps back gives a round-trip time.
 func TestRTTEstimatorMeasuresTheDistanceBetweenSendAndACK(t *testing.T) {
 	t.Parallel()
 	const seq = wire.TCPSeqNumber(10)
@@ -88,7 +86,7 @@ func TestRTTEstimatorMeasuresTheDistanceBetweenSendAndACK(t *testing.T) {
 	}
 }
 
-// smoltcp's test of the estimator only samples. The acknowledgement of the
+// The estimator only samples. The acknowledgement of the
 // segment being timed ends the sample it measures: a later one measures
 // nothing until another segment is timed.
 func TestRTTEstimatorMeasuresASampleOnce(t *testing.T) {

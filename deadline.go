@@ -13,7 +13,7 @@ const longestRead = time.Second
 //
 // time.Time.Add cannot overflow: for the longest timeout, math.MaxInt64, it
 // drops the monotonic reading and gives a wall-clock time some 292 years
-// ahead, which is no deadline in effect (the Rust version's None). A timeout
+// ahead, which is no deadline in effect. A timeout
 // of zero or less gives a deadline that has already passed.
 func deadlineAfter(timeout time.Duration) time.Time {
 	return time.Now().Add(timeout)

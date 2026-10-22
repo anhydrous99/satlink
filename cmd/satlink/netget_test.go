@@ -14,9 +14,8 @@ import (
 
 // An https:// fetch trusts the public web PKI — Mozilla's root program, and
 // nothing else — asks nothing more of a server, such as a pinned key, and
-// offers it no protocol through ALPN, as the Rust version's
-// TlsConnector::new(): a server offered h2 could answer an HTTP/1.0 request
-// in HTTP/2. The golden file net-get-https-untrusted cannot show it: a
+// offers it no protocol through ALPN: a server offered h2 could answer an
+// HTTP/1.0 request in HTTP/2. The golden file net-get-https-untrusted cannot show it: a
 // fetch that trusted something else would fail there just the same, as
 // would every real one, after paying for the call. So the test looks at
 // the connector the fetch dials with.
@@ -55,7 +54,7 @@ func mozillasRootProgram(t *testing.T) *x509.CertPool {
 	return roots
 }
 
-// Rust: the_request_names_the_port_but_keeps_the_fragment_back.
+// The request names the port but keeps the fragment back.
 func TestTheRequestNamesThePortButKeepsTheFragmentBack(t *testing.T) {
 	request := httpRequest(mustParseHTTPURL(t, "http://example.com:8080/page?q=1#top"))
 
@@ -108,8 +107,7 @@ func (c *transferRecorder) Read(p []byte) (int, error) {
 	return c.response.Read(p)
 }
 
-// Go only: Rust's tests leave the deadline unchecked. No other test could
-// show it sooner than ten minutes.
+// No other test could show the deadline sooner than ten minutes.
 func TestNetGetAllowsTenMinutesForTheRequestAndItsWholeResponse(t *testing.T) {
 	response := "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello"
 	conn := &transferRecorder{response: strings.NewReader(response)}
@@ -179,7 +177,7 @@ func readThen(last reply) ([]byte, responseEnding) {
 // callDropped is how reading fails when the call has dropped.
 var callDropped = &satnet.Error{Kind: satnet.ErrLinkDown, Reason: satnet.CloseReason{Kind: satnet.CloseReasonCarrierLost}}
 
-// Rust: reading_stops_at_a_close_a_truncation_or_the_deadline.
+// Reading stops at a close, a truncation or the deadline.
 func TestReadingStopsAtACloseATruncationOrTheDeadline(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -212,7 +210,7 @@ func TestDataThatCameWithTheEndIsKept(t *testing.T) {
 	}
 }
 
-// Rust: reading_stops_once_the_response_is_as_long_as_announced.
+// Reading stops once the response is as long as announced.
 func TestReadingStopsOnceTheResponseIsAsLongAsAnnounced(t *testing.T) {
 	for _, chunks := range [][]string{
 		{"HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhel", "lo"},
@@ -235,7 +233,7 @@ func TestReadingStopsOnceTheResponseIsAsLongAsAnnounced(t *testing.T) {
 	}
 }
 
-// Rust: a_body_is_complete_when_its_length_says_so_or_the_session_ended_properly.
+// A body is complete when its length says so or the session ended properly.
 func TestABodyIsCompleteWhenItsLengthSaysSoOrTheSessionEndedProperly(t *testing.T) {
 	five := bodyLength{bytes: 5, known: true}
 	unknown := bodyLength{}
@@ -292,7 +290,7 @@ func TestAnIncompleteBodySaysWhatIsMissing(t *testing.T) {
 	}
 }
 
-// Rust: a_response_whose_head_never_ended_cannot_be_used.
+// A response whose head never ended cannot be used.
 func TestAResponseWhoseHeadNeverEndedCannotBeUsed(t *testing.T) {
 	for _, response := range []string{"", "HTTP/1.0 200 OK\r\nContent-Ty", "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n"} {
 		if _, _, ok := splitHTTPResponse([]byte(response)); ok {

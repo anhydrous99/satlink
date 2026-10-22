@@ -121,10 +121,8 @@ func (h *Handset) pulseDTR() error {
 // part of a data call that holds the handset — setting the call up, or
 // hanging it up — it pulses DTR only when a transport's panic unwinds
 // through that part: the call may then be up, and with AT&D2 the pulse
-// ends it. The Rust version's call owned the handset, so the unwinding
-// dropped it and its transport, whose drop dropped DTR; the Go handset stays
-// with its caller, so DTR comes up again, as with AT&D2 a DTR left down
-// would end the next call.
+// ends it. Unwinding does not close the handset, so DTR comes up again: with
+// AT&D2 a DTR left down would end the next call.
 //
 // It is best effort, as nothing can be reported while a panic unwinds: a
 // transport without a DTR line has nothing to pulse, and a second panic,

@@ -6,12 +6,10 @@ import (
 	"testing"
 )
 
-// The command line as the Rust version's clap read it: its help pages, its
-// errors for command lines that do not parse, its environment variables, and
-// its styles. Every golden file in testdata/help, testdata/usage and
-// testdata/style was checked against the Rust CLI's output for the same
-// command line, with only the product renamed (iridium → satlink, IRIDIUM_ →
-// SATLINK_).
+// The command line as clap reads it: its help pages, its errors for command
+// lines that do not parse, its environment variables, and its styles. The
+// golden files in testdata/help, testdata/usage and testdata/style hold that
+// output, byte for byte.
 
 // helpCommands are the command paths whose help pages are compared.
 var helpCommands = [][]string{
@@ -20,7 +18,7 @@ var helpCommands = [][]string{
 	{"net", "resolve"}, {"net", "get"}, {"net", "tcp"},
 }
 
-func TestTheCommandLineIsReadAsTheRustVersionReadIt(t *testing.T) {
+func TestTheCommandLineIsReadAsClapReadsIt(t *testing.T) {
 	cases := append(helpCases(), usageCases()...)
 	cases = append(cases, environmentCases()...)
 	cases = append(cases, styleCases()...)
@@ -204,7 +202,7 @@ func flagValueUsageCases() []goldenCase {
 }
 
 // notUTF8Case is a command line holding text that is not UTF-8, and what
-// the Rust CLI wrote on standard error for it.
+// clap wrote on standard error for it.
 type notUTF8Case struct {
 	name   string
 	world  world
@@ -240,11 +238,9 @@ func notUTF8Cases() []notUTF8Case {
 	}
 }
 
-// Go only. clap's value parsers refused text that is not UTF-8 before
-// anything ran, but for possible values, and clap showed tokens and
-// variables lossily. Golden files would hold the bytes themselves, so the
-// output is written out here, as the Rust CLI wrote it for the same command
-// line.
+// clap's value parsers refused text that is not UTF-8 before anything ran,
+// but for possible values, and clap showed tokens and variables lossily. Golden
+// files would hold the bytes themselves, so the output is written out here.
 func TestTextThatIsNotUTF8IsRefusedOrShownLossilyAsClapDid(t *testing.T) {
 	for _, test := range notUTF8Cases() {
 		t.Run(test.name, func(t *testing.T) {
@@ -268,13 +264,13 @@ func TestHelpShowsAVariableThatIsNotUTF8Lossily(t *testing.T) {
 	}
 }
 
-// Go only. clap's help and errors went to a stream that shows no styles
+// clap's help and errors went to a stream that shows no styles
 // through anstream, which took out the sequences that ESC starts, and the
 // C0 control characters and DEL but for tab, line feed, form feed and
 // carriage return: clap's own styles, and those that tokens and variables
 // brought in. A stream that shows styles got them all. Golden files would
 // hold the control characters themselves, so the output is written out
-// here, as the Rust CLI wrote it for the same command line.
+// here.
 func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing.T) {
 	refused := func(problem, usage string) string {
 		return "error: " + problem + "\n\nUsage: " + usage + "\n\nFor more information, try '--help'.\n"
@@ -301,8 +297,7 @@ func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing
 		// clap's style after the token ends the sequence.
 		{"an unfinished sequence", world{}, []string{"\x1b["}, unrecognized("")},
 		{"a line break inside a sequence", world{}, []string{"\x1b[\n1m"}, unrecognized("\n1m")},
-		// The value's control character is taken out; Rust's {:?} of the URL
-		// escapes it.
+		// The message quotes the URL and escapes the control character in it.
 		{"a control character in a URL", world{}, []string{instant, "net", "get", "http://web.test/a\vb"},
 			"error: invalid value 'http://web.test/ab' for '<URL>': \"http://web.test/a\\u{b}b\" " +
 				"is not a valid http:// or https:// URL\n\nFor more information, try '--help'.\n"},
@@ -327,7 +322,7 @@ func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing
 	}
 }
 
-// Go only, as the test above, for the variables whose values help shows. A
+// Like the test above, this covers the variables whose values help shows. A
 // line break in one starts the next line where the argument's help starts,
 // as clap indented the lines of an argument's help.
 func TestHelpShowsVariablesHoldingControlCharactersAsClapDid(t *testing.T) {

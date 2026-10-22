@@ -1,14 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the ESTABLISHED state
-// (src/socket/tcp.rs, lines 4505-5546). Three of them are not ported,
-// because they need the omitted TCP timestamp generator (PORTING-ipstack.md,
-// sections 3 and 6): test_established_options_reduce_payload_when_local_mss_limited,
-// test_established_options_reduce_payload_when_remote_mss_limited and
-// test_established_tiny_mss_with_options_makes_progress. The clamp of the
-// peer's MSS that the last of them also covers is tested in listen_test.go
-// and syn_sent_test.go; the local MSS limit that the second also covers is
-// tested, without timestamps, by TestEstablishedLocalMSSLimitsSegments.
+// Tests of the ESTABLISHED state.
 
 import (
 	"bytes"
@@ -20,7 +12,7 @@ import (
 )
 
 // peekThenReceive peeks into a buffer of bufferLen octets and then
-// receives into another, as smoltcp's peek_slice tests do, and returns what
+// receives into another, and returns what
 // each of the two calls copied.
 func peekThenReceive(t *testing.T, s *testSocket, bufferLen int) (peeked, received []byte) {
 	t.Helper()
@@ -31,8 +23,7 @@ func peekThenReceive(t *testing.T, s *testSocket, bufferLen int) (peeked, receiv
 	return peeked, received
 }
 
-// logTransmitState logs where the socket stands in sending, which smoltcp's
-// test_established_send_window_shrink prints; go test shows it for a failed
+// logTransmitState logs where the socket stands in sending; go test shows it for a failed
 // test, or with -v.
 func logTransmitState(t *testing.T, s *testSocket) {
 	t.Helper()
@@ -40,7 +31,7 @@ func logTransmitState(t *testing.T, s *testSocket) {
 }
 
 // setupRFC2018Cases returns the socket that the tests of RFC 2018's cases
-// start from, and the segment they send: smoltcp's setup_rfc2018_cases.
+// start from, and the segment they send.
 func setupRFC2018Cases(t *testing.T) (*testSocket, []byte) {
 	t.Helper()
 	// This is a utility function used by the tests for RFC 2018 cases. It
@@ -88,7 +79,7 @@ func TestPeekSlice(t *testing.T) {
 	// Peek into the receive buffer, then receive from it.
 	peeked, received := peekThenReceive(t, s, bufferLen)
 
-	// Beyond smoltcp's assertion that both calls copy the same, the Go test
+	// Beyond the assertion that both calls copy the same, the test
 	// checks that they copy the data, so that it cannot pass with nothing.
 	if !bytes.Equal(peeked, received) || string(received) != "0123456" {
 		t.Errorf("PeekSlice copied %q and ReceiveSlice %q, want %q from both", peeked, received, "0123456")
@@ -108,7 +99,7 @@ func TestPeekSliceBufferWrap(t *testing.T) {
 
 	peeked, received := peekThenReceive(t, s, bufferLen)
 
-	// As in TestPeekSlice, the Go test checks the data too.
+	// As in TestPeekSlice, the test checks the data too.
 	if !bytes.Equal(peeked, received) || string(received) != "6701234" {
 		t.Errorf("PeekSlice copied %q and ReceiveSlice %q, want %q from both", peeked, received, "6701234")
 	}
@@ -241,7 +232,7 @@ func TestEstablishedSendBufGtWin(t *testing.T) {
 // timestamps: a peer whose MSS exceeds what the local link takes gets
 // segments of the local MSS, the IP MTU less the IPv4 and TCP headers. With
 // Nagle's algorithm on, a second full segment follows the first while that
-// is in flight, and the shorter rest waits. Without timestamps, smoltcp's one
+// is in flight, and the shorter rest waits. Without timestamps, one
 // segment's worth of data would fit whichever MSS applied, so the test
 // queues more.
 func TestEstablishedLocalMSSLimitsSegments(t *testing.T) {
@@ -521,7 +512,7 @@ func TestEstablishedBadSeqChallengeACKUpdated(t *testing.T) {
 
 	// Send the wrong seq again, check that the challenge ack is correctly
 	// updated. The ack number must be updated even if we don't call dispatch
-	// on the socket. See https://github.com/smoltcp-rs/smoltcp/issues/338
+	// on the socket.
 	sendExpectingReply(t, s.at(2000*time.Millisecond), wrongSeq,
 		fromLocal(withSeq(localSeq.Add(1)), withAck(remoteSeq.Add(2)), withWindow(63))) // this has changed
 }

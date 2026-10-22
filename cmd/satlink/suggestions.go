@@ -6,7 +6,7 @@ import (
 )
 
 // Suggestions for a mistyped name — "tip: a similar subcommand exists:
-// 'info'" — found as the Rust version's clap found them.
+// 'info'" — found the way clap finds them.
 
 // similarityThreshold is how alike two names must be for one to suggest the
 // other: clap's 0.7, "so that bar -> baz is suggested".

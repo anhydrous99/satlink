@@ -10,7 +10,7 @@ import (
 // give it.
 const programName = "satlink"
 
-// version is the Rust workspace's version, which the port carries on.
+// version is satlink's version.
 const version = "0.1.0"
 
 // cli is one run of the command line: the world it runs in, its standard

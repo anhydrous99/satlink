@@ -12,7 +12,7 @@ func mustParseHTTPURL(t *testing.T, rawURL string) httpURL {
 	return url
 }
 
-// Rust: parses_urls, the URLs that parse.
+// The URLs that parse.
 func TestParsesURLs(t *testing.T) {
 	tests := []struct {
 		url  string
@@ -28,7 +28,7 @@ func TestParsesURLs(t *testing.T) {
 	}
 }
 
-// Rust: parses_urls, the URLs that do not; the others are Go's own.
+// The URLs that do not parse.
 func TestRefusesWhatIsNotAnHTTPURL(t *testing.T) {
 	for _, url := range []string{
 		"ftp://example.com",
@@ -48,7 +48,7 @@ func TestRefusesWhatIsNotAnHTTPURL(t *testing.T) {
 func TestARefusedURLIsNamedInTheError(t *testing.T) {
 	tests := map[string]string{
 		"ftp://example.com": `"ftp://example.com" is not a valid http:// or https:// URL`,
-		// Rust's {:?} of a str, where Go's %q would write "\v".
+		// The escape for a vertical tab is \u{b}, where %q would write "\v".
 		"http://web.test/a\vb": `"http://web.test/a\u{b}b" is not a valid http:// or https:// URL`,
 	}
 	for url, want := range tests {
@@ -58,7 +58,7 @@ func TestARefusedURLIsNamedInTheError(t *testing.T) {
 	}
 }
 
-// Rust: a_url_that_would_break_the_request_line_is_refused_before_dialling.
+// A URL that would break the request line is refused before dialling.
 func TestAURLThatWouldBreakTheRequestLineIsRefusedBeforeDialling(t *testing.T) {
 	for _, url := range []string{
 		"http://web.test/my file.txt",
@@ -89,7 +89,7 @@ func isRefused(url string) bool {
 	return err != nil
 }
 
-func TestAPortMayCarryAPlusSignAsInRust(t *testing.T) {
+func TestAPortMayCarryAPlusSign(t *testing.T) {
 	url := mustParseHTTPURL(t, "http://example.com:+8080/")
 
 	if url.port != 8080 {
@@ -97,7 +97,7 @@ func TestAPortMayCarryAPlusSignAsInRust(t *testing.T) {
 	}
 }
 
-// Rust: the_fragment_stays_behind_and_a_bare_query_gets_a_path.
+// The fragment stays behind, and a bare query gets a path.
 func TestTheFragmentStaysBehindAndABareQueryGetsAPath(t *testing.T) {
 	url := mustParseHTTPURL(t, "http://example.com:8080/page?q=1#top")
 	if url.port != 8080 || url.path != "/page?q=1" {
@@ -110,7 +110,7 @@ func TestTheFragmentStaysBehindAndABareQueryGetsAPath(t *testing.T) {
 	}
 }
 
-// Rust: the_host_header_names_the_port_unless_it_is_the_default.
+// The Host header names the port unless it is the default.
 func TestTheHostHeaderNamesThePortUnlessItIsTheDefault(t *testing.T) {
 	tests := []struct{ url, authority string }{
 		{"http://example.com:8080/", "example.com:8080"},

@@ -4,8 +4,8 @@
 # access included.
 #
 # Prerequisite: a full Xcode, as gomobile refuses the Command Line Tools
-# alone. gomobile has no Kotlin/JVM desktop target, so unlike the Rust
-# version's script this builds no JVM bindings.
+# alone. gomobile has no Kotlin/JVM desktop target, so this script builds
+# no JVM bindings.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

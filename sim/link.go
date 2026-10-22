@@ -12,8 +12,8 @@ import (
 const (
 	// unlimitedRate is a line without a throughput cap.
 	unlimitedRate = 0
-	// slowestRate is what a configured rate that would never deliver
-	// anything means: in Go a negative one, where Rust had Some(0).
+	// slowestRate is what a negative configured rate means: the slowest the
+	// line goes, a byte a second.
 	slowestRate = 1
 	// nanosPerSecond converts between rates and durations.
 	nanosPerSecond = uint64(time.Second)
@@ -110,15 +110,14 @@ func (c *chunk) bytesDue(now time.Time, rate int) int {
 }
 
 // bytesCarried returns the whole bytes a line of rate bytes per second
-// carries in elapsed, saturating at the largest int, as the Rust version's
-// conversion to usize does: on a 32-bit platform an int holds less than
-// the count, which would otherwise wrap around.
+// carries in elapsed, saturating at the largest int: on a 32-bit platform an
+// int holds less than the count, which would otherwise wrap around.
 func bytesCarried(rate int, elapsed time.Duration) int {
 	return int(min(mulDiv(uint64(elapsed), uint64(rate), nanosPerSecond), math.MaxInt))
 }
 
-// mulDiv returns a×b/divisor rounded down, computed in 128 bits as the
-// Rust version's u128 arithmetic is, and saturating at math.MaxInt64.
+// mulDiv returns a×b/divisor rounded down, computed in 128 bits, and
+// saturating at math.MaxInt64.
 func mulDiv(a, b, divisor uint64) uint64 {
 	quotient, _, fits := divideProduct(a, b, divisor)
 	if !fits {

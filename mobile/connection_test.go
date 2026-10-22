@@ -103,8 +103,8 @@ func TestReceivingReportsWhatFailed(t *testing.T) {
 }
 
 func TestAReceiveBufferHoldsAtMost64KiB(t *testing.T) {
-	// Receive's documented cap, the Rust bindings' MAX_RECEIVE_LEN: written
-	// out, so that the test checks maxReceiveLen instead of trusting it.
+	// Receive's documented cap, written out, so that the test checks
+	// maxReceiveLen instead of trusting it.
 	const documentedCap = 64 * 1024
 	// A slice, not a map: where an int has 32 bits, MaxInt is MaxInt32.
 	cases := []struct{ maxLen, want int }{

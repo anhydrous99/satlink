@@ -24,13 +24,12 @@ import (
 	"github.com/anhydrous99/satlink/serial"
 )
 
-// The Rust version's tests/net.rs, those that need a process of their own:
-// the CLI's interruptions — SIGINT, SIGTERM and SIGHUP from outside, and
-// how the process then ends — and a standard error that blocks, which the
-// CLI's own log must not make the link wait for; and, Go only, standard
-// streams that nobody reads any more, which must not end the process before
-// it has hung up. They build the satlink binary once and run it.
-// netinprocess_test.go runs the others in-process.
+// The tests that need a process of their own: the interruptions — SIGINT,
+// SIGTERM and SIGHUP from outside, and how the process then ends — and a
+// standard error that blocks, which satlink's own log must not make the link
+// wait for; and standard streams that nobody reads any more, which must not end
+// the process before it has hung up. They build the satlink binary once and run
+// it. netinprocess_test.go runs the others in-process.
 
 // limit is the longest a run may take: dialling, PPP, the exchange and
 // hanging up, all without the simulator's delays.
@@ -47,7 +46,7 @@ const (
 )
 
 // The pipes that tests fill: chunks of fillChunk bytes until the pipe takes
-// no more, as the Rust tests fill theirs; a drain reads drainChunk bytes at
+// no more; a drain reads drainChunk bytes at
 // a time and looks again every drainCheck while nothing has arrived.
 const (
 	fillChunk  = 64
@@ -55,7 +54,7 @@ const (
 	drainCheck = 10 * time.Millisecond
 )
 
-// The scenarios' own times, the Rust tests': the gap between the two taps
+// The scenarios' own times: the gap between the two taps
 // of a double-tapped Ctrl-C; how long standard error stays blocked behind
 // them, longer than the 2 s in which a repeat is ignored; how long the log
 // stays blocked, longer than idleLimitSeconds and the hang-up take, which
@@ -296,14 +295,13 @@ func checkHungUpThenEndedBySIGINT(t *testing.T, status syscall.WaitStatus, print
 	}
 }
 
-// Go only: the process's own variables stand in for their options, as
-// clap's env read them; the in-process tests make up the variables a run
-// finds.
+// The process's own variables stand in for their options, as clap's env
+// reads them; the in-process tests make up the variables a run finds.
 func TestTheProcessesVariablesStandInForTheirOptions(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "ttyACM9")
 	// The serial library's error, as the open of a port that is not there
 	// fails: "transport error: No such file or directory" on macOS and
-	// Linux, as in Rust.
+	// Linux.
 	_, openErr := serial.Open(missing, serial.DefaultBaud)
 	tests := []struct {
 		name, variable string
@@ -333,8 +331,8 @@ func TestTheProcessesVariablesStandInForTheirOptions(t *testing.T) {
 	}
 }
 
-// Rust: an_interrupted_run_hangs_up_then_ends_by_sigint, and, Go only,
-// SIGTERM and SIGHUP.
+// An interrupted run hangs up, then ends by SIGINT. SIGTERM and SIGHUP are
+// tested too.
 func TestAnInterruptedRunHangsUpThenEndsBySIGINT(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -360,9 +358,9 @@ func TestAnInterruptedRunHangsUpThenEndsBySIGINT(t *testing.T) {
 	}
 }
 
-// Rust: a_second_interruption_right_after_the_first_still_lets_it_hang_up.
-// The second follows as soon as the first has been taken in, where the
-// Rust test leaves 200 ms between them.
+// A second interruption right after the first still lets it hang up. The
+// second follows as soon as the first has been taken in, rather than after a
+// pause of 200 ms.
 func TestASecondInterruptionRightAfterTheFirstStillLetsItHangUp(t *testing.T) {
 	t.Parallel()
 	skipUnlessDeliverable(t, syscall.SIGINT)
@@ -378,9 +376,9 @@ func TestASecondInterruptionRightAfterTheFirstStillLetsItHangUp(t *testing.T) {
 	checkHungUpThenEndedBySIGINT(t, status, run.stderr.String())
 }
 
-// Rust: an_interruption_during_call_setup_keeps_the_call_from_connecting.
-// With -v the simulator's log says when the call is being placed, where the
-// Rust test sleeps two seconds.
+// An interruption during call setup keeps the call from connecting. With -v the
+// simulator's log says when the call is being placed, so the test need not
+// sleep two seconds.
 func TestAnInterruptionDuringCallSetupKeepsTheCallFromConnecting(t *testing.T) {
 	t.Parallel()
 	skipUnlessDeliverable(t, syscall.SIGINT)
@@ -404,8 +402,8 @@ func TestAnInterruptionDuringCallSetupKeepsTheCallFromConnecting(t *testing.T) {
 	}
 }
 
-// Rust: a_hang_up_signal_it_was_started_to_ignore_stays_ignored, and, Go
-// only, an interrupt that a background job ignores.
+// A hang-up signal that satlink was started to ignore stays ignored, and so
+// does an interrupt that a background job ignores.
 func TestAnInterruptionItWasStartedToIgnoreStaysIgnored(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -442,8 +440,8 @@ func TestAnInterruptionItWasStartedToIgnoreStaysIgnored(t *testing.T) {
 	}
 }
 
-// Go only. Started with SIGINT ignored, as a background job without job
-// control is, satlink cannot end by SIGINT: interrupted by another signal,
+// Started with SIGINT ignored, as a background job without job control is,
+// satlink cannot end by SIGINT: interrupted by another signal,
 // it hangs up and then exits with status 130, so that a script around it
 // stops too.
 func TestARunInterruptedWhileSIGINTIsIgnoredExitsWithItsStatus(t *testing.T) {
@@ -649,10 +647,9 @@ func readUntil(t *testing.T, file *os.File, text string) {
 	}
 }
 
-// Go only. A reader of standard output that has had enough — `satlink net
-// get … | head` — fails the command once it has hung up, as in the Rust
-// version, whose runtime ignored SIGPIPE: it does not end satlink before
-// then.
+// A reader of standard output that has had enough — `satlink net get … | head`
+// — fails the command once it has hung up, and does not end satlink before
+// then. SIGPIPE is ignored, so the failing write is an error, not a signal.
 func TestAStandardOutputNobodyReadsFailsTheCommandOnceHungUp(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -687,9 +684,9 @@ func TestAStandardOutputNobodyReadsFailsTheCommandOnceHungUp(t *testing.T) {
 	}
 }
 
-// Go only. A log (-vvv) that nobody reads any more neither ends satlink
-// mid-call nor fails the relay: the Rust version, whose runtime ignored
-// SIGPIPE, relayed everything and hung up.
+// A log (-vvv) that nobody reads any more neither ends satlink mid-call nor
+// fails the relay: SIGPIPE is ignored, so the relay relays everything and hangs
+// up.
 func TestAStandardErrorNobodyReadsStopsNeitherTheRelayNorTheHangUp(t *testing.T) {
 	t.Parallel()
 	stderr, satlinksEnd, err := os.Pipe()
@@ -727,7 +724,7 @@ func TestAStandardErrorNobodyReadsStopsNeitherTheRelayNorTheHangUp(t *testing.T)
 	}
 }
 
-// Rust: a_double_tap_while_standard_error_is_blocked_still_lets_it_hang_up.
+// A double tap while standard error is blocked still lets it hang up.
 func TestADoubleTapWhileStandardErrorIsBlockedStillLetsItHangUp(t *testing.T) {
 	if testing.Short() {
 		t.Skip("leaves standard error blocked for seconds, behind the double tap")
@@ -753,11 +750,10 @@ func TestADoubleTapWhileStandardErrorIsBlockedStillLetsItHangUp(t *testing.T) {
 	checkHungUpThenEndedBySIGINT(t, status, string(printed))
 }
 
-// Go only: Rust's tests repeat no interruption this late. A repeat once the
-// first is older than the 2 s in which repeats are ignored quits at once,
-// leaving the call to the DTR drop: the warning, then death by SIGINT, as
-// the Rust version's handler died. A standard output nobody reads holds the
-// run in writing the page out, so that it cannot end first.
+// A repeat once the first is older than the 2 s in which repeats are ignored
+// quits at once, leaving the call to the DTR drop: the warning, then death by
+// SIGINT. A standard output nobody reads holds the run in writing the page out,
+// so that it cannot end first.
 func TestASecondInterruptionSecondsAfterTheFirstQuitsAtOnce(t *testing.T) {
 	t.Parallel()
 	skipUnlessDeliverable(t, syscall.SIGINT)
@@ -788,7 +784,7 @@ func TestASecondInterruptionSecondsAfterTheFirstQuitsAtOnce(t *testing.T) {
 	}
 }
 
-// Rust: a_blocked_standard_error_does_not_hold_the_link_up.
+// A blocked standard error does not hold the link up.
 func TestABlockedStandardErrorDoesNotHoldTheLinkUp(t *testing.T) {
 	if testing.Short() {
 		t.Skip("leaves standard error blocked for 40 s")

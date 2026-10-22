@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Go-only tests of IPCP at the endpoint: addresses no host can have,
+// Tests of IPCP at the endpoint: addresses no host can have,
 // renegotiation, termination and the Nak tolerance.
 
 func TestAClientRefusesAnAddressNoHostCanHave(t *testing.T) {

@@ -21,9 +21,8 @@ tools=$(mktemp -d)
 trap 'rm -rf "$tools"' EXIT
 go build -o "$tools/gobind" golang.org/x/mobile/cmd/gobind
 
-# The ABIs of the Rust build — armeabi-v7a, arm64-v8a and x86_64 — rather
-# than gomobile's default four. API level 21, the Rust build's too, is the
-# lowest that current NDKs still ship.
+# The ABIs — armeabi-v7a, arm64-v8a and x86_64 — rather than gomobile's
+# default four. API level 21 is the lowest that current NDKs still ship.
 mkdir -p "$OUT"
 PATH="$tools:$PATH" go tool gomobile bind \
     -target=android/arm,android/arm64,android/amd64 \

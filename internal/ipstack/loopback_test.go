@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	// timeWaitDuration is how long a TCP socket stays in TIME-WAIT
-	// (smoltcp's CLOSE_DELAY).
+	// timeWaitDuration is how long a TCP socket stays in TIME-WAIT.
 	timeWaitDuration = 10 * time.Second
 	// lineBusyTime is how long the busy-line test keeps the client's line
 	// busy: longer than the initial retransmission timeout of 1 s, as a
@@ -138,8 +137,8 @@ func TestLoopbackTCPRecoversFromALostSegment(t *testing.T) {
 		// The internet retransmits what the lost ACK acknowledged, and the
 		// client, in TIME-WAIT, acknowledges each segment again. The first
 		// ACK closes the internet's socket; the others reach no socket and
-		// draw RSTs, which end the client's TIME-WAIT at once, as smoltcp
-		// closes on a RST in every state but SYN-RECEIVED.
+		// draw RSTs, which end the client's TIME-WAIT at once: a socket closes on
+		// a RST in every state but SYN-RECEIVED.
 		{"the client's ACK of the internet's FIN", clientSide, isSentInTimeWait, 1},
 	}
 	for _, test := range tests {

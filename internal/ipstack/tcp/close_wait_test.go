@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the CLOSE-WAIT state
-// (src/socket/tcp.rs, lines 5811-5845).
+// Tests of the CLOSE-WAIT state.
 
 import (
 	"testing"

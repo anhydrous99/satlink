@@ -10,11 +10,10 @@ import (
 	"time"
 )
 
-// Whole numbers from the command line, read as the Rust version's clap read
-// them, and their conversions, which saturate instead of overflowing.
+// Whole numbers from the command line, read as clap reads them, and their
+// conversions, which saturate instead of overflowing.
 
-// The texts of Rust's ParseIntError, which the Rust version's clap gave for
-// a number it could not read.
+// The messages clap gives for a number it could not read.
 var (
 	errEmptyNumber    = errors.New("cannot parse integer from empty string")
 	errInvalidDigit   = errors.New("invalid digit found in string")
@@ -22,7 +21,7 @@ var (
 	errNumberTooSmall = errors.New("number too small to fit in target type")
 )
 
-// parseUnsigned reads text as Rust reads a u64: decimal digits after an
+// parseUnsigned reads text as a 64-bit unsigned number: decimal digits after an
 // optional '+', so "010" is ten and "0x10" no number at all.
 func parseUnsigned(text string) (uint64, error) {
 	if text == "" {
@@ -39,7 +38,7 @@ func parseUnsigned(text string) (uint64, error) {
 	}
 }
 
-// parseSigned reads text as Rust reads an i64: decimal digits after an
+// parseSigned reads text as a 64-bit signed number: decimal digits after an
 // optional sign.
 func parseSigned(text string) (int64, error) {
 	if text == "" {
@@ -86,7 +85,7 @@ type unsignedInteger interface {
 }
 
 // boundedValue keeps a number of type T. clap read such numbers — a u16 or
-// u32 of the Rust version — as an i64 and then checked their range, so a
+// u32 — as an i64 and then checked their range, so a
 // negative number is out of range rather than not a number: "-1 is not in
 // 0..=65535".
 type boundedValue[T unsignedInteger] struct {
@@ -118,7 +117,7 @@ func saturatingDuration(count uint64, unit time.Duration) time.Duration {
 }
 
 // saturatingProduct returns a times b, or the largest uint64 when that would
-// overflow, as Rust's saturating_mul does.
+// overflow.
 func saturatingProduct(a, b uint64) uint64 {
 	high, low := bits.Mul64(a, b)
 	if high != 0 {

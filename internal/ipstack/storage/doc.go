@@ -3,8 +3,8 @@
 // datagrams with headers (a UDP socket's queues), and the Assembler that
 // tracks which parts of a TCP receive window have arrived.
 //
-// It is a port of smoltcp's storage module. smoltcp lets callers supply the
-// memory; here each container allocates its own, with the capacity given to
+// Unlike smoltcp's storage module, which lets callers supply the memory, each
+// container allocates its own, with the capacity given to
 // its constructor, and never grows. The containers hand out slices of their
 // storage to avoid copying; such a slice is valid only until the container
 // is next changed, and its capacity is its length, so appending to it

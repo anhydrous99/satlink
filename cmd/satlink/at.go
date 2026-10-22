@@ -10,8 +10,8 @@ import (
 )
 
 // defaultATTimeoutSeconds is how long `satlink at` waits for the final
-// result unless told otherwise, as in the Rust version: longer than the five
-// seconds ordinary commands get, as a raw command may be a slow one.
+// result unless told otherwise: longer than the five seconds ordinary commands
+// get, as a raw command may be a slow one.
 const defaultATTimeoutSeconds = 10
 
 // atCommand is `satlink at`: any command, raw.

@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the FIN-WAIT-1 and FIN-WAIT-2
-// states (src/socket/tcp.rs, lines 5547-5704).
+// Tests of the FIN-WAIT-1 and FIN-WAIT-2 states.
 
 import (
 	"testing"

@@ -2,8 +2,7 @@ package satlink
 
 // The handset's lock and its claim by a data call: concurrent methods run
 // one after another, and while a data call holds the handset they fail at
-// once instead of corrupting the call. The Rust version needed neither: its
-// methods borrowed the handset exclusively, and a data call took it.
+// once instead of corrupting the call.
 
 // exchange runs talk holding the handset's lock, so that concurrent methods
 // run one after another, and returns its result. While a data call holds

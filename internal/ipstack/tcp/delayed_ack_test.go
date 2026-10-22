@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for delayed ACKs (src/socket/tcp.rs,
-// lines 9160-9357).
+// Tests of delayed ACKs.
 
 import (
 	"testing"

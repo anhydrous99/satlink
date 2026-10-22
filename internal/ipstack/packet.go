@@ -3,14 +3,14 @@ package ipstack
 import "github.com/anhydrous99/satlink/internal/ipstack/wire"
 
 // ipPacket is a datagram the interface sends, still as representations: an
-// IPv4 header and its payload (smoltcp's Packet and PacketV4). The header's
-// NextHeader and PayloadLen match the payload.
+// IPv4 header and its payload. The header's NextHeader and PayloadLen match
+// the payload.
 type ipPacket struct {
 	header  wire.IPv4Repr
 	payload ipPayload
 }
 
-// ipPayload is what an ipPacket carries (smoltcp's IpPayload): an ICMPv4
+// ipPayload is what an ipPacket carries: an ICMPv4
 // message, a UDP datagram or a TCP segment.
 type ipPayload interface {
 	// emit writes the payload into buffer, the header.PayloadLen octets

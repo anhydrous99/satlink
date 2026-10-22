@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Go-only tests of LCP echoes: keepalive probes, the answers to the peer's
+// Tests of LCP echoes: keepalive probes, the answers to the peer's
 // probes, and loopback detection from our own probes coming back.
 
 func TestAnOpenLinkWithoutKeepaliveRunsNoTimer(t *testing.T) {

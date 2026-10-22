@@ -91,7 +91,7 @@ func TestAQueryForAKnownNameIsAnsweredInAnyCase(t *testing.T) {
 	}
 }
 
-// Go only: names fold case as Rust's to_ascii_lowercase does. Unicode would
+// Names fold the case of ASCII letters alone. Unicode would
 // fold the Kelvin sign, U+212A, onto "k" and answer for a host that is not
 // there.
 func TestOnlyASCIILettersFoldInNames(t *testing.T) {
@@ -225,7 +225,7 @@ func TestHostsMustHaveIPv4Addresses(t *testing.T) {
 		{Name: "v4.test", Address: netip.MustParseAddr("192.0.2.1")},
 		{Name: "v6\x7f.test", Address: netip.MustParseAddr("2001:db8::1")},
 	}
-	// Rust's {:?} of a str, where Go's %q would write "v6\x7f.test".
+	// The name is quoted as debugtext writes it; Go's %q would write "v6\x7f.test".
 	const want = `"v6\u{7f}.test" in hosts needs an IPv4 address`
 
 	err := checkHosts(hosts)

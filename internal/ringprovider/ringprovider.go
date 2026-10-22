@@ -2,7 +2,7 @@ package ringprovider
 
 import "crypto/tls"
 
-// TLS12CipherSuites returns the TLS 1.2 cipher suites of rustls 0.23's ring
+// TLS12CipherSuites returns the TLS 1.2 cipher suites of rustls's ring
 // provider, in its order: ECDHE key exchange, signed with ECDSA or RSA, and
 // an AEAD cipher. crypto/tls's defaults would add the ECDHE suites with CBC
 // and HMAC-SHA1, which the provider does not have, as their
@@ -19,7 +19,7 @@ func TLS12CipherSuites() []uint16 {
 	}
 }
 
-// KeyExchangeGroups returns the key exchange groups of rustls 0.23's ring
+// KeyExchangeGroups returns the key exchange groups of rustls's ring
 // provider, in its order: X25519, P-256 and P-384, none of them
 // post-quantum. Each call returns a list of its own.
 func KeyExchangeGroups() []tls.CurveID {

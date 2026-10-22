@@ -497,7 +497,7 @@ func papMessage(data []byte) string {
 }
 
 // readable returns peer-supplied text made safe to show to a user: invalid
-// UTF-8 replaced as Rust's String::from_utf8_lossy does, control
+// UTF-8 replaced by U+FFFD, control
 // characters dropped and surrounding white space trimmed.
 func readable(text []byte) string {
 	return strings.TrimSpace(strings.Map(withoutControl, utf8lossy.String(text)))

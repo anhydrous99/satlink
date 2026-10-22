@@ -1,8 +1,7 @@
 package tcp
 
-// Go-specific tests (PORTING-ipstack.md, section 6) of what the socket does
-// with the segments the interface hands it: Accepts, Process and RSTReply
-// (segments.go, process.go, transitions.go, reply.go, reassembly.go).
+// Tests of what the socket does with the segments the interface hands it:
+// Accepts, Process and RSTReply.
 
 import (
 	"bytes"
@@ -54,9 +53,8 @@ func TestListenerOnAnAddressAcceptsOnlySegmentsToIt(t *testing.T) {
 // A closed socket accepts nothing, not even a segment for the endpoints it
 // still holds: a socket closed after listening keeps its listen endpoint,
 // and one aborted, timed out or closed while connecting keeps its four-tuple
-// until its RST has gone. smoltcp's test_closed_reject and
-// test_closed_reject_after_listen offer a SYN to the peer's address, which
-// such a socket would refuse whatever its state.
+// until its RST has gone. The tests of a closed socket offer a SYN to the
+// peer's address, which such a socket would refuse whatever its state.
 func TestAClosedSocketAcceptsNothing(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -157,12 +155,12 @@ func overrunningFIN(received int, ack wire.TCPSeqNumber) wire.TCPRepr {
 	return segment
 }
 
-// smoltcp drops a segment whose control flag the socket's state does not
+// A segment whose control flag the socket's state does not
 // take, without a reply and without taking anything from it ("expecting a
 // SYN|ACK", "unexpected packet"): a FIN in LISTEN or SYN-SENT, a SYN inside
 // the window of a synchronized connection, or a FIN at the window's start
 // once the peer's own FIN has been taken, also after data that the receive
-// window cuts short. smoltcp's own tests send none of them.
+// window cuts short.
 func TestSegmentsTheStateDoesNotTakeAreDropped(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -215,7 +213,7 @@ func socketLastAckWithItsFINSent(t *testing.T) *testSocket {
 	return s
 }
 
-// smoltcp disregards a FIN beyond a hole in every state. So CLOSE-WAIT and
+// A FIN beyond a hole is disregarded in every state. So CLOSE-WAIT and
 // CLOSING, which take no FIN, drop a FIN after data that the receive window
 // cuts short when its segment starts at the window's start
 // (TestSegmentsTheStateDoesNotTakeAreDropped), but take the segment without
@@ -267,8 +265,8 @@ func TestProcessPanicsOnAnACKThatAcceptsWouldRefuse(t *testing.T) {
 }
 
 // Every segment after the SYNs must carry an ACK, and the socket drops data
-// in one that does not. smoltcp's test_established_no_ack sends an empty
-// segment, which leaves nothing to show whether the socket took it.
+// in one that does not. A test that sends an empty segment without an ACK
+// leaves nothing to show whether the socket took it.
 func TestDataWithoutAnACKIsDropped(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -282,8 +280,7 @@ func TestDataWithoutAnACKIsDropped(t *testing.T) {
 // A RST ends a connection, and the socket queues none of the data it
 // carries: not in ESTABLISHED, which the RST closes, nor in a SYN-RECEIVED
 // that came from LISTEN, which it sends back to listening, where the data
-// would wait for the next connection. smoltcp's tests send RSTs without
-// data.
+// would wait for the next connection. The tests send RSTs without data.
 func TestTheDataOfARSTIsNotQueued(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -323,8 +320,8 @@ func socketSynReceivedFromListen(t *testing.T) *testSocket {
 
 // CLOSING lasts until the peer acknowledges the socket's FIN (RFC 9293): an
 // acknowledgement of what came before the FIN keeps the socket there, and
-// the FIN goes out again when its retransmission is due. smoltcp's
-// test_closing_ack_fin acknowledges the FIN at once.
+// the FIN goes out again when its retransmission is due. The test of the
+// FIN in CLOSING acknowledges the FIN at once.
 func TestClosingLastsUntilItsFINIsAcknowledged(t *testing.T) {
 	t.Parallel()
 	s := socketClosing(t)
@@ -375,9 +372,8 @@ func TestRSTReplyMatchesTheSegmentItAnswers(t *testing.T) {
 	}
 }
 
-// smoltcp's own tests of the challenge-ACK rate limit look well after its
-// second; the next challenge ACK may go as soon as the second is over
-// (smoltcp's cx.now() < self.challenge_ack_timer).
+// The tests of the challenge-ACK rate limit look well after its second; the
+// next challenge ACK may go as soon as the second is over.
 func TestChallengeACKsAreLimitedToOnePerSecond(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -390,9 +386,8 @@ func TestChallengeACKsAreLimitedToOnePerSecond(t *testing.T) {
 }
 
 // A segment that draws a challenge ACK is dropped whether or not the rate
-// limit withholds the ACK: the socket takes nothing from it, as smoltcp's
-// process returns at once with what challenge_ack_reply gives, nothing when
-// the ACK is withheld. The segments TestChallengeACKsAreLimitedToOnePerSecond
+// limit withholds the ACK: the socket takes nothing from it, and replies
+// with the challenge ACK unless the limit withholds it. The segments TestChallengeACKsAreLimitedToOnePerSecond
 // repeats would change nothing if taken.
 func TestASegmentWhoseChallengeACKIsWithheldIsDropped(t *testing.T) {
 	t.Parallel()
@@ -450,9 +445,8 @@ func socketWithDataInFlight(t *testing.T) *testSocket {
 
 // Data outside the receive window is answered every time, even within the
 // second that limits challenge ACKs: it is a retransmission whose ACK was
-// lost, which the peer stops sending only once an ACK gets through. smoltcp's
-// test_old_data_ack_not_rate_limited retransmits plain data; data with FIN
-// or PSH is exempt from the limit too.
+// lost, which the peer stops sending only once an ACK gets through. The test
+// retransmits plain data; data with FIN or PSH is exempt from the limit too.
 func TestRetransmittedDataIsAnsweredEveryTime(t *testing.T) {
 	t.Parallel()
 	const data = "abcdef"
@@ -507,7 +501,7 @@ func TestSACKBlockNamesTheLatestSegmentOrElseTheLowestBlock(t *testing.T) {
 // so a segment that extends a block is named by the whole block, whether it
 // extends the lower of two blocks or the higher. The higher one shows it:
 // when no block holds the segment, the ACK names the lowest block instead
-// (TestSACKBlockNamesTheLatestSegmentOrElseTheLowestBlock). smoltcp's tests
+// (TestSACKBlockNamesTheLatestSegmentOrElseTheLowestBlock). The tests here
 // extend only a lone block, which is the lowest as well.
 func TestSACKBlockOfASegmentThatExtendsABlockIsTheWholeBlock(t *testing.T) {
 	t.Parallel()
@@ -530,7 +524,7 @@ func TestSACKBlockOfASegmentThatExtendsABlockIsTheWholeBlock(t *testing.T) {
 
 // Until its SYN|ACK goes out, a socket in SYN-RECEIVED has announced no
 // receive window, so it takes no data: it answers data with an ACK and stays
-// in SYN-RECEIVED. smoltcp's tests send data only after the SYN|ACK.
+// in SYN-RECEIVED. The tests send data only after the SYN|ACK.
 func TestNoDataIsTakenBeforeTheSYNACKAnnouncesAWindow(t *testing.T) {
 	t.Parallel()
 	s := socketSynReceived(t)
@@ -541,7 +535,7 @@ func TestNoDataIsTakenBeforeTheSYNACKAnnouncesAWindow(t *testing.T) {
 	compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
 }
 
-// smoltcp's own tests leave the edges of RFC 9293's acceptability test
+// The tests leave the edges of RFC 9293's acceptability test
 // unchecked. With "abc" received but not acknowledged, the window the socket
 // last announced, 64 octets from its ACK of the SYN, runs from octet 3 to
 // octet 64 of the peer's stream.
@@ -593,7 +587,7 @@ func TestScaledReceiveWindowTakesDataUpToItsScaledEnd(t *testing.T) {
 }
 
 // RFC 9293's acceptability test lets a zero window take an empty segment
-// only at its start; smoltcp's own tests send none elsewhere.
+// only at its start.
 func TestZeroWindowTakesAnEmptySegmentOnlyAtItsStart(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -624,7 +618,7 @@ func TestZeroWindowTakesAnEmptySegmentOnlyAtItsStart(t *testing.T) {
 }
 
 // The assembler tracks at most storage.AssemblerMaxSegmentCount runs of data;
-// smoltcp drops a segment that would need one more, without an ACK.
+// A segment that would need one more is dropped, without an ACK.
 func TestSegmentBeyondTooManyHolesIsDroppedUnanswered(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -637,12 +631,11 @@ func TestSegmentBeyondTooManyHolesIsDroppedUnanswered(t *testing.T) {
 	send(t, s, dataFromRemote(1+2*storage.AssemblerMaxSegmentCount, "x"))
 }
 
-// A SYN announces its window unscaled, which smoltcp reads with the
+// A SYN announces its window unscaled, which the peer reads with the
 // socket's scale until the socket sends its next segment: with a receive
-// buffer that needs a scale, it took data beyond the buffer's end then, and
-// queuing that data panicked or handed the application octets the peer never
-// sent. The port takes data up to the buffer's end only (PORTING-ipstack.md,
-// section 9).
+// buffer that needs a scale, taking data beyond the buffer's end then would
+// panic or hand the application octets the peer never sent. The socket takes
+// data up to the buffer's end only.
 func TestTheWindowOfASYNReachesNoFurtherThanTheBuffer(t *testing.T) {
 	t.Parallel()
 	// A buffer of 128 KiB needs a window scale of 2: the window field of the
@@ -698,15 +691,15 @@ func fillInOrder(t *testing.T, s *testSocket, length int) {
 	}
 }
 
-// smoltcp's acceptability tests compare sequence numbers modulo 2³², where of
-// two numbers 2³¹ apart each compares as before the other. So in a receive
-// window that ends before it starts they take a segment 2³¹ − 1 or 2³¹ after
-// the window's start for one inside it, and data that starts or ends there.
-// smoltcp then panics as it trims the segment to the window, takes a RST from
-// there, or places the data far beyond the receive buffer, where its SACK
-// block overflows. The port finds every such segment outside the window
-// (PORTING-ipstack.md, section 9): it drops a RST, answers anything else with
-// an ACK, and takes nothing from it.
+// The acceptability test compares sequence numbers modulo 2³², where of two
+// numbers 2³¹ apart each compares as before the other. So in a receive window
+// that ends before it starts, it takes a segment 2³¹ − 1 or 2³¹ after the
+// window's start for one inside it, and data that starts or ends there.
+// Accepting such a segment would panic as it trims the segment to the window,
+// take a RST from there, or place the data far beyond the receive buffer, where
+// its SACK block overflows. The socket finds every such segment outside the
+// window: it drops a RST, answers anything else with an ACK, and takes nothing
+// from it.
 func TestAWindowThatEndsBeforeItStartsTakesNoSegmentHalfTheSequenceSpaceAway(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -763,12 +756,11 @@ func TestAWindowThatEndsBeforeItStartsTakesNoSegmentHalfTheSequenceSpaceAway(t *
 	}
 }
 
-// smoltcp's acceptability tests find an empty segment at the start of a
-// receive window that ends before it starts to lie outside the window, so
-// the socket answers it with a challenge ACK and takes nothing from it:
-// neither the end of the handshake, nor an acknowledgement of its data, nor
-// the peer's window. The port keeps that: smoltcp neither panics on the
-// segment nor corrupts a stream with it.
+// An empty segment at the start of a receive window that ends before it
+// starts lies outside the window, so the socket answers it with a challenge
+// ACK and takes nothing from it: neither the end of the handshake, nor an
+// acknowledgement of its data, nor the peer's window. The segment neither
+// panics the socket nor corrupts a stream.
 func TestAWindowThatEndsBeforeItStartsAnswersASegmentAtItsStartWithAChallengeACK(t *testing.T) {
 	t.Parallel()
 	for _, window := range windowsEndingBeforeTheyStart {
@@ -796,7 +788,7 @@ type windowEndingBeforeItStarts struct {
 }
 
 // windowsEndingBeforeTheyStart are the ways to a receive window that ends
-// before it starts. smoltcp's tests take none of them.
+// before it starts.
 var windowsEndingBeforeTheyStart = []windowEndingBeforeItStarts{
 	{"a peer's SYN before the socket's own", socketWithAPeersSYNBeforeItsOwn, ackFromLocal(0, defaultBufferLen)},
 	{"a FIN right at the window's end", socketWithAFINAtTheWindowsEnd,
@@ -872,10 +864,10 @@ func assertTookNothing(t *testing.T, s, fresh *testSocket) {
 
 // RFC 9293 (3.10.7.4) trims a segment to the receive window "including SYN
 // and FIN", so a FIN that follows data the window cut off is not taken.
-// smoltcp takes it, ending the stream at the window's end and acknowledging
-// the first octet cut off as delivered, which the peer then never sends
-// again (PORTING-ipstack.md, section 9). The port ignores that FIN, and the
-// peer's retransmission of the rest brings it again.
+// taking it would end the stream at the window's end and acknowledge the
+// first octet cut off as delivered, which the peer then never sends again. The
+// socket ignores that FIN, and the peer's retransmission of the rest brings it
+// again.
 func TestAFINAfterDataCutAtTheWindowsEndWaitsForTheRest(t *testing.T) {
 	t.Parallel()
 	// A buffer of 128 KiB needs a window scale of 2.
@@ -954,9 +946,9 @@ func TestAFINAfterDataCutAtTheWindowsEndWaitsForTheRest(t *testing.T) {
 
 // Every state that takes a FIN ignores one that follows data the receive
 // window cut off, and moves only as the segment's acknowledgement says. The
-// states that take none handle such a segment as smoltcp does: they drop it
-// whole (TestSegmentsTheStateDoesNotTakeAreDropped), but for one beyond a
-// hole, whose FIN smoltcp disregards in every state
+// states that take none drop such a segment whole
+// (TestSegmentsTheStateDoesNotTakeAreDropped), but for one beyond a hole, whose
+// FIN is disregarded in every state
 // (TestCloseWaitAndClosingTakeASegmentBeyondAHoleWithoutItsFIN).
 func TestAFINAfterDataCutAtTheWindowsEndIsIgnoredInEveryStateThatTakesAFIN(t *testing.T) {
 	t.Parallel()
@@ -1022,7 +1014,7 @@ func tail(data []byte) []byte {
 // The peer's window
 // =========================================================================
 
-// smoltcp's tests of window scaling check the scale a peer's SYN announces,
+// The tests of window scaling check the scale a peer's SYN announces,
 // and that the SYN's own window is not scaled. The window of every later
 // segment is shifted left by that scale (RFC 7323).
 func TestThePeersWindowScaleAppliesToItsLaterSegments(t *testing.T) {
@@ -1065,8 +1057,7 @@ func TestThePeersWindowScaleAppliesToItsLaterSegments(t *testing.T) {
 
 // RFC 6298 (5.2) turns the retransmission timer off once everything sent is
 // acknowledged, and the idle timer it leaves behind times keep-alives again:
-// the next one goes a whole interval after the acknowledgement. smoltcp's
-// test_sends_keep_alive stays idle throughout.
+// the next one goes a whole interval after the acknowledgement.
 func TestKeepAliveResumesOnceEverythingSentIsAcknowledged(t *testing.T) {
 	t.Parallel()
 	const interval, acknowledgedAt = 10 * time.Second, 100 * time.Millisecond
@@ -1085,8 +1076,7 @@ func TestKeepAliveResumesOnceEverythingSentIsAcknowledged(t *testing.T) {
 // idle timer it leaves behind times keep-alives again. Here the probe
 // carries the last octet queued, which the window update acknowledges, so
 // that nothing is left to send: the next keep-alive goes a whole interval
-// after the update. smoltcp's tests of zero-window probes run without
-// keep-alive.
+// after the update.
 func TestKeepAliveResumesWhenTheProbedWindowOpens(t *testing.T) {
 	t.Parallel()
 	const interval, openedAt = 10 * time.Second, 1100 * time.Millisecond
@@ -1107,8 +1097,8 @@ func TestKeepAliveResumesWhenTheProbedWindowOpens(t *testing.T) {
 // Options
 // =========================================================================
 
-// The port has no timestamp generator (PORTING-ipstack.md, section 3), so it
-// never sends the timestamps option, not even to a peer that sends it.
+// The socket has no timestamp generator, so it never sends the timestamps
+// option, not even to a peer that sends it.
 func TestTimestampsAreNeverSent(t *testing.T) {
 	t.Parallel()
 	s := socketListen(t)

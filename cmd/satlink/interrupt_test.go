@@ -52,7 +52,8 @@ func newHandledInterruptions() *handledInterruptions {
 	return h
 }
 
-// Go only: the Rust handler's order, which its tests leave unchecked.
+// The stop is asked for before the message is written, so a blocked standard
+// error cannot hold it up.
 func TestTheFirstInterruptionAsksTheRunToStopBeforeSayingSo(t *testing.T) {
 	interrupted, interrupt := context.WithCancel(context.Background())
 	stderr := newBlockedWriter()

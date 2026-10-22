@@ -5,9 +5,9 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// dispatchIP serializes packet and sends it through slot: smoltcp's
-// dispatch_ip on Medium::Ip. The stack does not fragment, so a datagram
-// larger than the IP MTU is dropped, and the slot left unused.
+// dispatchIP serializes packet and sends it through slot. The stack does not
+// fragment, so a datagram larger than the IP MTU is dropped, and the slot left
+// unused.
 func (i *Interface) dispatchIP(slot TransmitSlot, packet ipPacket) {
 	// The unspecified address must never be a datagram's destination
 	// (RFC 1122 § 3.2.1.3), and no socket or reply ever makes it one.

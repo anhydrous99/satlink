@@ -263,12 +263,12 @@ func (c *TLSConnection) Close() (err error) {
 	if err != nil {
 		return err
 	}
-	// Releasing must not wait, as the Rust bindings' destroy did not: with
+	// Releasing must not wait: with
 	// a write deadline of now, what does not fit at once is dropped, and a
 	// connection already closed refuses the deadline, which changes nothing.
 	_ = conn.SetWriteDeadline(time.Now())
-	// A close_notify that did not fit is expected — the Rust bindings sent
-	// none — and the TCP connection closes gracefully either way, as it
+	// A close_notify that did not fit is expected, and the TCP connection
+	// closes gracefully either way, as it
 	// does after a link that has gone down.
 	_ = conn.Close()
 	return nil
@@ -324,7 +324,7 @@ func (c *UDPConnection) Send(datagram []byte, timeoutMillis int64) (err error) {
 // Receive returns the next datagram from the peer, truncated to maxLen (at
 // most 64 KiB), waiting up to timeoutMillis: a timeout of zero takes only a
 // datagram that has already arrived. With maxLen 0 it waits for a datagram
-// and keeps none of it, as in the Rust bindings.
+// and keeps none of it.
 func (c *UDPConnection) Receive(maxLen int, timeoutMillis int64) (datagram *Datagram, err error) {
 	defer recoverPanic(&err)
 	conn, err := made(c.conn, "UDPConnection")
@@ -389,14 +389,15 @@ func send(conn deadlineWriter, data []byte, timeoutMillis int64) error {
 	if err := conn.SetWriteDeadline(deadlineAfterMillis(timeoutMillis)); err != nil {
 		return fromError(err)
 	}
-	// Send reports no count, as the Rust bindings' send reports none: an app
+	// Send reports no count: an app
 	// that needs it sends with SendSome.
 	_, err := conn.Write(data)
 	return fromError(err)
 }
 
 // partialWriter is what SendSome needs of a stream connection: satnet's TCP
-// and TLS connections, whose WriteSome is the Rust version's send_until.
+// and TLS connections, whose WriteSome queues what fits without waiting for
+// room for the rest.
 type partialWriter interface {
 	WriteSome(p []byte) (int, error)
 	SetWriteDeadline(deadline time.Time) error
@@ -457,7 +458,7 @@ func streamBuffer(maxLen int) ([]byte, error) {
 }
 
 // datagramBuffer returns a buffer for the first maxLen bytes of a
-// datagram. maxLen may be 0, as in the Rust bindings, as a datagram has no
+// datagram. maxLen may be 0, as a datagram has no
 // end of stream that an empty result could be taken for: Receive then
 // takes a datagram and keeps none of it.
 func datagramBuffer(maxLen int) ([]byte, error) {

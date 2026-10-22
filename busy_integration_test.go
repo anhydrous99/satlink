@@ -10,11 +10,10 @@ import (
 	"github.com/anhydrous99/satlink"
 )
 
-// Go only: the handset is never moved into a data call, so while a call
-// holds it, its own methods fail with ErrBusy, and every way out of the
-// call releases it. A transport's panic out of a call that holds the
-// handset pulses DTR first, where the Rust version's unwinding dropped the
-// handset, whose transport dropped DTR.
+// The handset is never moved into a data call, so while a call holds it,
+// its own methods fail with ErrBusy, and every way out of the call releases
+// it. A transport's panic out of a call that holds the handset pulses DTR
+// first, which ends the call under AT&D2.
 
 // promptly bounds what must not wait for a dial or a call: it returns at
 // once, or it is blocked.

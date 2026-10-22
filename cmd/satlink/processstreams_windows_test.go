@@ -6,9 +6,8 @@ import (
 	"testing"
 )
 
-// As Rust's standard library takes ERROR_INVALID_HANDLE: a standard stream
-// whose handle is NULL, in a process without a console, drops what is
-// written to it and has ended (std's handle_ebadf).
+// ERROR_INVALID_HANDLE ends a standard stream whose handle is NULL, in a
+// process without a console: it drops what is written to it and has ended.
 func TestAStreamWithoutAHandleIsAnEmptyInputAndASink(t *testing.T) {
 	// Such a stream is a File over the NULL handle: Go keeps what
 	// GetStdHandle returns.

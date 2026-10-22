@@ -170,7 +170,7 @@ func (b *PacketBuffer[H]) Clear() {
 }
 
 // requireSize panics if size, the payload size given to operation, is
-// negative, before the buffer changes: smoltcp's sizes are unsigned, and a
+// negative, before the buffer changes: sizes are unsigned, and a
 // packet of a negative size would be queued before its payload failed.
 func requireSize(operation string, size int) {
 	if size < 0 {

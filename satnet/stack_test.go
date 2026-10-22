@@ -38,7 +38,7 @@ func TestRefusesAddressesTheStackCannotTake(t *testing.T) {
 		netip.AddrFrom4([4]byte{255, 255, 255, 255}),
 		netip.AddrFrom4([4]byte{224, 0, 0, 1}),
 		netip.AddrFrom4([4]byte{0, 0, 0, 0}),
-		// Go only: what Rust's Ipv4Addr could not hold.
+		// An IPv6 address, which IPv4 settings cannot hold.
 		netip.MustParseAddr("2001:db8::1"),
 		{},
 	} {

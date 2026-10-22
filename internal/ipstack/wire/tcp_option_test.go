@@ -17,7 +17,7 @@ func sackOption(blocks ...SACKRange) tcpOption {
 }
 
 // assertOptionParses checks that encoded parses as option, with nothing left
-// over, and that option emits as encoded (smoltcp's assert_option_parses!).
+// over, and that option emits as encoded.
 func assertOptionParses(t *testing.T, option tcpOption, encoded []byte) {
 	t.Helper()
 	parsed, rest, err := parseTCPOption(encoded)
@@ -33,7 +33,6 @@ func assertOptionParses(t *testing.T, option tcpOption, encoded []byte) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_tcp_options.
 func TestTCPOptions(t *testing.T) {
 	t.Parallel()
 	assertOptionParses(t, tcpOption{kind: tcpOptionEndOfList}, []byte{0x00})
@@ -65,7 +64,6 @@ func TestTCPOptions(t *testing.T) {
 		[]byte{0x0c, 0x05, 0x01, 0x02, 0x03})
 }
 
-// Ported from smoltcp's wire/tcp.rs test_malformed_tcp_options.
 func TestMalformedTCPOptions(t *testing.T) {
 	t.Parallel()
 	malformed := [][]byte{

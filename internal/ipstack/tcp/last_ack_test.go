@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the LAST-ACK state
-// (src/socket/tcp.rs, lines 5846-6005).
+// Tests of the LAST-ACK state.
 
 import (
 	"testing"

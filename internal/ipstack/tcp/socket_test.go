@@ -1,12 +1,8 @@
 package tcp
 
-// Go-specific tests (PORTING-ipstack.md, section 6) of the socket itself: its
-// construction and settings, its states and their predicates, and its
-// endpoints (socket.go, state.go). The other Go-specific tests are beside
-// the code they test: stream_test.go, connection_test.go, process_test.go,
-// dispatch_test.go and pull_model_test.go. Like them, they also check the
-// smoltcp behaviour the consumers rely on (section 8), and smoltcp behaviour
-// its own tests leave unchecked.
+// Tests of the socket itself: its construction and settings, its states and
+// their predicates, and its endpoints. They also check the behaviour that the
+// consumers rely on, as described in docs/IPSTACK.md.
 
 import (
 	"net/netip"
@@ -90,8 +86,8 @@ func TestSetNagleEnabledTurnsNagleOff(t *testing.T) {
 }
 
 // RFC 7323 allows a window scale of at most 14, enough for any receive buffer
-// smaller than 1 GiB. NewSocket takes one of exactly 1 GiB too, as smoltcp
-// does, and offers it a scale of 15, which peers read as 14.
+// smaller than 1 GiB. NewSocket takes one of exactly 1 GiB too, and offers it
+// a scale of 15, which peers read as 14.
 func TestWindowScaleOfTheLargestReceiveBuffers(t *testing.T) {
 	t.Parallel()
 	for capacity, want := range map[int]uint8{maxReceiveBufferLen - 1: 14, maxReceiveBufferLen: 15} {
@@ -130,7 +126,7 @@ func TestStateStringNamesEveryState(t *testing.T) {
 // =========================================================================
 
 // socketsInEveryState returns a test socket in each state of the state
-// machine, as smoltcp's tests build them.
+// machine.
 func socketsInEveryState(t *testing.T) map[State]*testSocket {
 	t.Helper()
 	return map[State]*testSocket{
@@ -193,8 +189,7 @@ func TestBufferedDataCanBeReceivedInAnyState(t *testing.T) {
 // =========================================================================
 
 // A socket without a connection has no endpoints, and sends nothing, not
-// even a RST. smoltcp's test_last_ack_fin_ack checks only the state that the
-// last ACK in LAST-ACK leaves.
+// even a RST. The LAST-ACK test checks only the state that the last ACK leaves.
 func TestEndpointsAreZeroWithoutAConnection(t *testing.T) {
 	t.Parallel()
 	closed := socketClosed(t)

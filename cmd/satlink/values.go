@@ -23,8 +23,8 @@ func (v stringValue) Set(text string) error {
 	return nil
 }
 
-// givenText is text that may not have been given at all, as the Rust
-// version's Option<String>: given tells an empty text from none.
+// givenText is text that may not have been given at all, like an optional
+// string: given tells an empty text from none.
 type givenText struct {
 	text  string
 	given bool

@@ -23,14 +23,14 @@ func (i *Interface) socketIngress(device Device, sockets *SocketSet) PollIngress
 	if response, ok := i.processIP(sockets, datagram); ok {
 		i.dispatchIP(reply, response)
 	}
-	// smoltcp counts every datagram that is not empty as having maybe
-	// changed a socket, even those that cannot have (IP fragments, ICMP
-	// messages, datagrams for other hosts): it does not find out which did.
+	// Every datagram that is not empty counts as having maybe changed a socket,
+	// even those that cannot have (IP fragments, ICMP messages, datagrams for
+	// other hosts): the stack does not find out which did.
 	return IngressSocketStateChanged
 }
 
 // processIP processes a datagram that is not empty and returns the reply to
-// send at once, if any: smoltcp's process_ip on Medium::Ip.
+// send at once, if any.
 func (i *Interface) processIP(sockets *SocketSet, datagram []byte) (ipPacket, bool) {
 	if wire.IPv4Packet(datagram).Version() != ipv4Version {
 		// Drop all other traffic.
@@ -45,7 +45,7 @@ func (i *Interface) processIP(sockets *SocketSet, datagram []byte) (ipPacket, bo
 }
 
 // traceMalformed logs that the interface dropped a datagram because the
-// parser what names rejected it, as smoltcp's check! macro does.
+// parser named by what rejected it.
 func traceMalformed(what string) {
 	netlog.Trace("iface: malformed", "what", what)
 }

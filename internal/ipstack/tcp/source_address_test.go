@@ -1,7 +1,6 @@
 package tcp
 
-// The test of smoltcp's socket/tcp.rs for a change of the interface's IP
-// address (src/socket/tcp.rs, lines 9842-9874).
+// Tests of a change of the interface's IP address.
 
 import (
 	"net/netip"

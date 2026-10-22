@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Go-only tests of the authentication phase at the endpoint: what the
+// Tests of the authentication phase at the endpoint: what the
 // server demands and the peer refuses, lost packets, and the timers.
 
 func TestTheLongestCredentialsAuthenticate(t *testing.T) {

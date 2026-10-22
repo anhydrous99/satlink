@@ -66,8 +66,8 @@ func (s *Socket) SendQueue() int {
 
 // checkAddressable returns ErrUnaddressable unless a datagram with meta can
 // be sent: the socket must be bound, and the destination a usable IPv4
-// endpoint. The address checks beyond smoltcp's keep out what its types
-// cannot hold: an address that is not IPv4.
+// endpoint. The address checks beyond those of the design keep out what the
+// types cannot hold: an address that is not IPv4.
 func (s *Socket) checkAddressable(meta Metadata) error {
 	destination := meta.Endpoint.Addr()
 	switch {
@@ -87,8 +87,8 @@ func (s *Socket) traceQueued(meta Metadata, size int) {
 	netlog.Trace("udp: buffer to send octets", "local", s.endpoint, "remote", meta.Endpoint, "octets", size)
 }
 
-// requireSize panics unless size, given to operation, is a size: smoltcp's
-// sizes are unsigned, and the packet buffer must not take a negative one.
+// requireSize panics unless size, given to operation, is a size: sizes are
+// unsigned, and the packet buffer must not take a negative one.
 func requireSize(operation string, size int) {
 	if size < 0 {
 		panic(fmt.Sprintf("udp: %s: size %d is negative", operation, size))

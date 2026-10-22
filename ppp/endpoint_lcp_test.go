@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Go-only tests of LCP as the line sees it: the codes on the wire, answers
+// Tests of LCP as the line sees it: the codes on the wire, answers
 // to unusual requests, loops and stray answers.
 
 func TestLCPPacketsGoOutWithRFC1661sCodes(t *testing.T) {

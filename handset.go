@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // Response is what a successful command returned.
@@ -639,7 +639,7 @@ func infoText(line, prefix string) (string, bool) {
 func validateNumber(number string) error {
 	digits := strings.TrimPrefix(number, "+")
 	if digits == "" || strings.IndexFunc(digits, isNotDialable) >= 0 {
-		return invalidArgument(rustdebug.Quote(number) + " is not a dialable number")
+		return invalidArgument(debugtext.Quote(number) + " is not a dialable number")
 	}
 	return nil
 }

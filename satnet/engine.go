@@ -16,7 +16,7 @@ import (
 const maxWait = time.Second
 
 // shared is the engine behind its lock, with the signal that wakes whoever
-// waits for it to change: Rust's Mutex<Engine> and Condvar.
+// waits for it to change.
 type shared struct {
 	mu      sync.Mutex
 	engine  *engine
@@ -62,7 +62,7 @@ func (s *shared) update(change func(e *engine)) {
 	change(e)
 }
 
-// status returns a snapshot of the link.
+// status returns the state of the link.
 func (s *shared) status() Status {
 	e := s.lock()
 	defer s.unlock()
@@ -275,7 +275,7 @@ func newEngine(stack *stack, names *nameCache, connectMessage string, now time.T
 	}
 }
 
-// status returns a snapshot of the link, with its own copy of the IPv4
+// status returns the state of the link, with its own copy of the IPv4
 // settings.
 func (e *engine) status() Status {
 	status := Status{

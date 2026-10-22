@@ -6,14 +6,13 @@ import (
 	"io"
 
 	"github.com/anhydrous99/satlink"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/spf13/cobra"
 )
 
 // `satlink sms`: sending, listing, reading and deleting text messages.
 
-// smsFilters are the filters `sms list` takes, by the names the Rust
-// version gave them, the default first.
+// smsFilters are the filters `sms list` takes, the default first.
 var smsFilters = [...]struct {
 	name   string
 	filter satlink.SMSFilter
@@ -87,7 +86,7 @@ func (c *cli) smsDeleteCommand() *command {
 }
 
 // storedMessageCommand is the `satlink sms` subcommand name, which acts on
-// the message stored at the index it is given, a u32 in the Rust version.
+// the message stored at the index it is given, a u32.
 func (c *cli) storedMessageCommand(name, short string, act func(*satlink.Handset, int) error) *command {
 	var index uint32
 	return newCommand(&cobra.Command{
@@ -125,7 +124,7 @@ func (v smsFilterValue) Set(name string) error {
 			return nil
 		}
 	}
-	return errors.New(rustdebug.Quote(name) + " is not an SMS filter")
+	return errors.New(debugtext.Quote(name) + " is not an SMS filter")
 }
 
 // printMessages writes each message's header line — index, status, address

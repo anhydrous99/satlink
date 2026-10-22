@@ -1,9 +1,9 @@
 package ipstack
 
-// These tests pin the pull model the consumers rely on (PORTING-ipstack.md
-// § 5, contract 3, and § 8): the device decides when the stack may send, a
-// received datagram's reply slot is always used, and what a refused socket
-// had to send goes out at a later poll. smoltcp has no tests of them.
+// These tests pin the pull model the consumers rely on (see docs/IPSTACK.md):
+// the device decides when the stack may send, a received datagram's reply
+// slot is always used, and what a refused socket had to send goes out at a
+// later poll.
 
 import (
 	"bytes"

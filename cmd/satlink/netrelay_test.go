@@ -94,7 +94,7 @@ func (s *recordingStream) checkReported() {
 	}
 }
 
-// Go only: Rust's tests leave the stream's end unchecked.
+// The stream is reset unless all of standard input was sent.
 func TestTheSenderResetsTheStreamUnlessAllOfStandardInputWasSent(t *testing.T) {
 	unsendable := errors.New("timed out")
 	tests := []struct {
@@ -148,7 +148,7 @@ func TestEachChunkOfStandardInputGetsSendTimeoutToBeQueued(t *testing.T) {
 	if err != nil || len(stream.deadlines) != 3 {
 		t.Fatalf("forwarding returned %v after %d writes, want nil after 3", err, len(stream.deadlines))
 	}
-	// The Rust version's SEND_TIMEOUT.
+	// The send timeout.
 	const allowed = 2 * time.Minute
 	for i, deadline := range stream.deadlines {
 		if !isAllowedAfter(deadline, allowed, before, after) {
@@ -207,7 +207,7 @@ func readToTheEnd(t *testing.T, conn *satnet.TCPConn) ([]byte, error) {
 	return io.ReadAll(conn)
 }
 
-// Go only: what the connection says once standard input could not be read.
+// What the connection says once standard input could not be read.
 func TestASenderWhoseStandardInputFailsResetsTheConnection(t *testing.T) {
 	t.Parallel()
 	conn := echoConnection(t)
@@ -226,7 +226,7 @@ func TestASenderWhoseStandardInputFailsResetsTheConnection(t *testing.T) {
 	}
 }
 
-// Go only: what the connection says once all of standard input was sent.
+// What the connection says once all of standard input was sent.
 func TestASenderWhoseStandardInputEndsFinishesTheStream(t *testing.T) {
 	t.Parallel()
 	conn := echoConnection(t)
@@ -321,9 +321,8 @@ func TestStandardInputLeftUnsentWhenTheRemoteEndClosedIsAnErrorUnlessSomeoneIsTy
 	}
 }
 
-// Go only: Rust's tests leave the grace unchecked. Once all of standard
-// input is queued, it must be acknowledged within 30 s of the remote end's
-// close, as long as closing the link would wait for it.
+// Once all of standard input is queued, it must be acknowledged within 30 s of
+// the remote end's close, as long as closing the link would wait for it.
 func TestTheEndOfStandardInputMustBeAcknowledgedWithinThirtySeconds(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -394,12 +393,9 @@ func isConnectionClosed(conn *satnet.TCPConn) bool {
 // last user is done with it, which takes no traffic.
 const closeWait = 10 * time.Second
 
-// Go only: Rust's tests leave the stream's drop unchecked. The relay's
-// connection closes, gracefully, once the relay and the sender of standard
-// input are both done with it, whichever is done last, as the Rust
-// version's TcpStream closed once both had dropped the Arc that held it;
-// and at once when the relay cannot say that it is connected, before the
-// sender starts, as the Rust relay's `?` dropped the only Arc.
+// The relay's connection closes, gracefully, once the relay and the sender of
+// standard input are both done with it, whichever is done last; and at once
+// when the relay cannot say that it is connected, before the sender starts.
 func TestARelaysConnectionClosesOnceTheRelayAndTheSenderAreDone(t *testing.T) {
 	t.Run("the sender first", func(t *testing.T) {
 		t.Parallel()

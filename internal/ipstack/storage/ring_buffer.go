@@ -270,7 +270,7 @@ func (r *RingBuffer[T]) dequeueContiguous(data []T) int {
 
 // checkedCount returns count after checking that it is between 0 and limit;
 // a count outside that range is a programming error in the caller of
-// operation, as smoltcp's assertions treat it.
+// operation.
 func checkedCount(operation string, count, limit int) int {
 	if count < 0 || count > limit {
 		panic(fmt.Sprintf("storage: %s: count %d is outside 0 to %d", operation, count, limit))

@@ -10,9 +10,8 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// Go only: a configuration printed with fmt never shows the password the
-// gateway demands, as the Rust configuration's derived Debug, which printed
-// the credentials' redacting Debug, never did.
+// A configuration printed with fmt never shows the password the gateway
+// demands.
 
 // gatewayPassword is the secret the formatting must keep to itself.
 const gatewayPassword = "hunter2"

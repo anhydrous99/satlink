@@ -80,22 +80,21 @@
 //   - keep one [TLSConnector] for the whole app: its session cache lets
 //     later connections to the same server resume with about 1 KB;
 //   - no post-quantum key share is offered: X25519, P-256 and P-384 are
-//     offered, with a key share for X25519 only, as rustls's ring defaults
-//     do; X25519MLKEM768 would add about 2.3 KB to every handshake, 1.2 KB
-//     of it in the ClientHello;
+//     offered, with a key share for X25519 only; X25519MLKEM768 would add
+//     about 2.3 KB to every handshake, 1.2 KB of it in the ClientHello;
 //   - crypto/tls asks servers for post-quantum (ML-DSA) certificates, and
 //     for RSA-PSS signatures before ECDSA ones, and cannot be told
-//     otherwise: a server that holds several certificates may send satnet
-//     another one than it sends the Rust version, such as an ML-DSA one,
-//     whose key and signature add about 5 KB to a full handshake, so pin
-//     the key of each ([TLSOptions.PinnedPublicKeys]);
+//     otherwise: a server that holds several certificates may send one with
+//     a different key, such as an ML-DSA one, whose key and signature add
+//     about 5 KB to a full handshake, so pin the key of each
+//     ([TLSOptions.PinnedPublicKeys]);
 //   - certificate compression (RFC 8879), which saves a quarter to a third
 //     of the handshake with servers that support it, is not available: Go's
 //     crypto/tls does not implement it, so certificate chains arrive
 //     uncompressed;
 //   - crypto/tls resumes a TLS 1.2 session with a ticket only, not by its
-//     session ID, as the Rust version could: a TLS 1.2 server that issues
-//     no tickets costs a full handshake every time.
+//     session ID: a TLS 1.2 server that issues no tickets costs a full
+//     handshake every time.
 //
 // # Errors
 //
@@ -107,9 +106,8 @@
 // a *net.OpError wrapping ctx.Err().
 //
 // Each [ErrorKind] constant is a sentinel for errors.Is, and errors.Is also
-// matches the standard library's equivalents of the Rust version's
-// io::ErrorKind conversion, so that code written for the net package needs
-// no changes:
+// matches the standard library's equivalents, so that code written for the
+// net package needs no changes:
 //
 //	ErrTimedOut                                  os.ErrDeadlineExceeded
 //	ErrLinkDown                                  syscall.ENOTCONN

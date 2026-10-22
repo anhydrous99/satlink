@@ -9,7 +9,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// connection is the part of a socket that smoltcp's reset reinitialises.
+// connection is the part of a socket that a reset reinitialises.
 type connection struct {
 	state        State
 	timer        timer

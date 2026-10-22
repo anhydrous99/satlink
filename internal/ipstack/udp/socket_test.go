@@ -1,9 +1,8 @@
 package udp
 
-// The tests up to TestClosing port smoltcp's UDP socket tests
-// (src/socket/udp.rs:603-1088), the Medium::Ip case of each; the hop-limit
-// tests are not ported, as hop limits are (PORTING-ipstack.md § 3). The
-// Go-specific tests follow them.
+// The tests of the UDP socket cover binding, sending, receiving and the
+// metadata of datagrams. The hop limit is always the default, so there are no
+// hop-limit tests.
 
 import (
 	"bytes"
@@ -21,10 +20,10 @@ import (
 const (
 	localPort  uint16 = 53
 	remotePort uint16 = 49500
-	// payloadOctetsPerPacket is how much payload storage smoltcp's test
-	// buffers have for each of their datagram slots.
+	// payloadOctetsPerPacket is how much payload storage each datagram slot of
+	// the test buffers has.
 	payloadOctetsPerPacket = 16
-	// testIPMTU is the MTU of smoltcp's TestingDevice on Medium::Ip.
+	// testIPMTU is the IP MTU of the test context.
 	testIPMTU = 1500
 )
 
@@ -35,14 +34,13 @@ var (
 	// socket's nor its peer's.
 	otherAddr = netip.AddrFrom4([4]byte{192, 168, 1, 3})
 
-	// localEnd is smoltcp's LOCAL_END as Bind takes it: the local port on
-	// the local address.
+	// localEnd is the local port on the local address, as Bind takes it.
 	localEnd = wire.ListenEndpoint{Addr: localAddr, Port: localPort}
 	// localPortOnly is a bare port, the local port on every address.
 	localPortOnly = wire.ListenEndpoint{Port: localPort}
 	remoteEnd     = netip.AddrPortFrom(remoteAddr, remotePort)
 	// toRemote is the metadata of a datagram for remoteEnd, from an address
-	// the socket chooses (smoltcp's REMOTE_END.into()).
+	// the socket chooses.
 	toRemote = Metadata{Endpoint: remoteEnd}
 
 	testPayload = []byte("abcdef")
@@ -74,8 +72,8 @@ var (
 	remoteUDPRepr = wire.UDPRepr{SrcPort: remotePort, DstPort: localPort}
 )
 
-// buffer returns smoltcp's test buffer: packets datagram slots with 16
-// payload octets each.
+// buffer returns a test buffer of packets datagram slots with 16 payload
+// octets each.
 func buffer(packets int) *PacketBuffer {
 	return NewPacketBuffer(packets, payloadOctetsPerPacket*packets)
 }
@@ -86,8 +84,7 @@ func remoteMetadataWithLocal() Metadata {
 	return Metadata{Endpoint: remoteEnd, LocalAddress: localAddr}
 }
 
-// testContext returns the context of smoltcp's test interface
-// (tests::setup(Medium::Ip)): at the epoch, with seed 0, an IP MTU of 1500
+// testContext returns a context at the epoch, with seed 0, an IP MTU of 1500
 // and the addresses 192.168.1.1/24 and 127.0.0.1/8.
 func testContext(t *testing.T) *socket.Context {
 	t.Helper()

@@ -21,7 +21,7 @@ type Metadata struct {
 	LocalAddress netip.Addr
 }
 
-// String formats the metadata as smoltcp does: the endpoint.
+// String formats the metadata as its endpoint.
 func (m Metadata) String() string {
 	return m.Endpoint.String()
 }

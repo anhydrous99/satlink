@@ -89,10 +89,9 @@ func (t tcpAction) execute(link netLink, s streams) error {
 }
 
 // sharedConnection is a connection that the relay and the sender of
-// standard input share. It closes once the last of them is done with it, as
-// the Rust version's TcpStream closed once the last Arc holding it was
-// dropped: the relay's as it returned, or the sender thread's once standard
-// input had ended. So neither closes it under the other, whose calls Close
+// standard input share. It closes once the last of them is done with it: the
+// relay's as it returned, or the sender thread's once standard input had
+// ended. So neither closes it under the other, whose calls Close
 // would end with net.ErrClosed.
 type sharedConnection struct {
 	conn  io.Closer
@@ -237,9 +236,8 @@ type outgoingStream interface {
 // sendStandardInput sends standard input to conn and reports the outcome on
 // outcomes, which it then closes. It ends the stream after reporting: with
 // its end once all of standard input is queued, and with a reset after a
-// failure. A panic ends this goroutine alone, without an outcome, as it
-// ended the sending thread alone in the Rust version, rather than the whole
-// program before it has hung up.
+// failure. A panic ends this goroutine alone, without an outcome, rather than
+// the whole program before it has hung up.
 func sendStandardInput(conn outgoingStream, s streams, outcomes chan<- error) {
 	defer close(outcomes)
 	defer func() {
@@ -256,7 +254,7 @@ func sendStandardInput(conn outgoingStream, s streams, outcomes chan<- error) {
 // err. Only the end of standard input ends the stream: the other end must
 // not take a part for the whole.
 func endStream(conn outgoingStream, err error) {
-	// Rust's abort and shutdown_write cannot fail; these fail only once the
+	// The abort and the write shutdown cannot fail; these fail only once the
 	// connection is closed, which leaves nothing to end.
 	if err != nil {
 		_ = conn.Abort()

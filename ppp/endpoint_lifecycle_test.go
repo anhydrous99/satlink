@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Go-only tests of an endpoint's life: opening, closing, opening again,
+// Tests of an endpoint's life: opening, closing, opening again,
 // going down for good, and the timers its owner runs.
 
 func TestOpenStartsOnlyADeadLink(t *testing.T) {

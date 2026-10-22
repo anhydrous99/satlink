@@ -60,11 +60,10 @@ func checkLabel(label []byte) error {
 	}
 }
 
-// copyName makes name the wire form of labels, which replaces it: smoltcp's
-// copy_name. It fails with the first error labels yields, or with
-// wire.ErrMalformed when the name would exceed MaxNameSize octets, and then
-// leaves name holding what it copied before the failure, as smoltcp leaves
-// its fixed-capacity name.
+// copyName makes name the wire form of labels, which replaces it. It fails
+// with the first error labels yields, or with wire.ErrMalformed when the name
+// would exceed MaxNameSize octets, and then leaves name holding what it copied
+// before the failure.
 func copyName(name *[]byte, labels iter.Seq2[[]byte, error]) error {
 	*name = (*name)[:0]
 	for label, err := range labels {
@@ -83,7 +82,7 @@ func copyName(name *[]byte, labels iter.Seq2[[]byte, error]) error {
 
 // appendLabel appends label to the wire form of a name: its length octet,
 // then its octets. Each part is appended only if it keeps the name within
-// MaxNameSize octets, as smoltcp's fixed-capacity storage takes it; it
+// MaxNameSize octets; it
 // reports whether both were. A label is never longer than maxLabelLen, so its
 // length fits its octet.
 func appendLabel(name *[]byte, label []byte) bool {
@@ -101,7 +100,7 @@ func appendWithinNameSize(name *[]byte, octets ...byte) bool {
 }
 
 // namesEqual reports whether two names have the same labels, compared octet
-// for octet in step as smoltcp's eq_names does: it fails with the first
+// for octet in step: it fails with the first
 // error either name yields before they differ or end.
 func namesEqual(a, b iter.Seq2[[]byte, error]) (bool, error) {
 	nextA, stopA := iter.Pull2(a)

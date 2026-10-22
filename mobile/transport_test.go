@@ -238,8 +238,8 @@ func TestAPanickingTransportIsAnInternalError(t *testing.T) {
 // handset ignores the DTR pulse the panic sets off — whether DTR drops end
 // calls over USB is unverified — or the transport has no DTR line:
 // EstablishLink's documentation and SatlinkErrorInternal's tell the app to
-// end it with a new IridiumHandset on the transport, as the Rust bindings'
-// unwinding left the call up.
+// end it with a new IridiumHandset on the transport, since unwinding leaves
+// the call up.
 func TestACallAPanicLeftUpIsEndedByANewHandsetOnTheAppsTransport(t *testing.T) {
 	t.Parallel()
 	port := &connectPanickingPort{closingPort: newClosingPort(t)}
@@ -264,8 +264,8 @@ func TestACallAPanicLeftUpIsEndedByANewHandsetOnTheAppsTransport(t *testing.T) {
 
 // TestAPanicOnceTheCallIsUpPulsesDTRWhichEndsTheCall: the core pulses DTR
 // as the panic unwinds out of the dial, which after AT&D2 ends the call
-// over a ByteTransport whose DTR line reaches the handset, where the Rust
-// bindings' unwinding left the call up.
+// over a ByteTransport whose DTR line reaches the handset. Unwinding alone
+// would leave the call up.
 func TestAPanicOnceTheCallIsUpPulsesDTRWhichEndsTheCall(t *testing.T) {
 	t.Parallel()
 	port := &connectPanickingPort{closingPort: newClosingPort(t)}

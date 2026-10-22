@@ -101,8 +101,8 @@ func TestAFaultyTransportOverASimulatorIsDeafToTheEscape(t *testing.T) {
 	faulty := NewFaultyTransport(simulator)
 	faulty.DeafToEscape.Store(true)
 	handset := InitializedHandset(t, faulty)
-	// Short, as in the Rust tests' faulty handset: an escape the handset
-	// ignores is followed by waits for its answer to ATH.
+	// Short: an escape the handset ignores is followed by waits for its
+	// answer to ATH.
 	handset.SetTimeout(handsetTimeout)
 	settings := satlink.DefaultDataCallSettings()
 	settings.EscapeGuard = CallEscapeGuard

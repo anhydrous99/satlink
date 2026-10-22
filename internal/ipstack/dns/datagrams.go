@@ -17,8 +17,7 @@ const (
 	// dnsPort is the port DNS servers answer on (RFC 1035 § 4.2.1).
 	dnsPort = 53
 	// mdnsPort is the port of multicast DNS (RFC 6762), whose responses the
-	// socket accepts from anyone, as smoltcp does even without multicast
-	// DNS.
+	// socket accepts from anyone.
 	mdnsPort = 5353
 )
 
@@ -28,15 +27,14 @@ const (
 // An error means the query was not sent, typically because the device has no
 // room for it, and Dispatch returns it unchanged. The query keeps its
 // retransmission time and delay, so it is sent at a later poll. What
-// Dispatch decided before emitting stands, as after smoltcp's failed
-// emit(…)? (dns.rs:552-623, :641-644): the server's 10 s timeout runs from
+// Dispatch decided before emitting stands: the server's 10 s timeout runs from
 // the query's first attempt to that server, refused or not; a move to the
 // next server, or a failure, is not undone.
 type EmitFunc func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) error
 
 // Accepts reports whether a UDP datagram is for the resolver: it comes from
 // port 53 of one of the servers, or from port 5353 (multicast DNS) of anyone,
-// as smoltcp accepts even without multicast DNS. The interface offers a
+// as smoltcp accepts them. The interface offers a
 // datagram to the DNS sockets only when no UDP socket accepted it.
 //
 // Accepting port 5353 has a cost: any host that can send the interface a

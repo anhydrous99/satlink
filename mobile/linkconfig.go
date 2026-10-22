@@ -17,8 +17,7 @@ import (
 const negativeLimit = "limits must not be negative; use 0 for no limit"
 
 // invalidIPv4Syntax is the reason a host address that is not IPv4 is
-// refused, as the Rust bindings gave it: the error text of Rust's Ipv4Addr
-// parser, which names no address.
+// refused. The text names no address.
 const invalidIPv4Syntax = "invalid IPv4 address syntax"
 
 // config returns the link configuration the settings describe, with

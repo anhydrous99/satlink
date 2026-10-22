@@ -3,7 +3,7 @@ package satlink
 import "testing"
 
 func TestClonesShareOneRequest(t *testing.T) {
-	// Rust clones the Cancellation; Go copies the settings that hold it.
+	// Copying the settings copies the reference to the one Cancellation.
 	settings := DefaultDataCallSettings()
 	clone := settings
 	another := DefaultDataCallSettings()

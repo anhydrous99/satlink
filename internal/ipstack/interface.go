@@ -32,7 +32,7 @@ const (
 	PollSocketStateChanged
 )
 
-// String returns the variant name, as Rust's Debug does.
+// String returns the variant name.
 func (r PollResult) String() string {
 	switch r {
 	case PollNone:
@@ -56,13 +56,13 @@ const (
 	// datagrams only.
 	IngressPacketProcessed
 	// IngressSocketStateChanged means a datagram that was not empty was
-	// processed, and sockets may have changed; more may be waiting. As in
-	// smoltcp, it is returned for every such datagram, whether a socket took
-	// it or the interface answered or dropped it.
+	// processed, and sockets may have changed; more may be waiting. It is
+	// returned for every such datagram, whether a socket took it or the
+	// interface answered or dropped it.
 	IngressSocketStateChanged
 )
 
-// String returns the variant name, as Rust's Debug does.
+// String returns the variant name.
 func (r PollIngressSingleResult) String() string {
 	switch r {
 	case IngressNone:
@@ -96,8 +96,7 @@ func (r PollIngressSingleResult) String() string {
 // not safe for concurrent use.
 type Interface struct {
 	// cx is what the sockets know of the interface: the time of the poll,
-	// the random source, the IP MTU and the addresses (smoltcp's
-	// InterfaceInner).
+	// the random source, the IP MTU and the addresses.
 	cx *socket.Context
 	// checksums says which checksums the stack verifies and computes, as
 	// the device asked.
@@ -109,27 +108,24 @@ type Interface struct {
 // change the MTU, create a new interface. It panics if capabilities.MTU is
 // below MinMTU.
 //
-// Like smoltcp's Interface::new, it draws from the random source before any
-// socket does, so that a seed gives the sockets the initial sequence numbers
-// and DNS query ids and ports that smoltcp gives them.
+// It draws from the random source before any socket does, so that a seed gives
+// the sockets their initial sequence numbers and DNS query ids and ports.
 func NewInterface(config Config, capabilities DeviceCapabilities, now time.Time) *Interface {
 	if capabilities.MTU < MinMTU {
 		panic(fmt.Sprintf("ipstack: an MTU of %d is below MinMTU, %d", capabilities.MTU, MinMTU))
 	}
 	// Devices carry bare IP datagrams, so the IP MTU is the device's.
 	cx := socket.NewContext(now, config.RandomSeed, capabilities.MTU)
-	// smoltcp keeps the identifier only to fragment datagrams, which the
-	// stack does not do; drawing it all the same keeps every later draw, the
-	// sockets', what smoltcp draws for the same seed.
+	// The identifier is used only to fragment datagrams, which the stack does
+	// not do. Drawing it all the same keeps the sockets' draws the same for a
+	// given seed.
 	_ = fragmentIdentifier(cx.Rand())
 	return &Interface{cx: cx, checksums: capabilities.Checksum}
 }
 
-// fragmentIdentifier draws where smoltcp starts counting the identification
-// it gives the IPv4 datagrams it fragments (RFC 791 § 3.1): a random Uint16
-// other than 0, drawn again until it is one. smoltcp's Interface::new draws
-// it from the interface's random source before any socket draws, whenever
-// IPv4 is compiled in (src/iface/interface/mod.rs:250-259).
+// fragmentIdentifier draws the identification the interface gives the IPv4
+// datagrams it fragments (RFC 791 § 3.1): a random Uint16 other than 0, drawn
+// again until it is one. It is drawn before any socket draws.
 func fragmentIdentifier(random *socket.Rand) uint16 {
 	for {
 		if identifier := random.Uint16(); identifier != 0 {
@@ -144,7 +140,7 @@ func (i *Interface) Context() *socket.Context {
 	return i.cx
 }
 
-// SetIPAddrs replaces the interface's addresses (smoltcp's update_ip_addrs).
+// SetIPAddrs replaces the interface's addresses.
 // Each must be an IPv4 unicast address, or 0.0.0.0, with a valid prefix
 // length; otherwise SetIPAddrs returns an error wrapping
 // socket.ErrInvalidIPAddr and changes nothing (socket.Context.SetIPAddrs). A

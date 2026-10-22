@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for flow control
-// (src/socket/tcp.rs, lines 7791-8200).
+// Tests of flow control.
 
 import (
 	"testing"

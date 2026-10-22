@@ -9,10 +9,9 @@ import (
 // across the wrap-around, so that a number just past 2³¹ − 1 is after it.
 type TCPSeqNumber int32
 
-// Add returns the sequence number n octets after s; a negative n goes back,
-// as smoltcp's subtraction of an octet count does. It panics if n is
-// outside ±(2³¹ − 1), as smoltcp's overflow checks do: no segment or window
-// spans half the sequence space.
+// Add returns the sequence number n octets after s; a negative n goes back.
+// It panics if n is outside ±(2³¹ − 1): no segment or window spans half the
+// sequence space.
 func (s TCPSeqNumber) Add(n int) TCPSeqNumber {
 	switch {
 	case n > math.MaxInt32:
@@ -24,7 +23,7 @@ func (s TCPSeqNumber) Add(n int) TCPSeqNumber {
 }
 
 // Sub returns how many octets s is after earlier. It panics if s is before
-// earlier, as smoltcp's underflow check does.
+// earlier.
 func (s TCPSeqNumber) Sub(earlier TCPSeqNumber) int {
 	difference := int32(s) - int32(earlier)
 	if difference < 0 {

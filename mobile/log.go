@@ -10,7 +10,7 @@ import (
 
 // Logging, as the module's other logging packages do it: through the
 // process-wide slog logger, with this package as the record's "pkg"
-// attribute (see "Logging" in docs/PORTING.md). This package logs only the
+// attribute (see "Logging" in docs/DESIGN.md). This package logs only the
 // panics it recovers where no caller can be told; SetLogSink forwards
 // every package's records to the app.
 
@@ -18,7 +18,7 @@ import (
 // app's sink as the record's target.
 const logPackage = "mobile"
 
-// logError logs msg at error level, like Rust's log::error!.
+// logError logs msg at error level.
 func logError(msg string) {
 	logger := slog.Default()
 	ctx := context.Background()

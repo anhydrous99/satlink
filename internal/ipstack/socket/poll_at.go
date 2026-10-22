@@ -72,9 +72,8 @@ func (p PollAt) Deadline(now time.Time) (time.Time, bool) {
 	}
 }
 
-// String names the answer with the variant names of smoltcp's derived
-// Debug: "Now", "Ingress", or "Time(…)" with the time as time.Time prints it
-// (smoltcp's Debug prints the Instant's microseconds instead).
+// String names the answer: "Now", "Ingress", or "Time(…)" with the time as
+// time.Time prints it.
 func (p PollAt) String() string {
 	switch p.kind {
 	case pollNow:

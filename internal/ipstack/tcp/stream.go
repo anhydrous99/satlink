@@ -98,8 +98,7 @@ func (s *Socket) receiveWith(dequeue func(buffer *SocketBuffer) int) (int, error
 func (s *Socket) checkReceivable() error {
 	// Before the connection is established there is nothing to read. The
 	// socket takes no data that arrives with a SYN (it does not support TCP
-	// Fast Open), although smoltcp's comment here says it may have received
-	// some.
+	// Fast Open).
 	if s.MayReceive() {
 		return nil
 	}
@@ -123,7 +122,7 @@ func (s *Socket) Peek(size int) ([]byte, error) {
 
 // PeekSlice copies as many received octets into data as fit, without
 // dequeuing them, and returns how many it copied. Unlike Peek it reads the
-// buffer in any state, as smoltcp's peek_slice does.
+// buffer in any state.
 func (s *Socket) PeekSlice(data []byte) int {
 	return s.receiveBuffer.ReadAllocated(0, data)
 }

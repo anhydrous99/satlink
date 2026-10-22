@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // The kinds of [SatlinkError], and the fields of SatlinkError each one
@@ -131,8 +131,7 @@ func (e *SatlinkError) Error() string {
 	return errorMessages[e.Kind](e)
 }
 
-// errorMessages words each kind's message from the error's fields, as the
-// Rust bindings worded them.
+// errorMessages words each kind's message from the error's fields.
 var errorMessages = [...]func(e *SatlinkError) string{
 	SatlinkErrorTransport:        func(e *SatlinkError) string { return "transport: " + e.Reason },
 	SatlinkErrorTimeout:          func(e *SatlinkError) string { return "timed out waiting for " + e.Command },
@@ -143,7 +142,7 @@ var errorMessages = [...]func(e *SatlinkError) string{
 	SatlinkErrorParse:            func(e *SatlinkError) string { return "unexpected response: " + e.Reason },
 	SatlinkErrorInvalidArgument:  func(e *SatlinkError) string { return "invalid argument: " + e.Reason },
 	SatlinkErrorPolicyDenied:     func(e *SatlinkError) string { return e.Destination + " is not allowed by the link settings" },
-	SatlinkErrorInvalidHost:      func(e *SatlinkError) string { return rustdebug.Quote(e.Host) + " is not a valid host name" },
+	SatlinkErrorInvalidHost:      func(e *SatlinkError) string { return debugtext.Quote(e.Host) + " is not a valid host name" },
 	SatlinkErrorNameNotFound:     func(e *SatlinkError) string { return "no address found for " + e.Host },
 	SatlinkErrorNoDNSServer:      func(*SatlinkError) string { return "the link has no DNS server" },
 	SatlinkErrorConnectionFailed: func(e *SatlinkError) string { return "could not connect to " + e.Address },

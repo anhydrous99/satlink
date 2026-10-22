@@ -1,10 +1,9 @@
-// Package ipstack is a userspace TCP/IP stack: a Go port of the parts of
-// smoltcp 0.14 (https://github.com/smoltcp-rs/smoltcp) that the Rust
-// workspace this module ports compiles in. satnet runs it inside the app, fed
-// by the PPP link, and the simulator runs it on the gateway's side, answering
-// for every address.
+// Package ipstack is a userspace TCP/IP stack for bare IPv4 links, modelled on
+// the design of smoltcp 0.14 (https://github.com/smoltcp-rs/smoltcp). satnet
+// runs it inside the app, fed by the PPP link, and the simulator runs it on the
+// gateway's side, answering for every address.
 //
-// # Why a port of smoltcp
+// # Pull model
 //
 // The stack is driven in a pull model. A Device offers the stack a transmit
 // slot only when it can take a datagram, so the stack decides what to send,
@@ -15,7 +14,7 @@
 //
 // # Layers
 //
-// As in smoltcp, the stack is built in layers, each a package:
+// The stack is built in layers, each a package:
 //
 //   - wire reads and writes IPv4, TCP, UDP, ICMPv4 and DNS packets, at the
 //     level of raw header fields (IPv4Packet…) and of validated
@@ -37,14 +36,10 @@
 //
 // # Supported subset
 //
-// The workspace enables smoltcp's std, log, medium-ip, proto-ipv4,
-// socket-tcp, socket-udp, socket-dns, dns-max-server-count-2 and
-// dns-max-result-count-4 features, and this port has exactly what they
-// compile: devices that carry bare IPv4 datagrams (smoltcp's Medium::Ip, as
-// on PPP or a TUN device), IPv4 only, TCP, UDP and DNS sockets. There is no
+// The stack handles devices that carry bare IPv4 datagrams, as on a PPP link or
+// a TUN device, with IPv4 only and TCP, UDP and DNS sockets. There is no
 // Ethernet, IPv6, fragmentation or reassembly, multicast, DHCP, raw or ICMP
-// sockets, TCP congestion control, or async wakers, and, since the
-// auto-icmp-echo-reply feature is not enabled either, the interface does not
+// sockets, TCP congestion control, or async wakers, and the interface does not
 // answer pings.
 //
 // Derived from smoltcp, 0BSD licence; see LICENSE-smoltcp in this directory.

@@ -11,10 +11,9 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// Go only. Each value is asked for once the lines before it are written, as
-// the Rust version asked for it right before its println!, which panicked
-// when the line could not be written: output that nobody can read costs no
-// further exchange with the handset, which may be slow to answer.
+// Each value is asked for once the lines before it are written: output that
+// nobody can read costs no further exchange with the handset, which may be slow
+// to answer.
 func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) {
 	tests := []struct {
 		failingLine string

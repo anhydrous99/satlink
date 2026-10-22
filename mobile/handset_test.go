@@ -97,7 +97,7 @@ func TestAFailureWhileACallMayStillBeUpSaysSo(t *testing.T) {
 			want: callMayStillBeUpError("transport error: unplugged"),
 		},
 		{
-			// The flag is Rust's CallFailure, not its Error::CallMayStillBeUp.
+			// The flag on an error of another kind does not make it a hang-up failure.
 			name: "a failure of another kind with the flag gives its text",
 			err:  &satlink.Error{Kind: satlink.ErrTimeout, Command: "+++", CallMayStillBeUp: true},
 			want: callMayStillBeUpError(`timed out waiting for a response to "+++"`),

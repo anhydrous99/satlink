@@ -66,10 +66,9 @@ func TestAcceptsTheShortestUsefulLimits(t *testing.T) {
 	}
 }
 
-// TestRejectsZeroAndAbsurdLimits is the Rust test in Go's shape: zero is "no
-// limit" in Go, so the invalid durations are negative. The Rust case of a
-// zero data limit has no Go form, as MaxBytes is unsigned and 0 means none;
-// it is left out.
+// TestRejectsZeroAndAbsurdLimits checks the limits that refuse absurd values:
+// zero is "no limit" in Go, so the invalid durations are negative. A zero
+// data limit is left out, as MaxBytes is unsigned and 0 means none.
 func TestRejectsZeroAndAbsurdLimits(t *testing.T) {
 	defaults := DefaultLimits()
 	for name, change := range map[string]func(*Limits){
@@ -93,7 +92,7 @@ func TestRejectsZeroAndAbsurdLimits(t *testing.T) {
 	}
 }
 
-func TestConfigurationsAreRefusedForTheRustReasons(t *testing.T) {
+func TestConfigurationsAreRefusedWithTheirMessages(t *testing.T) {
 	for _, c := range []struct {
 		name    string
 		change  func(*Config)
@@ -103,7 +102,8 @@ func TestConfigurationsAreRefusedForTheRustReasons(t *testing.T) {
 		{"link rate", func(c *Config) { c.Tuning.LinkRate = 0 }, "the link rate must be above zero"},
 		{"buffers", func(c *Config) { c.Tuning.TCPSendBuffer = c.Tuning.MTU - 1 }, "TCP buffers must hold at least one full packet"},
 		{"host name", func(c *Config) { c.Hosts["bad name"] = ipv4(192, 0, 2, 1) }, `"bad name" in hosts is not a valid host name`},
-		// Rust's {:?} of a str, where Go's %q would write "bad\x7fname".
+		// Control characters are escaped as \u{7f}, where Go's %q would write
+		// "bad\x7fname".
 		{"host name with a control character", func(c *Config) { c.Hosts["bad\x7fname"] = ipv4(192, 0, 2, 1) },
 			`"bad\u{7f}name" in hosts is not a valid host name`},
 		{"host address", func(c *Config) { c.Hosts["six.example"] = netip.MustParseAddr("2001:db8::1") }, `"six.example" in hosts needs an IPv4 address`},
@@ -204,7 +204,7 @@ func TestPPPRefusesWhatItCannotCarry(t *testing.T) {
 	if !errors.Is(err, ErrInvalidConfig) || !errors.As(err, &refused) || refused.Kind != ppp.ErrCredentialTooLong {
 		t.Fatalf("prepare() = %v, want ErrInvalidConfig wrapping ppp's ErrCredentialTooLong", err)
 	}
-	// The Rust version's text, which carries ppp's.
+	// The text wraps ppp's own message.
 	if want := "invalid configuration: the username is longer than 255 bytes"; err.Error() != want {
 		t.Errorf("prepare() = %q, want %q", err, want)
 	}

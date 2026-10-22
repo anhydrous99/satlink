@@ -15,7 +15,7 @@ import (
 // own.
 
 // logLineFormat is how a log record is printed, "[LEVEL pkg] text", the
-// level padded to five characters as the Rust version's "[{:<5} {}] {}".
+// level padded to five characters.
 const logLineFormat = "[%-5s %s] %s\n"
 
 // droppedLinesFormat says how many lines standard error could not take, in
@@ -153,9 +153,8 @@ func (l *stderrLog) close() {
 // writerBehind returns the standard error that the CLI writes its own lines
 // to. Each write first waits for the log lines handed over before it to be
 // written, however long standard error blocks them, as it would block the
-// write itself; so the lines come in the order they were made. The Rust
-// version's logger thread wrote a line before the command's next one, where
-// Go's scheduler would let the command's goroutine write first.
+// write itself; so the lines come in the order they were made. Without the
+// wait, Go's scheduler could let the command's goroutine write first.
 func (l *stderrLog) writerBehind() io.Writer {
 	return writerBehindLog{log: l}
 }

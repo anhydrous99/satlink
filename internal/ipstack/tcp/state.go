@@ -59,8 +59,7 @@ var stateNames = [...]string{
 	StateTimeWait:    "TIME-WAIT",
 }
 
-// String returns the state's RFC 793 name, as smoltcp displays it
-// ("SYN-SENT").
+// String returns the state's RFC 793 name ("SYN-SENT").
 func (s State) String() string {
 	if s < 0 || int(s) >= len(stateNames) {
 		return "State(" + strconv.Itoa(int(s)) + ")"

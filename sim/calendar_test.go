@@ -5,9 +5,8 @@ import (
 	"time"
 )
 
-// The Rust version computes dates with Howard Hinnant's civil_from_days;
-// the Go version leaves that to package time, and the Rust tests check
-// that the result is the same.
+// The dates come from package time. The tests check them against known
+// moments, and against a day-by-day count from the epoch.
 
 const secondsPerDay = 24 * 60 * 60
 

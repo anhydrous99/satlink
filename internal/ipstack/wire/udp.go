@@ -192,7 +192,7 @@ func (r UDPRepr) Emit(packet UDPPacket, src, dst netip.Addr, payload []byte, che
 	}
 }
 
-// String formats the header as smoltcp does: "UDP src=… dst=…".
+// String formats the header as "UDP src=… dst=…".
 func (r UDPRepr) String() string {
 	return fmt.Sprintf("UDP src=%d dst=%d", r.SrcPort, r.DstPort)
 }

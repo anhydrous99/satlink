@@ -1,10 +1,7 @@
 package ipstack
 
-// The tests up to TestICMPReplySize port smoltcp's IPv4 interface tests
-// (src/iface/interface/tests/ipv4.rs), the Medium::Ip case of those the
-// workspace compiles. test_local_subnet_broadcasts, get_source_address and
-// get_source_address_empty_interface test what package socket now holds, and
-// are ported there. The Go-specific tests of IPv4 processing follow.
+// The tests up to TestICMPReplySize follow smoltcp's IPv4 interface tests for
+// bare IPv4 datagrams. The tests after them cover the rest of IPv4 processing.
 
 import (
 	"bytes"

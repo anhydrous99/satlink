@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Go-only tests of the packets an endpoint discards, and of the
+// Tests of the packets an endpoint discards, and of the
 // Protocol-Rejects it sends and receives.
 
 func TestNetworkTrafficBeforeTheNetworkPhaseIsDiscarded(t *testing.T) {

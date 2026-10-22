@@ -8,7 +8,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// The timing of queries (smoltcp's dns.rs:19-21).
+// The timing of queries.
 const (
 	// retransmitDelay is how long a server has to answer a query's first
 	// attempt before the query is sent to it again.
@@ -20,7 +20,7 @@ const (
 	maxRetransmitDelay = 10 * time.Second
 	// retransmitTimeout is how long a server has to answer, from the
 	// query's first attempt to it, before the query moves on to the next
-	// one. smoltcp: "Should generally be 2-10 secs".
+	// one.
 	retransmitTimeout = 10 * time.Second
 )
 
@@ -36,7 +36,7 @@ const (
 	queryFailed
 )
 
-// query is one lookup: smoltcp's DnsQuery and its State.
+// query is one lookup.
 type query struct {
 	state queryState
 	// pending is the lookup in progress, while the state is queryPending.
@@ -72,7 +72,7 @@ type pendingQuery struct {
 
 // newQuery returns a pending query for name, in its wire form, and
 // queryType. It draws the transaction id and then the source port from the
-// interface's random source, as smoltcp does: the order of the draws decides
+// interface's random source: the order of the draws decides
 // both values.
 func newQuery(cx *socket.Context, name []byte, queryType wire.DNSType) *query {
 	transactionID := cx.Rand().Uint16()

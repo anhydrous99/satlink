@@ -9,9 +9,8 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// Limits of the resolver, set as the workspace configures smoltcp
-// (dns-max-server-count-2, dns-max-result-count-4) and at smoltcp's default
-// name size.
+// Limits of the resolver: two servers, four results, and the default name
+// size.
 const (
 	// MaxServerCount is how many servers a socket keeps: IPCP hands out
 	// two. Further servers are ignored.
@@ -43,14 +42,13 @@ type Socket struct {
 	// servers are the servers to ask, in turn: at most MaxServerCount.
 	servers []netip.Addr
 	// queries holds the queries by slot, a free slot being nil. It grows as
-	// needed, as smoltcp's growable query storage does.
+	// needed.
 	queries []*query
 }
 
 // NewSocket returns a resolver that asks servers, of which it keeps the first
 // MaxServerCount. A server must be an IPv4 address (Is4): a query fails when
-// it reaches a server that is unspecified or not IPv4, as smoltcp fails one
-// that reaches an unspecified server.
+// it reaches a server that is unspecified or not IPv4.
 func NewSocket(servers []netip.Addr) *Socket {
 	return &Socket{servers: slices.Clone(servers[:min(len(servers), MaxServerCount)])}
 }

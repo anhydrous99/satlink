@@ -83,17 +83,17 @@ func commandLineExitText(t *testing.T, w world, args []string, p palette) string
 	return exit.text
 }
 
-// Go only: the port's rules against anstyle-parse 1.0.0's own, for every
-// state and every byte. The port leaves out the rules that stripping cannot
-// tell from no rule at all, so the two are compared as stripping sees them:
+// The stripper's rules against anstyle-parse 1.0.0's own, for every state and
+// every byte. The stripper leaves out the rules that stripping cannot tell from
+// no rule at all, so the two are compared as stripping sees them:
 // each byte must move the parser where anstyle-parse moved it, and be
 // dropped or kept as anstream dropped or kept it.
 func TestTheParsersRulesAreAnstyleParsesAsStrippingSeesThem(t *testing.T) {
 	for state := range anstyleParseRules {
 		for b := range 256 {
-			got, want := portStep(vtState(state), byte(b)), anstreamStep(vtState(state), byte(b))
+			got, want := vtStep(vtState(state), byte(b)), anstreamStep(vtState(state), byte(b))
 			if got != want {
-				t.Errorf("state %d, byte %#02x: the port moves to state %d, %v; anstyle-parse moved to %d, %v",
+				t.Errorf("state %d, byte %#02x: the stripper moves to state %d, %v; anstyle-parse moved to %d, %v",
 					state, b, got.next, got.fate, want.next, want.fate)
 				// The first difference in a state shows which rule to look at.
 				break
@@ -126,8 +126,8 @@ func (f byteFate) String() string {
 	return [...]string{byteDropped: "byte dropped", byteKept: "byte kept", characterKept: "character kept"}[f]
 }
 
-// portStep is the step that b takes from state by the port's rules.
-func portStep(state vtState, b byte) strippingStep {
+// vtStep is the step that b takes from state by the stripper's rules.
+func vtStep(state vtState, b byte) strippingStep {
 	next, action := vtTransition(state, b)
 	switch {
 	case action == vtBeginUTF8:
@@ -141,7 +141,7 @@ func portStep(state vtState, b byte) strippingStep {
 
 // anstreamStep is the step that b took from state by anstyle-parse's rules,
 // Anywhere's first, as its state_change looks them up, with anstream's
-// judgement of the byte. The port stays on the ground through a UTF-8
+// judgement of the byte. The stripper stays on the ground through a UTF-8
 // character, which anstyle-parse follows in its Utf8 state.
 func anstreamStep(state vtState, b byte) strippingStep {
 	for _, rules := range [][]anstyleRule{anstyleParseRules[vtAnywhere], anstyleParseRules[state]} {
@@ -165,7 +165,7 @@ func anstreamStep(state vtState, b byte) strippingStep {
 // white space.
 func anstreamFate(b byte, action anstyleAction) byteFate {
 	const del = 0x7f
-	// The bytes of Rust's u8::is_ascii_whitespace.
+	// The ASCII whitespace bytes: space, tab, line feed, form feed and carriage return.
 	const asciiWhiteSpace = " \t\n\f\r"
 	switch {
 	case action == anstyleBeginUTF8:
@@ -204,13 +204,13 @@ type anstyleRule struct {
 	action      anstyleAction
 }
 
-// vtUTF8 is anstyle-parse's state inside a UTF-8 character, which the port
-// does without: a number that none of the port's states has.
+// vtUTF8 is anstyle-parse's state inside a UTF-8 character, which the stripper
+// does without: a number that none of its states has.
 const vtUTF8 = vtSOSPMAPCString + 1
 
 // anstyleParseRules are anstyle-parse 1.0.0's rules (state/codegen.rs),
 // state by state and line by line, in its order and with its actions; only
-// the states have the port's names. A byte that no rule of a state names
+// the states have the stripper's names. A byte that no rule of a state names
 // leaves the parser where it was and does nothing (Anywhere, Nop).
 var anstyleParseRules = [...][]anstyleRule{
 	vtAnywhere: {

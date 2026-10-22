@@ -12,7 +12,7 @@ import (
 )
 
 // The device tests' connections run between local ports of ours and port
-// 80 of one peer, as the Rust tests' do.
+// 80 of one peer.
 const (
 	deviceMTU      = 576
 	devicePeerPort = 80
@@ -20,7 +20,7 @@ const (
 	// unchanged unless a test says otherwise.
 	ourAcknowledgement = 1
 	deviceWindow       = 1024
-	// The Rust tests' bare datagram to port 53: an IPv4 header and 20
+	// The bare datagram to port 53: an IPv4 header and 20
 	// bytes that no TCP rule touches.
 	bareDatagramLen = 40
 	bareHeaderLen   = 20
@@ -99,8 +99,7 @@ func segmentOf(t *testing.T, datagram []byte) wire.TCPPacket {
 	return segment
 }
 
-// testSegment is a TCP segment between our local port and the peer, as the
-// Rust tests' Segment describes one.
+// testSegment is a TCP segment between our local port and the peer.
 type testSegment struct {
 	port            uint16
 	fromPeer        bool
@@ -202,8 +201,7 @@ func (s testSegment) datagram() []byte {
 }
 
 // datagramFrom returns a UDP-sized datagram from sourcePort to port 53,
-// which no TCP rule touches, built with the packet's setters as the Rust
-// test builds it.
+// which no TCP rule touches, built with the packet's setters.
 func datagramFrom(sourcePort uint16) []byte {
 	datagram := make([]byte, bareDatagramLen)
 	packet := wire.IPv4Packet(datagram)

@@ -3,7 +3,7 @@ package satlink
 import (
 	"fmt"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // noCarrier is the result code of a call that ended, or of hanging up when
@@ -76,8 +76,7 @@ const (
 	ErrCancelled
 )
 
-// kindLabels are the kinds' labels, worded as the Rust version's messages
-// start.
+// kindLabels are the kinds' labels, which begin each error's message.
 var kindLabels = [...]string{
 	ErrTransport:        "transport error",
 	ErrTimeout:          "timed out",
@@ -125,8 +124,7 @@ type Error struct {
 	// billing: always on an error of kind [ErrCallMayStillBeUp], and on an
 	// error of another kind when the operation that returned it ended with
 	// a hang-up that could not be confirmed — neither ATH after the escape
-	// nor a DTR drop was — as the Rust version's
-	// CallFailure.call_may_still_be_up says. It is set on the errors of
+	// nor a DTR drop was. It is set on the errors of
 	// [DataCall.HangUp] and [Handset.EndDataCall] once they have tried to
 	// hang up, and on those of a [Handset.DialData] or [Handset.AnswerData]
 	// whose abandoned attempt might have connected and could not be ended.
@@ -135,16 +133,16 @@ type Error struct {
 	CallMayStillBeUp bool
 }
 
-// Error returns the message, worded as the Rust version words it, for
-// example `timed out waiting for a response to "AT+CSQ"`.
+// Error returns the message, for example
+// `timed out waiting for a response to "AT+CSQ"`.
 func (e *Error) Error() string {
 	switch e.Kind {
 	case ErrTransport, ErrCall, ErrParse, ErrInvalidArgument, ErrCallMayStillBeUp:
 		return e.Kind.Error() + ": " + e.messageOrCause()
 	case ErrTimeout:
-		return "timed out waiting for a response to " + rustdebug.Quote(e.Command)
+		return "timed out waiting for a response to " + debugtext.Quote(e.Command)
 	case ErrCommandFailed:
-		return "handset returned ERROR for " + rustdebug.Quote(e.Command)
+		return "handset returned ERROR for " + debugtext.Quote(e.Command)
 	case ErrEquipment, ErrSMS:
 		return e.Kind.Error() + ": " + e.Code
 	default:

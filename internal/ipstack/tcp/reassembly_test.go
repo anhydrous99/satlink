@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for reassembly (src/socket/tcp.rs,
-// lines 8853-8965).
+// Tests of reassembly.
 
 import (
 	"testing"

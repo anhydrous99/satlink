@@ -1,10 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for zero-window probes
-// (src/socket/tcp.rs, lines 8201-8560).
-// test_zero_window_probe_not_capped_by_cwnd is not ported: it tests Reno
-// congestion control, which the workspace does not compile
-// (PORTING-ipstack.md, sections 3 and 6).
+// Tests of zero-window probes.
 
 import (
 	"testing"
@@ -42,7 +38,7 @@ func socketProbingAClosedWindow(t *testing.T) *testSocket {
 }
 
 // assertProbing fails the test unless the socket's timer is timing a
-// zero-window probe: smoltcp's assert!(s.timer.is_zero_window_probe()).
+// zero-window probe.
 func assertProbing(t *testing.T, s *testSocket) {
 	t.Helper()
 	if !s.timer.isZeroWindowProbe() {
@@ -51,7 +47,7 @@ func assertProbing(t *testing.T, s *testSocket) {
 }
 
 // assertNotProbing fails the test if the socket's timer is timing a
-// zero-window probe: smoltcp's assert!(!s.timer.is_zero_window_probe()).
+// zero-window probe.
 func assertNotProbing(t *testing.T, s *testSocket) {
 	t.Helper()
 	if s.timer.isZeroWindowProbe() {
@@ -61,8 +57,7 @@ func assertNotProbing(t *testing.T, s *testSocket) {
 
 // receiveOnlyWhenDue expects the socket to send nothing a millisecond
 // before due, and then only want at due, a duration after the epoch: a
-// segment whose timer fires exactly then. It is smoltcp's
-// recv_nothing!(s, time due - 1) followed by recv!(s, time due, [want]).
+// segment whose timer fires exactly then.
 func receiveOnlyWhenDue(t *testing.T, s *testSocket, due time.Duration, want wire.TCPRepr) {
 	t.Helper()
 	receiveNothing(t, s.at(due-time.Millisecond))

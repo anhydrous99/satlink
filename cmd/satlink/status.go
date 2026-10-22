@@ -27,8 +27,8 @@ func (c *cli) statusCommand() *command {
 
 // printStatus writes the handset's signal, battery and registration. Only
 // the signal must be known; the others may be unavailable, and then say why.
-// Each is asked for once the lines before it are written, as in the Rust
-// version: output that nobody can read costs no further exchange.
+// Each is asked for once the lines before it are written: output that nobody
+// can read costs no further exchange.
 func printStatus(w io.Writer, handset *satlink.Handset) error {
 	bars, err := handset.SignalQuality()
 	if err != nil {

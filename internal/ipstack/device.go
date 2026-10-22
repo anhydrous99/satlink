@@ -7,7 +7,7 @@ import (
 )
 
 // Device is a network device that carries bare IPv4 datagrams, without a
-// link-layer header: smoltcp's phy::Device on Medium::Ip, as on a PPP link.
+// link-layer header, as on a PPP link.
 //
 // It works in a pull model. The interface asks for the next received datagram
 // when it polls, and asks for a transmit slot each time it has a datagram
@@ -18,7 +18,7 @@ type Device interface {
 	// Receive takes the next received datagram, if any, and returns it with
 	// a slot for a reply. The reply slot must accept a datagram even when
 	// Transmit would refuse one: the interface answers some datagrams at
-	// once (an ACK, a RST, an ICMP error), assuming, as smoltcp does, that
+	// once (an ACK, a RST, an ICMP error), assuming that
 	// it can always send zero or one datagrams for each one it receives.
 	// The interface reads datagram only until the poll call that took it
 	// returns, so the device may reuse its storage afterwards.

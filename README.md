@@ -4,9 +4,8 @@ A cross-platform client for Iridium satellite handsets (9555, 9555A, 9575/P/E, R
 service port) over USB, for macOS, Linux and Android: the handset itself (status,
 SMS, calls) and an **IP link that only your app can use**.
 
-satlink is the Go port of the Rust workspace `iridium-handset`: the same features,
-behaviour, defaults and tests, written as Go. [docs/PORTING.md](docs/PORTING.md)
-records how the two correspond and where they differ.
+satlink is written in Go. [docs/DESIGN.md](docs/DESIGN.md) is the maintainers' guide: the
+package layout, the conventions the code follows, and the contracts between packages.
 
 ## Why no driver is needed
 
@@ -34,12 +33,12 @@ sim/                simulated handset + Iridium gateway + tiny internet, for tes
 serial/             serial transport + discovery by USB VID/PID
 cmd/satlink/        the satlink command-line tool
 mobile/             gomobile bindings: Kotlin and Java (Android), Swift and Objective-C (macOS)
-internal/ipstack/   TCP/IP: a Go port of the part of smoltcp the link uses
-internal/…          shared internals: log rendering, Rust's Debug texts, rustls's TLS suites, lossy UTF-8, ASCII case, OS error texts, test support
+internal/ipstack/   TCP/IP, modelled on smoltcp's design and covering what the link uses
+internal/…          shared internals: log rendering, Debug-style texts, TLS cipher suites, lossy UTF-8, ASCII case, OS error texts, test support
 android/            Kotlin USB-host transport, examples, USB device filter
 linux/              udev rule
 scripts/            gomobile build scripts
-docs/               the maintainers' guide to the port
+docs/               the maintainers' guides: DESIGN.md and IPSTACK.md
 ```
 
 The module is `github.com/anhydrous99/satlink` and needs Go 1.27. Its direct
@@ -88,7 +87,7 @@ what it may do:
   ~1 KB. **No RFC 8879 certificate compression**: Go's crypto/tls does not implement
   it, so certificate chains arrive uncompressed, and full handshakes with servers
   that compress them (Cloudflare among them) cost a quarter to a third more airtime
-  than with the Rust version. A server that closes without the TLS goodbye gives
+  than they would with compression. A server that closes without the TLS goodbye gives
   `satnet.ErrTLSTruncated` rather than `io.EOF`: trust what arrived only if its own
   framing (a `Content-Length`, say) shows it is complete. Once `CloseWrite` has
   queued our goodbye, writes fail with `satnet.ErrConnectionReset` — the server
@@ -335,7 +334,7 @@ Every command shows a summary of its arguments with `-h`, and more with `--help`
 - once interrupted, death by `SIGINT` (status 130 on Windows).
 
 Output to a standard output opened read-only on Unix, or to one that `satlink` was
-not handed on Windows, is dropped without an error, as in the Rust version. On
+not handed on Windows, is dropped without an error. On
 Windows, one opened read-only fails the command.
 
 Use `--port /dev/ttyACM0` (or `SATLINK_PORT`) when more than one handset is
@@ -512,78 +511,74 @@ protocols, in a class of your own. A serial link keeps its port, which
 only one may open, until its call has ended: after `SatlinkErrorHangUpFailed` from a
 serial link's `HangUp`, the link closes the port a moment later, and then
 `SatlinkMobileOpenSerialHandset` on the same path can end the call. iOS is not
-supported: iPhones don't expose USB CDC devices to apps. Unlike the Rust version, there are no Kotlin/JVM desktop
+supported: iPhones don't expose USB CDC devices to apps. There are no Kotlin/JVM desktop
 bindings: gomobile targets Android and Apple platforms only.
 
-## Differences from the Rust version
+## Behaviour notes
 
-The behaviour is the Rust version's, with these deliberate exceptions; section 3 of
-[docs/PORTING.md](docs/PORTING.md) lists every one with its reason.
+These are the places where satlink deliberately behaves in a way a reader might not
+expect, with the reason for each. [docs/DESIGN.md](docs/DESIGN.md) section 3 lists
+them with their reasons in full.
 
 - **No RFC 8879 certificate compression** (above): Go's crypto/tls lacks it.
-- TLS is Go's crypto/tls instead of rustls: its error messages are crypto/tls's, and
-  the public roots are Mozilla's, from `golang.org/x/crypto/x509roots/fallback`,
-  whatever the operating system trusts, with the distrust dates NSS sets on the
-  roots Mozilla phases out, which the Rust version's webpki-roots cannot express: a
+- **TLS roots and certificates.** TLS uses Go's crypto/tls. The public roots are
+  Mozilla's, from `golang.org/x/crypto/x509roots/fallback`, whatever the operating
+  system trusts, with the distrust dates NSS sets on the roots Mozilla phases out: a
   chain issued after its root's date is refused (Izenpe.com's, after 2026-04-15).
-  crypto/tls asks servers for ML-DSA and P-521 certificates and cannot be told not
-  to, so satnet takes chains with such keys, which rustls's ring backend cannot
-  verify: a server that holds one next to a classical certificate may send it, and an
-  ML-DSA-65 leaf adds about 5 KB (some 17 s) to a full handshake, where the Rust
-  version is sent the classical one. crypto/tls also asks for RSA-PSS signatures
-  before ECDSA ones, where rustls asks for ECDSA first, so a server that holds
-  several certificates may send satnet another one than the Rust version: pin the
-  key of each (`TLSOptions.PinnedPublicKeys`). Chains with an RSA key under 2041
-  bits (ring counts its 2048-bit minimum in whole bytes) or over 8192, or an ECDSA
-  key on P-224, are refused, as in the Rust version.
-- The handset is never moved into a link or a call: while one holds it, its methods
-  fail with `satlink.ErrBusy`, and it is released when the call ends; a `DataCall`
-  dropped without `HangUp` ends nothing, so hang up in a deferred function. Rust's
-  `CallFailure` and `LinkFailure` are plain errors that match
-  `satlink.ErrCallMayStillBeUp`, and Rust's `?` conversion of one whose call may
-  still be up into `Error::CallMayStillBeUp` has no Go form: the error passed on
-  keeps its own text, and still matches `satlink.ErrCallMayStillBeUp`.
-- Go-only API where Go needs it: net.Conn deadlines, `Link.DialContext` and
-  `TLSConnector.Config` for `net/http`, `Close` methods for Rust's `Drop`.
-- The simulator's TLS echo is always on, so `satlink --simulate net get https://…`
-  fails certificate verification (the test CA is not a public root) instead of
-  failing to connect.
-- crypto/tls resumes a TLS 1.2 session with a ticket only, never by session ID: a
-  TLS 1.2 server that issues no tickets costs a full handshake every time.
-- `WaitAcknowledged` never reports as delivered what never left: data that an
-  address change, an `Abort` or the hang-up dropped makes it fail
-  (`ErrConnectionReset`, `ErrLinkDown`), where the Rust version can report it
-  delivered.
-- Serial writes have no timeout, and errors other than the operating system's own
-  keep the serial library's wording. On Unix, a serial port opened while the process
-  holds about a thousand files fails its reads, as the serial library waits with
-  select(2).
-- A transport that panics while a data call is set up or hung up has DTR dropped
-  briefly before the panic goes on, which ends the call after `AT&D2`, as the
-  Rust version's dropped transport did.
-- Log lines name the Go package (`[INFO  satnet] …`) instead of the Rust module path.
-- A `SIGTERM` the CLI was started with ignored is caught; a CLI started with `SIGINT`
-  ignored ends an interrupted run with status 130 instead of by `SIGINT`; on
-  Windows, closing the console starts the hang-up before Windows ends the process,
-  MSYS and Cygwin terminals are not taken for terminals, and a console without
-  `TERM` gets no styles.
-- `net get https://…` ends its TLS session with the TLS goodbye, one alert record
+  crypto/tls asks servers for ML-DSA and P-521 certificates and cannot be told not to,
+  so satnet takes chains with such keys. A server that holds one next to a classical
+  certificate may send it, and an ML-DSA-65 leaf adds about 5 KB (some 17 s) to a full
+  handshake. crypto/tls also asks for RSA-PSS signatures before ECDSA ones, so a server
+  that holds several certificates may send satnet another one than it would otherwise:
+  pin the key of each (`TLSOptions.PinnedPublicKeys`). Chains with an RSA key under
+  2041 bits (a 2048-bit minimum counted in whole bytes) or over 8192 bits, or an ECDSA
+  key on P-224, are refused.
+- **Handset ownership.** The handset is never moved into a link or a call: while one
+  holds it, its methods fail with `satlink.ErrBusy`, and it is released when the call
+  ends. A `DataCall` dropped without `HangUp` ends nothing, so hang up in a deferred
+  function. An error that may leave a call up matches `satlink.ErrCallMayStillBeUp`
+  and keeps its own text.
+- **Go API where Go needs it.** net.Conn deadlines, `Link.DialContext` and
+  `TLSConnector.Config` for `net/http`, and `Close` methods on values that hold a
+  resource.
+- **Simulator TLS echo.** The echo is always on, so `satlink --simulate net get https://…`
+  fails certificate verification (the test CA is not a public root) instead of failing
+  to connect.
+- **TLS 1.2 resumption.** crypto/tls resumes a TLS 1.2 session with a ticket only, never
+  by session ID: a TLS 1.2 server that issues no tickets costs a full handshake every
+  time.
+- **Acknowledged data.** `WaitAcknowledged` never reports as delivered what never left:
+  data that an address change, an `Abort` or the hang-up dropped makes it fail
+  (`ErrConnectionReset`, `ErrLinkDown`).
+- **Serial writes and descriptors.** Serial writes have no timeout, and errors other
+  than the operating system's own keep the serial library's wording. On Unix, a serial
+  port opened while the process holds about a thousand files fails its reads, as the
+  serial library waits with select(2).
+- **Transport panics during a call.** A transport that panics while a data call is set
+  up or hung up has DTR dropped briefly before the panic goes on, which ends the call
+  after `AT&D2`.
+- **Log lines** name the Go package (`[INFO  satnet] …`).
+- **Signals and terminals.** A `SIGTERM` the CLI was started with ignored is caught. A
+  CLI started with `SIGINT` ignored ends an interrupted run with status 130 instead of
+  by `SIGINT`. On Windows, closing the console starts the hang-up before Windows ends
+  the process; MSYS and Cygwin terminals are not taken for terminals; and a console
+  without `TERM` gets no styles.
+- **`net get https://…`** ends its TLS session with the TLS goodbye, one alert record
   more of airtime.
-- The mobile API keeps to what gomobile binds: lists with `Len`/`Get`, int constants
-  for enumerations, `int64` milliseconds; in Java and Kotlin, handles of one class
-  all compare equal, records compare their fields — but the lists they hold always
-  compare equal, and the `Data` of `Received` and `Datagram` compares by reference,
-  so compare contents — and settings compare without their rules, hosts, roots,
-  pins and ALPN protocols.
-- Rust bugs the port does not reproduce: PPP negotiations stuck after a stray
-  Terminate-Ack, and a Nak that a hostile request could inflate into a panic; the
-  CLI's handset commands panicking with status 101 when their output cannot be
-  written, where satlink fails with status 1; and three of smoltcp's: a SYN's window
+- **Mobile API.** It keeps to what gomobile binds: lists with `Len`/`Get`, int constants
+  for enumerations, `int64` milliseconds. In Java and Kotlin, handles of one class all
+  compare equal, and records compare their fields, but the lists they hold always compare
+  equal, and the `Data` of `Received` and `Datagram` compares by reference, so compare
+  contents. Settings compare without their rules, hosts, roots, pins and ALPN protocols.
+- **Defects not reproduced.** satlink does not reproduce these defects: PPP negotiations
+  stuck after a stray Terminate-Ack, and a Nak that a hostile request could inflate into a
+  panic; the CLI's handset commands panicking with status 101 when their output cannot be
+  written, where satlink fails with status 1; and three of smoltcp 0.14's: a SYN's window
   reaching past the receive buffer, a FIN taken after data the window cut short, and
-  segments from half the sequence space away taken while the receive window ends
-  before it starts. ipstack also keeps its `PollAt` from a panic of smoltcp's
-  `poll_at` after a peer's early SYN, or a SYN|ACK to a socket without a receive
-  buffer, which neither version reaches.
+  segments from half the sequence space away taken while the receive window ends before
+  it starts. ipstack also keeps its `PollAt` from a panic of smoltcp's `poll_at` after a
+  peer's early SYN, or a SYN|ACK to a socket without a receive buffer, which ipstack
+  cannot reach.
 
 ## Testing
 
@@ -605,9 +600,8 @@ go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -over 15 .
 go test -race -cover ./...
 ```
 
-Every Rust test is ported, and Go-only behaviour has tests of its own:
-[docs/PORTING.md](docs/PORTING.md) lists them file by file (section 1) and says how
-they are written (section 2, Tests).
+The tests are written beside the code they cover. [docs/DESIGN.md](docs/DESIGN.md)
+lists them file by file (section 1) and says how they are written (section 2, Tests).
 
 PPP has been checked against RFC test vectors, its option types and packet codes
 against the RFCs' numbering, and satlink's own server role (the simulator's gateway),

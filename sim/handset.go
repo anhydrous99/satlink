@@ -54,7 +54,7 @@ var (
 // sharedModem is what a Handset and its Controls hold. Once none of them
 // is left, a cleanup ends what the modem runs in the background: the TLS
 // sessions of a call still up, whose goroutines would otherwise keep them
-// alive, as Rust frees them with the last handle to the modem.
+// alive once the last handle to the modem is gone.
 type sharedModem struct {
 	locked *lockedModem
 }
@@ -74,9 +74,9 @@ func New(config Config) *Handset {
 	shared := &sharedModem{locked: locked}
 	runtime.AddCleanup(shared, (*lockedModem).shutDown, locked)
 	handset := &Handset{shared: shared}
-	// The Rust handset dropped DTR when it was dropped, ending a call after
-	// AT&D2 even if the app crashed; a Handset nobody can reach any more
-	// does the same. After Close it changes nothing: DTR is down already.
+	// A Handset nobody can reach any more drops DTR, ending a call after
+	// AT&D2 even if the app crashed. After Close it changes nothing: DTR is
+	// down already.
 	runtime.AddCleanup(handset, (*lockedModem).dropDTR, locked)
 	return handset
 }

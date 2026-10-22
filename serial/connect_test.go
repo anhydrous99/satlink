@@ -48,7 +48,7 @@ func TestChoosePortWithSeveralHandsetsListsThem(t *testing.T) {
 }
 
 func TestChoosePortFromChoosesAsChoosePortDoes(t *testing.T) {
-	// Go only: the choice among ports already discovered.
+	// The choice among ports already discovered.
 	two := []Port{{Path: "/dev/ttyACM0"}, {Path: "/dev/ttyACM1"}}
 	if path, err := ChoosePortFrom(two[:1]); err != nil || path != "/dev/ttyACM0" {
 		t.Errorf("ChoosePortFrom(one port) = %q, %v; want its path", path, err)
@@ -108,9 +108,9 @@ func TestConnectClosesThePortWhenInitializeFails(t *testing.T) {
 }
 
 func TestConnectClosesThePortWhenInitializePanics(t *testing.T) {
-	// The Rust version's unwinding dropped the port, which closed it: a
-	// caller that recovers the panic must not be left holding a port open,
-	// with DTR up.
+	// A panic unwinds past the open port, which must be closed: a caller
+	// that recovers the panic must not be left holding a port open, with
+	// DTR up.
 	port := newFakePort()
 	port.readPanic = func() { panic("a port bug") }
 
@@ -199,7 +199,7 @@ func TestOpeningADeviceThatDoesNotExistSaysSoAsTheCLibraryDoes(t *testing.T) {
 	_, err := Open(missing, DefaultBaud)
 
 	if got, want := fmt.Sprint(err), "transport error: No such file or directory"; got != want {
-		t.Errorf("Open = %q, want %q, as the Rust version reported it", got, want)
+		t.Errorf("Open = %q, want %q", got, want)
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("Open = %v, want it to match fs.ErrNotExist", err)

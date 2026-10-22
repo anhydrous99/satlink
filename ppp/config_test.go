@@ -75,7 +75,7 @@ func TestNewConfigHasTheDefaults(t *testing.T) {
 	}
 }
 
-func TestNewEndpointRefusesUnusableSettingsInRustsOrder(t *testing.T) {
+func TestNewEndpointRefusesUnusableSettingsInOrder(t *testing.T) {
 	tooLong := strings.Repeat("x", maxCredentialLen+1)
 	assertRefusals(t, []refusal{
 		{"an MRU below IPv4's minimum", func(c *Config) { c.MRU = MinMRU - 1 }, ConfigError{Kind: ErrMRUTooSmall, MRU: MinMRU - 1}},
@@ -334,7 +334,7 @@ func TestPointersToAuthenticationPrintAsPointersToStructsDo(t *testing.T) {
 }
 
 func TestPlusVNamesTheFieldsOfWhatHasFieldsToName(t *testing.T) {
-	// Go only: %+v names a struct's fields, as fmt does for any struct,
+	// %+v names a struct's fields, as fmt does for any struct,
 	// with the passwords redacted; the opaque Role and Endpoint have none to
 	// name.
 	credentials := Credentials{Username: "pilot", Password: secretPassword}

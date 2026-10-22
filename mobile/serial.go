@@ -13,9 +13,8 @@ import (
 // port discovery needs the desktop operating systems' APIs. For gomobile's
 // macOS target, gobind reads this package with GOOS=ios and the macos tag,
 // and gomobile compiles it with GOOS=darwin and the macos tag, against the
-// macOS SDK: the constraint keeps the serial API in both, as the Rust
-// desktop bindings had it. On macOS it needs cgo, which gomobile builds use
-// anyway.
+// macOS SDK: the constraint keeps the serial API in both. On macOS it needs
+// cgo, which gomobile builds use anyway.
 
 // SerialHandsetPort is a serial port that belongs to an Iridium handset.
 type SerialHandsetPort struct {
@@ -93,9 +92,7 @@ func OpenSerialHandset(path string, baud int) (handset *IridiumHandset, err erro
 // (SatlinkErrorInternal) closes the port at once, which drops DTR and so
 // ends a call it left up.
 func EstablishSerialLink(path string, baud int, settings *LinkSettings, listener LinkListener, cancellation *Cancellation) (link *SatelliteLink, err error) {
-	// Five parameters, one more than this module's functions take: the bound
-	// API keeps the Rust bindings' establish_serial, as EstablishLink keeps
-	// establish, and gomobile has no default arguments to spare the last two.
+	// Five parameters: gomobile has no default arguments to spare any of them.
 	defer recoverPanic(&err)
 	if settings == nil {
 		return nil, nilArgument("settings")

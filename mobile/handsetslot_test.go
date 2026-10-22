@@ -11,10 +11,10 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// In the Rust bindings a link owned the handset it borrowed, and with it
-// the port, until the call had ended: dropping the IridiumHandset meanwhile
-// could not close the port the link hangs up through. These tests hold
-// IridiumHandset.Close to the same.
+// A link owns the handset it borrows, and with it the port, until the call
+// has ended: dropping the IridiumHandset meanwhile could not close the port
+// the link hangs up through. These tests hold IridiumHandset.Close to the
+// same.
 
 // callPatience is how long a test waits for a call that must not block.
 const callPatience = 10 * time.Second
@@ -222,7 +222,7 @@ func TestAbandoningASetupTakesOnlyAHandsetBeingLent(t *testing.T) {
 	}
 }
 
-func TestTheSlotsAreNamedAsTheRustBindingsNameThem(t *testing.T) {
+func TestTheSlotsHaveTheirNames(t *testing.T) {
 	cases := map[handsetSlot]string{
 		slotHere:        "Here",
 		slotStranded:    "Stranded",

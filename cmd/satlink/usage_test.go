@@ -57,8 +57,7 @@ func TestValuesAreQuotedOnlyWhenTheirEndsWouldNotShow(t *testing.T) {
 		"a b":       `"a b"`,
 		"tab\there": `"tab\there"`,
 		"plain":     "plain",
-		// Rust's {:?} of a str, as clap's Escape writes it, where Go's %q
-		// would write "\v".
+		// clap's escape for a vertical tab is \u{b}, where %q would write "\v".
 		"vertical\vtab": `"vertical\u{b}tab"`,
 	}
 	for text, want := range tests {

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
@@ -93,8 +93,8 @@ func isStatusCode(code string) bool {
 }
 
 // bodyLength is how long a response's body must be, when the response
-// says. The length is a uint64, as Rust's usize is on 64-bit platforms, so
-// that every length the Rust version took is taken.
+// says. The length is a uint64, so that every length a response can state is
+// taken.
 type bodyLength struct {
 	bytes uint64
 	known bool
@@ -109,17 +109,16 @@ func expectedBodyLength(status int, head string) (bodyLength, error) {
 	}
 	// Not allowed in a reply to HTTP/1.0 (RFC 9112 §6.1).
 	if coding, found := header(head, transferEncodingField); found {
-		return bodyLength{}, errors.New("the reply uses Transfer-Encoding " + rustdebug.Quote(coding) + ", which HTTP/1.0 does not allow")
+		return bodyLength{}, errors.New("the reply uses Transfer-Encoding " + debugtext.Quote(coding) + ", which HTTP/1.0 does not allow")
 	}
 	length, found := header(head, contentLengthField)
 	if !found {
 		return bodyLength{}, nil
 	}
-	// 1*DIGIT (RFC 9110 §8.6): ParseUint takes no sign, where Rust's parse
-	// would also take "+5".
+	// 1*DIGIT (RFC 9110 §8.6): ParseUint takes no sign, so "+5" is refused.
 	bytes, err := strconv.ParseUint(length, 10, 64)
 	if err != nil {
-		return bodyLength{}, errors.New("the Content-Length " + rustdebug.Quote(length) + " is not a length")
+		return bodyLength{}, errors.New("the Content-Length " + debugtext.Quote(length) + " is not a length")
 	}
 	return bodyLength{bytes: bytes, known: true}, nil
 }
@@ -133,8 +132,8 @@ func header(head, name string) (string, bool) {
 	_, fieldLines, _ := strings.Cut(head, "\n")
 	for line := range lines(fieldLines) {
 		field, value, found := strings.Cut(line, ":")
-		// Field names compare as ASCII, as Rust's eq_ignore_ascii_case:
-		// Unicode case folding, strings.EqualFold's, would take "ſ" for "s".
+		// Field names compare as ASCII: Unicode case folding, strings.EqualFold's,
+		// would take "ſ" for "s".
 		if found && asciicase.EqualFold(strings.TrimSpace(field), name) {
 			values = append(values, strings.TrimSpace(value))
 		}
@@ -174,8 +173,8 @@ func firstLine(text string) string {
 	return ""
 }
 
-// lines yields the lines of text as Rust's str::lines does: split at "\n" or
-// "\r\n", without the line endings, and no empty line after the last one.
+// lines yields the lines of text: split at "\n" or "\r\n", without the line
+// endings, and no empty line after the last one.
 func lines(text string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for line := range strings.Lines(text) {

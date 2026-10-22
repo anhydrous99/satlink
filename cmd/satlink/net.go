@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/spf13/cobra"
 )
@@ -155,9 +155,8 @@ func (a netArguments) policy() (satnet.Policy, error) {
 	return policy, nil
 }
 
-// netAction is what a net subcommand does — the Rust version's NetCommand:
-// its work during the call, the destination it needs, and for resolve an
-// answer that needs no call.
+// netAction is what a net subcommand does: its work during the call, the
+// destination it needs, and for resolve an answer that needs no call.
 type netAction interface {
 	// target is the destination the command needs, and false when it needs
 	// none.
@@ -200,7 +199,7 @@ func (t netTarget) rule() string {
 // call: a rule such as *.example.com or 10.0.0.0/8 is not a host.
 func (t netTarget) check(policy satnet.Policy) error {
 	if !t.isReachable(policy) {
-		return errors.New(rustdebug.Quote(t.host) + " is not a host name or IPv4 address")
+		return errors.New(debugtext.Quote(t.host) + " is not a host name or IPv4 address")
 	}
 	return nil
 }

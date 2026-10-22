@@ -8,7 +8,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/logtext"
 )
 
-func TestLevelNamesFollowTheRustLogCrate(t *testing.T) {
+func TestLevelNamesMatchTheirBands(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		level slog.Level

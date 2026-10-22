@@ -28,7 +28,7 @@ func pipeEnds(t *testing.T) (reader, writer *os.File) {
 	return reader, writer
 }
 
-func TestAStreamThatTheSystemFailsSaysWhyAsTheRustVersionDid(t *testing.T) {
+func TestAStreamThatTheSystemFailsSaysWhy(t *testing.T) {
 	reader, nobodyReads := pipeEnds(t)
 	if err := reader.Close(); err != nil {
 		t.Fatal(err)
@@ -63,9 +63,9 @@ func TestAStreamThatTheSystemFailsSaysWhyAsTheRustVersionDid(t *testing.T) {
 	}
 }
 
-// As Rust's standard library takes EBADF: a standard output opened
-// read-only drops what is written to it, and a standard input opened
-// write-only has ended (std's handle_ebadf).
+// EBADF ends a stream that is not open for its direction: a standard output
+// opened read-only drops what is written to it, and a standard input opened
+// write-only has ended.
 func TestAStreamNotOpenForTheDirectionIsAnEmptyInputAndASink(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "stream")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {

@@ -18,7 +18,7 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// Go only: the connections as net.Conns — deadlines, Close waking blocked
+// The connections as net.Conns — deadlines, Close waking blocked
 // calls, use after Close — DialContext and net/http over the link, and the
 // runtime cleanups of dropped links.
 

@@ -188,8 +188,8 @@ func TestASinkThatFallsBehindLosesRecordsRatherThanHoldingUpTheLogger(t *testing
 		t.Fatal("the first record never reached the sink")
 	}
 
-	// SetLogSink's documented queue, the Rust bindings' QUEUE_LIMIT: written
-	// out, so that the test checks logQueueLimit instead of trusting it.
+	// SetLogSink's documented queue limit, written out, so that the test checks
+	// logQueueLimit instead of trusting it.
 	const documentedQueueLimit = 256
 	const overflow = 10
 	for i := range documentedQueueLimit + overflow {
