@@ -351,10 +351,15 @@ func findJavac(t *testing.T) string {
 }
 
 // buildGobind builds the go.mod-pinned gobind into the test's own
-// directory and returns its path.
+// directory and returns its path. Windows runs only a file with an
+// executable's extension, which go build -o does not add.
 func buildGobind(t *testing.T) string {
 	t.Helper()
-	gobind := filepath.Join(t.TempDir(), "gobind")
+	name := "gobind"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	gobind := filepath.Join(t.TempDir(), name)
 	build := exec.Command(findGoTool(t), "build", "-o", gobind, "golang.org/x/mobile/cmd/gobind")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("building gobind: %v\n%s", err, output)

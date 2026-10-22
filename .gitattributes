@@ -1,0 +1,4 @@
+# Test data is checked out byte for byte on every platform: the golden files
+# must match the commands' output exactly, CRLFs in HTTP headers included,
+# which a line-ending conversion on checkout breaks.
+**/testdata/** -text
