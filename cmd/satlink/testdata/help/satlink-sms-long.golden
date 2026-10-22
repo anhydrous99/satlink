@@ -19,6 +19,8 @@ Options:
           [env: SATLINK_PORT=]
 
   -b, --baud <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       --simulate[=<SIMULATE>]

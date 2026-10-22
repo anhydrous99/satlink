@@ -39,7 +39,7 @@ type getAction struct {
 func getCommand(start func(netAction) error) *command {
 	var action getAction
 	return netSubcommand(&cobra.Command{Use: "get", Short: "Fetch an http:// or https:// URL and print its body"},
-		start, func() netAction { return action }, requiredPositional("URL", urlValue{target: &action.url}))
+		start, func() netAction { return action }, requiredPositional("URL", "http:// or https:// URL to fetch", urlValue{target: &action.url}))
 }
 
 func (g getAction) target() (netTarget, bool) {

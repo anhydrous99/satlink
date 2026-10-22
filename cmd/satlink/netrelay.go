@@ -51,8 +51,8 @@ func tcpCommand(start func(netAction) error) *command {
 		Use:   "tcp",
 		Short: "Connect to HOST PORT and relay standard input and output, like netcat",
 	}, start, func() netAction { return action },
-		requiredPositional("HOST", stringValue{target: &action.host}),
-		requiredPositional("PORT", boundedValue[uint16]{target: &action.port}))
+		requiredPositional("HOST", "Host to connect to: a name or an IPv4 address", stringValue{target: &action.host}),
+		requiredPositional("PORT", "TCP port to connect to", boundedValue[uint16]{target: &action.port}))
 }
 
 func (t tcpAction) target() (netTarget, bool) {

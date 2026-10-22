@@ -29,7 +29,7 @@ const colourVariable = "FIXTURE_COLOUR"
 func newFixture() *fixture {
 	f := &fixture{}
 	leaf := newCommand(&cobra.Command{Use: "leaf", Short: "A leaf"},
-		requiredPositional("FIRST", stringValue{target: &f.first}),
+		requiredPositional("FIRST", "", stringValue{target: &f.first}),
 		&argument{valueName: "REST", hasDefault: true, defaultValue: "none", value: stringValue{target: &f.rest}})
 	group := newCommand(&cobra.Command{Use: "group", Short: "A group"},
 		&argument{long: "tag", valueName: "TAG", action: actionAppend, value: stringsValue{target: &f.tags}},

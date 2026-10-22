@@ -78,9 +78,10 @@ type possibleValue struct {
 }
 
 // requiredPositional returns a positional argument that must be given, such
-// as <NUMBER>, whose value is kept by value.
-func requiredPositional(valueName string, value argumentValue) *argument {
-	return &argument{valueName: valueName, required: true, value: value}
+// as <NUMBER>, which help describes as help, and whose value is kept by
+// value.
+func requiredPositional(valueName, help string, value argumentValue) *argument {
+	return &argument{valueName: valueName, help: help, required: true, value: value}
 }
 
 // isPositional reports whether the argument is taken by position rather

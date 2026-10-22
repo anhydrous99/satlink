@@ -25,6 +25,8 @@ Talk to an Iridium satellite handset over USB
           [env: SATLINK_PORT=]
 
   [1m-b[0m, [1m--baud[0m <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       [1m--simulate[0m[=<SIMULATE>]

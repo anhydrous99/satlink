@@ -16,7 +16,7 @@ Options:
       --number <NUMBER>            Number to dial for the data call [env: SATLINK_DATA_NUMBER=12345] [default: 008816000025]
   -p, --port <PORT>                Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
       --allow <RULE>               Also allow a destination such as `example.com:443` (repeatable); the command's own target is always allowed
-  -b, --baud <BAUD>                [default: 19200]
+  -b, --baud <BAUD>                Serial port speed, in bits per second [default: 19200]
       --simulate[=<SIMULATE>]      Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
       --username <USERNAME>        PPP user name (Iridium's gateway accepts any) [default: ""]
       --password <PASSWORD>        PPP password (Iridium's gateway accepts any) [default: ""]

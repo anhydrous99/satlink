@@ -21,7 +21,7 @@ func (c *cli) dialCommand() *command {
 				return writef(c.streams.stdout, "Dialling %s…\n", number)
 			}))
 		},
-	}, requiredPositional("NUMBER", stringValue{target: &number}))
+	}, requiredPositional("NUMBER", "Phone number to call, in international format", stringValue{target: &number}))
 }
 
 // answerCommand is `satlink answer`.

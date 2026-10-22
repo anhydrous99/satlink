@@ -305,5 +305,5 @@ func netSubcommand(cobraCommand *cobra.Command, start func(netAction) error, new
 func resolveCommand(start func(netAction) error) *command {
 	var action resolveAction
 	return netSubcommand(&cobra.Command{Use: "resolve", Short: "Look up a host name over the link"},
-		start, func() netAction { return action }, requiredPositional("HOST", stringValue{target: &action.host}))
+		start, func() netAction { return action }, requiredPositional("HOST", "Host name to look up", stringValue{target: &action.host}))
 }

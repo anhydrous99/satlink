@@ -6,11 +6,11 @@ Fetch an http:// or https:// URL and print its body
 Usage: satlink net get [OPTIONS] <URL>
 
 Arguments:
-  <URL>  
+  <URL>  http:// or https:// URL to fetch
 
 Options:
   -p, --port <PORT>            Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
-  -b, --baud <BAUD>            [default: 19200]
+  -b, --baud <BAUD>            Serial port speed, in bits per second [default: 19200]
       --simulate[=<SIMULATE>]  Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
   -v, --verbose...             Log what the link is doing (-v), in more detail (-vv, -vvv)
   -h, --help                   Print help (see more with '--help')

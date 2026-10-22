@@ -7,10 +7,10 @@ Usage: satlink sms send [OPTIONS] <NUMBER> <TEXT>
 
 Arguments:
   <NUMBER>
-          
+          Phone number to send to, in international format
 
   <TEXT>
-          
+          Message text
 
 Options:
   -p, --port <PORT>
@@ -19,6 +19,8 @@ Options:
           [env: SATLINK_PORT=]
 
   -b, --baud <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       --simulate[=<SIMULATE>]

@@ -33,7 +33,7 @@ func (o *globalOptions) arguments() []*argument {
 	return []*argument{
 		{long: "port", short: 'p', valueName: "PORT", global: true, env: portVariable,
 			help: "Serial device (auto-detected by USB vendor ID when omitted)", value: &o.port},
-		{long: "baud", short: 'b', valueName: "BAUD", global: true,
+		{long: "baud", short: 'b', valueName: "BAUD", global: true, help: "Serial port speed, in bits per second",
 			hasDefault: true, defaultValue: strconv.Itoa(serial.DefaultBaud), value: boundedValue[uint32]{target: &o.baud}},
 		{long: "simulate", valueName: "SIMULATE", global: true, missingValue: defaultLinkProfile,
 			possibleValues: linkProfileValues(), value: &o.simulate,

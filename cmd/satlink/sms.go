@@ -45,7 +45,8 @@ func (c *cli) smsSendCommand() *command {
 				return writef(c.streams.stdout, "Sent (message reference %d)\n", reference)
 			}))
 		},
-	}, requiredPositional("NUMBER", stringValue{target: &number}), requiredPositional("TEXT", stringValue{target: &text}))
+	}, requiredPositional("NUMBER", "Phone number to send to, in international format", stringValue{target: &number}),
+		requiredPositional("TEXT", "Message text", stringValue{target: &text}))
 }
 
 // smsListCommand is `satlink sms list`.
@@ -63,7 +64,7 @@ func (c *cli) smsListCommand() *command {
 				return printMessages(c.streams.stdout, messages)
 			}))
 		},
-	}, &argument{valueName: "FILTER", hasDefault: true, defaultValue: smsFilters[0].name,
+	}, &argument{valueName: "FILTER", help: "Which messages to list", hasDefault: true, defaultValue: smsFilters[0].name,
 		possibleValues: smsFilterValues(), value: smsFilterValue{target: &filter}})
 }
 
@@ -97,7 +98,7 @@ func (c *cli) storedMessageCommand(name, short string, act func(*iridium.Handset
 				return act(handset, int(index))
 			}))
 		},
-	}, requiredPositional("INDEX", boundedValue[uint32]{target: &index}))
+	}, requiredPositional("INDEX", "Message index, as `sms list` shows it", boundedValue[uint32]{target: &index}))
 }
 
 // smsFilterValues returns the values that `sms list` takes.
