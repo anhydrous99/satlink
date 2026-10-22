@@ -11,7 +11,7 @@ import (
 
 	serialport "go.bug.st/serial"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 func TestChoosePortTakesTheGivenPathWithoutLooking(t *testing.T) {
@@ -60,7 +60,7 @@ func TestChoosePortFromChoosesAsChoosePortDoes(t *testing.T) {
 }
 
 func TestChoosePortPassesADiscoveryFailureOn(t *testing.T) {
-	failure := &satlink.Error{Kind: satlink.ErrTransport, Err: errPort}
+	failure := &iridium.Error{Kind: iridium.ErrTransport, Err: errPort}
 
 	_, err := choosePort("", func() ([]Port, error) { return nil, failure })
 
@@ -131,7 +131,7 @@ func TestConnectReportsAPortThatDoesNotOpen(t *testing.T) {
 
 	_, err := connect("/dev/ttyACM0", DefaultBaud, opener, discovering())
 
-	if !errors.Is(err, satlink.ErrTransport) || !errors.Is(err, errPort) {
+	if !errors.Is(err, iridium.ErrTransport) || !errors.Is(err, errPort) {
 		t.Errorf("connect = %v, want ErrTransport wrapping the library's error", err)
 	}
 }
@@ -184,7 +184,7 @@ func TestOpeningADeviceThatDoesNotExistFails(t *testing.T) {
 	_, connectErr := Connect(missing, DefaultBaud)
 
 	for _, err := range []error{openErr, connectErr} {
-		if !errors.Is(err, satlink.ErrTransport) {
+		if !errors.Is(err, iridium.ErrTransport) {
 			t.Errorf("error = %v, want ErrTransport", err)
 		}
 	}

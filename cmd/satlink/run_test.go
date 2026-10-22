@@ -58,7 +58,7 @@ func TestAPanicEndsTheRunWithStatus101OnceTheHandsetIsClosed(t *testing.T) {
 			got := runInProcess(t, trapped, test.args...)
 
 			checkEndedByThePanic(t, got)
-			if frame := "satlink.(*Handset)." + test.during + "("; !strings.Contains(got.stderr, frame) {
+			if frame := "iridium.(*Handset)." + test.during + "("; !strings.Contains(got.stderr, frame) {
 				t.Errorf("the stack reported does not pass through %s: %s", frame, got.stderr)
 			}
 			if simulator == nil || !isClosed(simulator) {

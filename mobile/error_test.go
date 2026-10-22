@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/satnet"
 )
@@ -63,67 +63,67 @@ func assertErrorMappings(t *testing.T, cases []errorMapping) {
 var handsetErrorMappings = []errorMapping{
 	{
 		name:     "transport message",
-		err:      &satlink.Error{Kind: satlink.ErrTransport, Message: "unplugged"},
+		err:      &iridium.Error{Kind: iridium.ErrTransport, Message: "unplugged"},
 		want:     &SatlinkError{Kind: SatlinkErrorTransport, Reason: "unplugged"},
 		wantText: "transport: unplugged",
 	},
 	{
 		name:     "transport cause",
-		err:      &satlink.Error{Kind: satlink.ErrTransport, Err: errCable},
+		err:      &iridium.Error{Kind: iridium.ErrTransport, Err: errCable},
 		want:     &SatlinkError{Kind: SatlinkErrorTransport, Reason: "cable pulled"},
 		wantText: "transport: cable pulled",
 	},
 	{
 		name:     "transport message and cause",
-		err:      &satlink.Error{Kind: satlink.ErrTransport, Message: "writing", Err: errCable},
+		err:      &iridium.Error{Kind: iridium.ErrTransport, Message: "writing", Err: errCable},
 		want:     &SatlinkError{Kind: SatlinkErrorTransport, Reason: "writing: cable pulled"},
 		wantText: "transport: writing: cable pulled",
 	},
 	{
 		name:     "timeout",
-		err:      &satlink.Error{Kind: satlink.ErrTimeout, Command: "AT+CSQ"},
+		err:      &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CSQ"},
 		want:     &SatlinkError{Kind: SatlinkErrorTimeout, Command: "AT+CSQ"},
 		wantText: "timed out waiting for AT+CSQ",
 	},
 	{
 		name:     "command failed",
-		err:      &satlink.Error{Kind: satlink.ErrCommandFailed, Command: "AT+CIMI"},
+		err:      &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+CIMI"},
 		want:     &SatlinkError{Kind: SatlinkErrorCommandFailed, Command: "AT+CIMI"},
 		wantText: "command failed: AT+CIMI",
 	},
 	{
 		name:     "equipment",
-		err:      &satlink.Error{Kind: satlink.ErrEquipment, Code: "SIM not inserted"},
+		err:      &iridium.Error{Kind: iridium.ErrEquipment, Code: "SIM not inserted"},
 		want:     &SatlinkError{Kind: SatlinkErrorEquipment, Code: "SIM not inserted"},
 		wantText: "+CME ERROR: SIM not inserted",
 	},
 	{
 		name:     "SMS",
-		err:      &satlink.Error{Kind: satlink.ErrSMS, Code: "321"},
+		err:      &iridium.Error{Kind: iridium.ErrSMS, Code: "321"},
 		want:     &SatlinkError{Kind: SatlinkErrorSMS, Code: "321"},
 		wantText: "+CMS ERROR: 321",
 	},
 	{
 		name:     "call",
-		err:      &satlink.Error{Kind: satlink.ErrCall, Message: "NO CARRIER"},
+		err:      &iridium.Error{Kind: iridium.ErrCall, Message: "NO CARRIER"},
 		want:     &SatlinkError{Kind: SatlinkErrorCall, Result: "NO CARRIER"},
 		wantText: "call failed: NO CARRIER",
 	},
 	{
 		name:     "parse",
-		err:      &satlink.Error{Kind: satlink.ErrParse, Message: "no +CSQ line in []"},
+		err:      &iridium.Error{Kind: iridium.ErrParse, Message: "no +CSQ line in []"},
 		want:     &SatlinkError{Kind: SatlinkErrorParse, Reason: "no +CSQ line in []"},
 		wantText: "unexpected response: no +CSQ line in []",
 	},
 	{
 		name:     "invalid argument",
-		err:      &satlink.Error{Kind: satlink.ErrInvalidArgument, Message: "9 is not an SMS filter"},
+		err:      &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: "9 is not an SMS filter"},
 		want:     &SatlinkError{Kind: SatlinkErrorInvalidArgument, Reason: "9 is not an SMS filter"},
 		wantText: "invalid argument: 9 is not an SMS filter",
 	},
 	{
 		name:     "busy",
-		err:      &satlink.Error{Kind: satlink.ErrBusy},
+		err:      &iridium.Error{Kind: iridium.ErrBusy},
 		want:     &SatlinkError{Kind: SatlinkErrorHandsetBusy},
 		wantText: "the handset is in use by a satellite link",
 	},
@@ -135,15 +135,15 @@ var handsetErrorMappings = []errorMapping{
 	},
 	{
 		name:     "cancelled",
-		err:      &satlink.Error{Kind: satlink.ErrCancelled},
+		err:      &iridium.Error{Kind: iridium.ErrCancelled},
 		want:     &SatlinkError{Kind: SatlinkErrorCancelled},
 		wantText: "the call setup was cancelled",
 	},
 	{
 		name:     "a kind without a constant",
-		err:      &satlink.Error{Kind: satlink.ErrorKind(99)},
-		want:     &SatlinkError{Kind: SatlinkErrorInternal, Reason: "satlink.ErrorKind(99)"},
-		wantText: "internal error: satlink.ErrorKind(99)",
+		err:      &iridium.Error{Kind: iridium.ErrorKind(99)},
+		want:     &SatlinkError{Kind: SatlinkErrorInternal, Reason: "iridium.ErrorKind(99)"},
+		wantText: "internal error: iridium.ErrorKind(99)",
 	},
 }
 
@@ -159,7 +159,7 @@ func TestHandsetErrorsMapOneToOne(t *testing.T) {
 var linkErrorMappings = []errorMapping{
 	{
 		name:     "handset",
-		err:      &satnet.Error{Kind: satnet.ErrHandset, Err: &satlink.Error{Kind: satlink.ErrCall, Message: "BUSY"}},
+		err:      &satnet.Error{Kind: satnet.ErrHandset, Err: &iridium.Error{Kind: iridium.ErrCall, Message: "BUSY"}},
 		want:     &SatlinkError{Kind: SatlinkErrorCall, Result: "BUSY"},
 		wantText: "call failed: BUSY",
 	},
@@ -171,7 +171,7 @@ var linkErrorMappings = []errorMapping{
 	},
 	{
 		name:     "a cancelled setup",
-		err:      &satnet.Error{Kind: satnet.ErrHandset, Err: &satlink.Error{Kind: satlink.ErrCancelled}},
+		err:      &satnet.Error{Kind: satnet.ErrHandset, Err: &iridium.Error{Kind: iridium.ErrCancelled}},
 		want:     &SatlinkError{Kind: SatlinkErrorCancelled},
 		wantText: "the call setup was cancelled",
 	},
@@ -342,7 +342,7 @@ func TestAnEstablishingErrorWhoseCallMayStillBeUpIsAFailedHangUp(t *testing.T) {
 		{
 			name: "a dial whose attempt could not be ended",
 			err: &satnet.Error{Kind: satnet.ErrHandset, CallMayStillBeUp: true,
-				Err: &satlink.Error{Kind: satlink.ErrTimeout, Command: "+++", CallMayStillBeUp: true}},
+				Err: &iridium.Error{Kind: iridium.ErrTimeout, Command: "+++", CallMayStillBeUp: true}},
 			generalKind: SatlinkErrorTimeout,
 		},
 		{
@@ -375,7 +375,7 @@ func TestAnEstablishingErrorWithoutTheFlagMapsAsUsual(t *testing.T) {
 }
 
 func TestACancelledSetupWhoseHangUpFailedIsAFailedHangUp(t *testing.T) {
-	err := &satnet.Error{Kind: satnet.ErrHandset, CallMayStillBeUp: true, Err: &satlink.Error{Kind: satlink.ErrCancelled}}
+	err := &satnet.Error{Kind: satnet.ErrHandset, CallMayStillBeUp: true, Err: &iridium.Error{Kind: iridium.ErrCancelled}}
 
 	assertSatlinkError(t, establishError(err),
 		&SatlinkError{Kind: SatlinkErrorHangUpFailed, Reason: "handset: the call setup was cancelled"},

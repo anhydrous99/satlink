@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -33,12 +33,12 @@ func fromError(err error) error {
 
 // satlinkErrorOf returns the SatlinkError for err, which is not nil. The
 // order matters, as satnet's errors also match the standard library's: a
-// *SatlinkError passes unchanged, then a *satnet.Error, a *satlink.Error
+// *SatlinkError passes unchanged, then a *satnet.Error, an *iridium.Error
 // and a *satnet.ParseRuleError are converted, and only then is net.ErrClosed
 // a closed connection. Any other error is none this package expects from
 // the libraries underneath, a fault inside the library.
 //
-// A handset error of kind satlink.ErrCallMayStillBeUp is a failed hang-up.
+// A handset error of kind iridium.ErrCallMayStillBeUp is a failed hang-up.
 // The CallMayStillBeUp flag on an error of another kind is ignored here, as
 // this conversion never sees it: establishError checks it, and
 // SatelliteLink.HangUp reads the link's status instead.
@@ -46,7 +46,7 @@ func satlinkErrorOf(err error) *SatlinkError {
 	var (
 		own       *SatlinkError
 		netError  *satnet.Error
-		coreError *satlink.Error
+		coreError *iridium.Error
 		ruleError *satnet.ParseRuleError
 	)
 	switch {
@@ -69,7 +69,7 @@ func satlinkErrorOf(err error) *SatlinkError {
 // SatlinkErrorHangUpFailed, with the
 // error's text as Reason, when its call may still be up.
 func establishError(err error) error {
-	if errors.Is(err, satlink.ErrCallMayStillBeUp) {
+	if errors.Is(err, iridium.ErrCallMayStillBeUp) {
 		return hangUpFailed(err.Error())
 	}
 	return fromError(err)
@@ -89,7 +89,7 @@ func unexpectedError(err error) *SatlinkError {
 
 // fromCoreError converts a handset's error, with ErrBusy as SatlinkErrorHandsetBusy and
 // ErrCallMayStillBeUp as SatlinkErrorHangUpFailed.
-func fromCoreError(e *satlink.Error) *SatlinkError {
+func fromCoreError(e *iridium.Error) *SatlinkError {
 	if e.Kind < 0 || int(e.Kind) >= len(coreErrorConversions) || coreErrorConversions[e.Kind] == nil {
 		return unexpectedError(e)
 	}
@@ -97,38 +97,38 @@ func fromCoreError(e *satlink.Error) *SatlinkError {
 }
 
 // coreErrorConversions convert each kind of handset error.
-var coreErrorConversions = [...]func(e *satlink.Error) *SatlinkError{
-	satlink.ErrTransport: func(e *satlink.Error) *SatlinkError {
+var coreErrorConversions = [...]func(e *iridium.Error) *SatlinkError{
+	iridium.ErrTransport: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorTransport, Reason: messageOrCause(e.Message, e.Err)}
 	},
-	satlink.ErrTimeout: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrTimeout: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorTimeout, Command: e.Command}
 	},
-	satlink.ErrCommandFailed: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrCommandFailed: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorCommandFailed, Command: e.Command}
 	},
-	satlink.ErrEquipment: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrEquipment: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorEquipment, Code: e.Code}
 	},
-	satlink.ErrSMS: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrSMS: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorSMS, Code: e.Code}
 	},
-	satlink.ErrCall: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrCall: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorCall, Result: messageOrCause(e.Message, e.Err)}
 	},
-	satlink.ErrParse: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrParse: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorParse, Reason: messageOrCause(e.Message, e.Err)}
 	},
-	satlink.ErrInvalidArgument: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrInvalidArgument: func(e *iridium.Error) *SatlinkError {
 		return invalidArgument(messageOrCause(e.Message, e.Err))
 	},
-	satlink.ErrBusy: func(*satlink.Error) *SatlinkError {
+	iridium.ErrBusy: func(*iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorHandsetBusy}
 	},
-	satlink.ErrCallMayStillBeUp: func(e *satlink.Error) *SatlinkError {
+	iridium.ErrCallMayStillBeUp: func(e *iridium.Error) *SatlinkError {
 		return hangUpFailed(messageOrCause(e.Message, e.Err))
 	},
-	satlink.ErrCancelled: func(*satlink.Error) *SatlinkError {
+	iridium.ErrCancelled: func(*iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorCancelled}
 	},
 }
@@ -185,7 +185,7 @@ var netErrorConversions = [...]func(e *satnet.Error) *SatlinkError{
 // fromHandsetFailure converts a link's ErrHandset into the handset's own
 // error, which it wraps.
 func fromHandsetFailure(e *satnet.Error) *SatlinkError {
-	var core *satlink.Error
+	var core *iridium.Error
 	if !errors.As(e.Err, &core) {
 		return unexpectedError(e)
 	}

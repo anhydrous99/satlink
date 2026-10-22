@@ -7,8 +7,8 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -45,7 +45,7 @@ const (
 // driver runs one data call. Only its own goroutine uses it, apart from the
 // engine, which it shares.
 type driver struct {
-	call    *satlink.DataCall
+	call    *iridium.DataCall
 	ppp     *ppp.Endpoint
 	shared  *shared
 	limits  Limits
@@ -65,7 +65,7 @@ type driver struct {
 	hangUpTime time.Duration
 	// cancellation stops the link while PPP comes up, as it stopped the
 	// dial; nil for none.
-	cancellation *satlink.Cancellation
+	cancellation *iridium.Cancellation
 	// readBuffer receives what the handset sends.
 	readBuffer []byte
 }
@@ -97,7 +97,7 @@ func (o *driverOutcome) wait() error {
 // startDriver starts the driver of call, which just connected, with PPP
 // endpoint and config, and returns the engine it shares with the link and
 // its outcome.
-func startDriver(call *satlink.DataCall, endpoint *ppp.Endpoint, config *Config) (*shared, *driverOutcome) {
+func startDriver(call *iridium.DataCall, endpoint *ppp.Endpoint, config *Config) (*shared, *driverOutcome) {
 	now := time.Now()
 	linkEngine := newEngine(
 		newStack(config.Tuning, now),

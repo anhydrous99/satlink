@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 )
 
@@ -302,7 +302,7 @@ func EstablishLinkWithHandset(handset *IridiumHandset, settings *LinkSettings, l
 // establishOwnLink brings a link up with a handset of its own, which is
 // closed if the link does not come up, a panic included: a serial port it
 // opened is released, and a ByteTransport stays the app's.
-func establishOwnLink(handset *satlink.Handset, config satnet.Config, listener LinkListener) (*SatelliteLink, error) {
+func establishOwnLink(handset *iridium.Handset, config satnet.Config, listener LinkListener) (*SatelliteLink, error) {
 	started := false
 	defer closeUnlessHandedOn(handset, &started)
 	established, err := satnet.Establish(handset, config)

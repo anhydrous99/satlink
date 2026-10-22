@@ -1,7 +1,7 @@
 // Package sim is a simulated Iridium 9555/9575 handset, for developing and
 // testing without hardware or airtime.
 //
-// [Handset] implements satlink.Transport, so whatever runs over a real
+// [Handset] implements iridium.Transport, so whatever runs over a real
 // handset's serial port runs over it unchanged:
 //
 //   - AT commands: identity, signal, battery, registration and clock
@@ -35,13 +35,13 @@
 //
 //	simulator := sim.New(sim.DefaultConfig())
 //	control := simulator.Control()
-//	handset := satlink.NewHandset(simulator)
+//	handset := iridium.NewHandset(simulator)
 //	if err := handset.Initialize(); err != nil {
 //		return err
 //	}
 //	bars, err := handset.SignalQuality() // 4
 //	...
 //	control.ReceiveSMS("+881631234567", "Hello from orbit")
-//	inbox, err := handset.ListSMS(satlink.SMSFilterUnread)
+//	inbox, err := handset.ListSMS(iridium.SMSFilterUnread)
 //	// inbox[0].Text == "Hello from orbit"
 package sim

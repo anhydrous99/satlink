@@ -3,7 +3,7 @@ package serial
 import (
 	"strings"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // ChoosePort returns the serial device to use: path if it is not empty,
@@ -21,7 +21,7 @@ func ChoosePort(path string) (string, error) {
 func ChoosePortFrom(ports []Port) (string, error) {
 	switch len(ports) {
 	case 0:
-		return "", &satlink.Error{Kind: satlink.ErrTransport, Message: "no Iridium handset found on USB"}
+		return "", &iridium.Error{Kind: iridium.ErrTransport, Message: "no Iridium handset found on USB"}
 	case 1:
 		return ports[0].Path, nil
 	default:
@@ -29,8 +29,8 @@ func ChoosePortFrom(ports []Port) (string, error) {
 		for i, port := range ports {
 			paths[i] = port.Path
 		}
-		return "", &satlink.Error{
-			Kind:    satlink.ErrTransport,
+		return "", &iridium.Error{
+			Kind:    iridium.ErrTransport,
 			Message: "several handsets found, choose one: " + strings.Join(paths, ", "),
 		}
 	}
@@ -49,15 +49,15 @@ func choosePort(path string, discoverPorts func() ([]Port, error)) (string, erro
 }
 
 // Connect opens path — or, when path is empty, the only handset discovered
-// — at baud and initialises the handset (satlink.Handset.Initialize). If
+// — at baud and initialises the handset (iridium.Handset.Initialize). If
 // initialising fails, a panic included, the port is closed again.
-func Connect(path string, baud int) (*satlink.Handset, error) {
+func Connect(path string, baud int) (*iridium.Handset, error) {
 	return connect(path, baud, openCloseOnExec, Discover)
 }
 
 // connect is Connect, opening the port with openPort and discovering
 // handsets with discoverPorts.
-func connect(path string, baud int, openPort portOpener, discoverPorts func() ([]Port, error)) (*satlink.Handset, error) {
+func connect(path string, baud int, openPort portOpener, discoverPorts func() ([]Port, error)) (*iridium.Handset, error) {
 	path, err := choosePort(path, discoverPorts)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func connect(path string, baud int, openPort portOpener, discoverPorts func() ([
 	if err != nil {
 		return nil, err
 	}
-	handset := satlink.NewHandset(transport)
+	handset := iridium.NewHandset(transport)
 	initialized := false
 	defer func() {
 		if !initialized {

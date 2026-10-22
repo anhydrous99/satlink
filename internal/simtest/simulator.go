@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -14,7 +14,7 @@ import (
 const EscapeGuard = 20 * time.Millisecond
 
 // CallEscapeGuard is the escape guard for data calls to a simulator with
-// [EscapeGuard]: comfortably above it, as satlink.DefaultEscapeGuard is
+// [EscapeGuard]: comfortably above it, as iridium.DefaultEscapeGuard is
 // above a real handset's.
 const CallEscapeGuard = 3 * EscapeGuard
 
@@ -43,18 +43,18 @@ func NewSimulator(t testing.TB, config sim.Config) *sim.Handset {
 // NewHandset returns a satlink handset over a new simulator made with
 // config, as NewSimulator makes one, initialised as InitializedHandset
 // does, and the simulator's control handle.
-func NewHandset(t testing.TB, config sim.Config) (*satlink.Handset, *sim.Control) {
+func NewHandset(t testing.TB, config sim.Config) (*iridium.Handset, *sim.Control) {
 	t.Helper()
 	simulator := NewSimulator(t, config)
 	return InitializedHandset(t, simulator), simulator.Control()
 }
 
 // InitializedHandset returns a satlink handset over transport, initialised
-// (satlink.Handset.Initialize). A failure to initialise fails the test at
+// (iridium.Handset.Initialize). A failure to initialise fails the test at
 // once. It closes nothing: the transport is the caller's.
-func InitializedHandset(t testing.TB, transport satlink.Transport) *satlink.Handset {
+func InitializedHandset(t testing.TB, transport iridium.Transport) *iridium.Handset {
 	t.Helper()
-	handset := satlink.NewHandset(transport)
+	handset := iridium.NewHandset(transport)
 	if err := handset.Initialize(); err != nil {
 		t.Fatalf("initialising the handset: %v", err)
 	}

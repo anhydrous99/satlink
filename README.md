@@ -26,7 +26,7 @@ Everything above the byte stream is implemented once, in Go.
 ## Layout
 
 ```
-.                   package satlink: AT protocol, typed commands, URCs, data calls (no I/O dependencies)
+iridium/            the handset: AT protocol, typed commands, URCs, data calls (no I/O dependencies)
 ppp/                PPP endpoint: framing, LCP, PAP/CHAP-MD5, IPCP (sans-I/O)
 satnet/             app-private IP link: PPP + TCP/IP in-process, policy, limits, TLS
 sim/                simulated handset + Iridium gateway + tiny internet, for tests and demos
@@ -137,10 +137,10 @@ settings apply.
 
 Setting the link up blocks for about half a minute. To stop it from another
 goroutine — a cancel button, a signal handler — call
-`config.Call.Cancellation.Cancel()` (a `*satlink.Cancellation`), or let a context
+`config.Call.Cancellation.Cancel()` (an `*iridium.Cancellation`), or let a context
 do it with `stop := context.AfterFunc(ctx, config.Call.Cancellation.Cancel)`: a dial
 still in progress is aborted, a call that came up is hung up, and `Establish` fails
-with an error for which `errors.Is(err, satlink.ErrCancelled)` holds. Once the link
+with an error for which `errors.Is(err, iridium.ErrCancelled)` holds. Once the link
 is up, close it instead.
 
 A write returns once the data is queued. Closing lets queued data arrive first — for
@@ -159,12 +159,12 @@ call `WaitAcknowledged` first.
 `link.Watcher()` follows the link's state from another goroutine (`LinkStateUp`,
 `LinkStateClosing`, `LinkStateClosed`, each with its `CloseReason`); a dropped call
 is reported as `CloseReasonCarrierLost`. While the link is up, the handset's own
-methods fail with `satlink.ErrBusy`; once it has hung up, the handset is released.
+methods fail with `iridium.ErrBusy`; once it has hung up, the handset is released.
 A `Link` garbage-collected without `Close` still hangs up, in the background. If
 the hang-up cannot be confirmed — neither `ATH` after the escape nor a DTR drop
 was — `Status().CallMayStillBeUp` says so, and `Close` (or `Establish`,
 for a link that never came up) fails with an error for which
-`errors.Is(err, satlink.ErrCallMayStillBeUp)` holds: the call may still be billing.
+`errors.Is(err, iridium.ErrCallMayStillBeUp)` holds: the call may still be billing.
 `Handset.EndDataCall` retries once the handset answers; power-cycling it is the
 last resort.
 
@@ -216,9 +216,9 @@ test certificates are valid from 2026-10-19 03:17 UTC, so a machine whose clock 
 behind that fails the TLS tests.
 
 ```go
-simulator := sim.New(sim.DefaultConfig()) // a satlink.Transport, like a serial port
+simulator := sim.New(sim.DefaultConfig()) // an iridium.Transport, like a serial port
 defer simulator.Close()
-handset := satlink.NewHandset(simulator)
+handset := iridium.NewHandset(simulator)
 if err := handset.Initialize(); err != nil {
 	return err
 }
@@ -361,18 +361,18 @@ _, err = handset.SendSMS("+881631234567", "hello")
 return err
 ```
 
-`satlink.Handset` works over any `satlink.Transport` (`WriteAll` + `ReadTimeout`
-with a timeout, plus `satlink.DTRController` where there is a DTR line), so other
+`iridium.Handset` works over any `iridium.Transport` (`WriteAll` + `ReadTimeout`
+with a timeout, plus `iridium.DTRController` where there is a DTR line), so other
 links such as Bluetooth serial or TCP bridges only need that interface. It is safe
 for use by several goroutines. `Handset.DialData` places circuit-switched data calls,
 and `DataCall.HangUp` ends them (`+++`, `ATH`, and a DTR drop if that fails);
-meanwhile the handset's own methods fail with `satlink.ErrBusy`, and the settings'
+meanwhile the handset's own methods fail with `iridium.ErrBusy`, and the settings'
 `Cancellation` stops a call being set up. `Handset.Initialize` also ends a data call
 an earlier session left up — still online, or held in online-command mode — or
-reports `satlink.ErrCallMayStillBeUp` if it cannot. `Handset.Answer` is for voice
+reports `iridium.ErrCallMayStillBeUp` if it cannot. `Handset.Answer` is for voice
 calls: a data call answered by mistake — or one that may come up after `ATA`'s
 answer was lost, unless the handset then shows a voice call up — is ended again at
-once, or reported as `satlink.ErrCallMayStillBeUp`.
+once, or reported as `iridium.ErrCallMayStillBeUp`.
 
 | Method | AT command |
 |---|---|
@@ -389,7 +389,7 @@ once, or reported as `satlink.ErrCallMayStillBeUp`.
 | `Command`, `CommandTimeout` | anything |
 | `TakeURCs` / `PollURCs` | queued `RING`, `+CMTI`, `+CREG`, … |
 
-Errors come back typed, as `*satlink.Error` whose kind is a sentinel for
+Errors come back typed, as `*iridium.Error` whose kind is a sentinel for
 `errors.Is`: `ErrEquipment` (`+CME ERROR`), `ErrSMS` (`+CMS ERROR`), `ErrCall`
 (`NO CARRIER`, `BUSY`), `ErrTimeout`, `ErrTransport`, `ErrBusy`,
 `ErrCallMayStillBeUp` ("the call may still be up: …", from `Initialize` and
@@ -534,9 +534,9 @@ them with their reasons in full.
   2041 bits (a 2048-bit minimum counted in whole bytes) or over 8192 bits, or an ECDSA
   key on P-224, are refused.
 - **Handset ownership.** The handset is never moved into a link or a call: while one
-  holds it, its methods fail with `satlink.ErrBusy`, and it is released when the call
+  holds it, its methods fail with `iridium.ErrBusy`, and it is released when the call
   ends. A `DataCall` dropped without `HangUp` ends nothing, so hang up in a deferred
-  function. An error that may leave a call up matches `satlink.ErrCallMayStillBeUp`
+  function. An error that may leave a call up matches `iridium.ErrCallMayStillBeUp`
   and keeps its own text.
 - **Go API where Go needs it.** net.Conn deadlines, `Link.DialContext` and
   `TLSConnector.Config` for `net/http`, and `Close` methods on values that hold a

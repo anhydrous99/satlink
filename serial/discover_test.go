@@ -7,7 +7,7 @@ import (
 
 	"go.bug.st/serial/enumerator"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 func TestDiscoverKeepsIridiumUSBPorts(t *testing.T) {
@@ -110,7 +110,7 @@ func TestDiscoverProbesNoDevice(t *testing.T) {
 func TestDiscoverReportsAnEnumerationFailure(t *testing.T) {
 	_, err := discover(listerOf(nil, errPort))
 
-	if !errors.Is(err, satlink.ErrTransport) || !errors.Is(err, errPort) {
+	if !errors.Is(err, iridium.ErrTransport) || !errors.Is(err, errPort) {
 		t.Errorf("discover = %v, want ErrTransport wrapping the enumerator's error", err)
 	}
 }

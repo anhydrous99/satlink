@@ -3,7 +3,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/serial"
 )
 
@@ -46,12 +46,12 @@ func (o *globalOptions) arguments() []*argument {
 // withHandset opens the simulated handset, or the serial port given or
 // discovered, readies it for commands and lets use have it. It closes the
 // handset again whatever happens — a panic included, as the panic unwinds.
-func (c *cli) withHandset(use func(*satlink.Handset) error) error {
+func (c *cli) withHandset(use func(*iridium.Handset) error) error {
 	transport, err := c.openTransport()
 	if err != nil {
 		return err
 	}
-	handset := satlink.NewHandset(transport)
+	handset := iridium.NewHandset(transport)
 	defer closeHandset(handset)
 	if err := handset.Initialize(); err != nil {
 		return err
@@ -61,8 +61,8 @@ func (c *cli) withHandset(use func(*satlink.Handset) error) error {
 
 // reportingEvents returns use followed, when it succeeds, by the unsolicited
 // result codes the handset sent meanwhile, on standard error.
-func (c *cli) reportingEvents(use func(*satlink.Handset) error) func(*satlink.Handset) error {
-	return func(handset *satlink.Handset) error {
+func (c *cli) reportingEvents(use func(*iridium.Handset) error) func(*iridium.Handset) error {
+	return func(handset *iridium.Handset) error {
 		if err := use(handset); err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func (c *cli) reportingEvents(use func(*satlink.Handset) error) func(*satlink.Ha
 
 // openTransport returns a simulated handset when --simulate asks for one,
 // and otherwise the serial port given or discovered.
-func (c *cli) openTransport() (satlink.Transport, error) {
+func (c *cli) openTransport() (iridium.Transport, error) {
 	if config, simulated := c.options.simulate.config(); simulated {
 		return c.env.simulateHandset(config), nil
 	}
@@ -107,7 +107,7 @@ func (c *cli) portPath() (string, error) {
 
 // closeHandset closes the handset's transport, which drops DTR, once the
 // command is done with it.
-func closeHandset(handset *satlink.Handset) {
+func closeHandset(handset *iridium.Handset) {
 	// Closing the port is the last thing done with the handset, and a failure
 	// has no remedy: it is not reported.
 	_ = handset.Close()

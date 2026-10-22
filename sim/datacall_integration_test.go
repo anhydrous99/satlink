@@ -7,17 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// Data calls through satlink.DataCall, with PPP and DNS over them.
+// Data calls through iridium.DataCall, with PPP and DNS over them.
 
 // assertAnswersAT fails the test unless the handset is back in command
 // mode and answers AT.
-func assertAnswersAT(t *testing.T, handset *satlink.Handset) {
+func assertAnswersAT(t *testing.T, handset *iridium.Handset) {
 	t.Helper()
 	if _, err := handset.Command("AT"); err != nil {
 		t.Errorf("the handset does not answer AT: %v", err)
@@ -25,7 +25,7 @@ func assertAnswersAT(t *testing.T, handset *satlink.Handset) {
 }
 
 // hangUp ends call, failing the test if it cannot.
-func hangUp(t *testing.T, call *satlink.DataCall) {
+func hangUp(t *testing.T, call *iridium.DataCall) {
 	t.Helper()
 	if err := call.HangUp(); err != nil {
 		t.Fatalf("the call does not end: %v", err)
@@ -154,7 +154,7 @@ func TestACallEscapedFromButNeverHungUpIsEndedByTheNextSession(t *testing.T) {
 		t.Fatal("the escape ended the call")
 	}
 
-	handset := satlink.NewHandset(transport)
+	handset := iridium.NewHandset(transport)
 	if err := handset.Initialize(); err != nil {
 		t.Fatalf("the handset is not recovered: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestOnlineCommandModeKeepsThePPPSession(t *testing.T) {
 	}
 }
 
-func writeAll(t *testing.T, transport satlink.Transport, data string) {
+func writeAll(t *testing.T, transport iridium.Transport, data string) {
 	t.Helper()
 	if err := transport.WriteAll([]byte(data)); err != nil {
 		t.Fatalf("the simulator failed: %v", err)
@@ -314,7 +314,7 @@ func TestANetworkTheGatewayCannotServeFailsTheCall(t *testing.T) {
 
 	_, err := handset.DialData(iridiumInternetNumber, callSettings())
 
-	assertHandsetError(t, err, satlink.Error{Kind: satlink.ErrCall, Message: "NO CARRIER"})
+	assertHandsetError(t, err, iridium.Error{Kind: iridium.ErrCall, Message: "NO CARRIER"})
 	if control.Stats().InDataCall {
 		t.Error("a call is up")
 	}

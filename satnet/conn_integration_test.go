@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -546,7 +546,7 @@ func closeBody(t *testing.T, response *http.Response) {
 
 // establishThenDrop brings a link up over handset and drops it, keeping only
 // a watcher and a connection, neither of which may keep it reachable.
-func establishThenDrop(t *testing.T, handset *satlink.Handset) (*satnet.Watcher, *satnet.TCPConn) {
+func establishThenDrop(t *testing.T, handset *iridium.Handset) (*satnet.Watcher, *satnet.TCPConn) {
 	t.Helper()
 	link, err := satnet.Establish(handset, linkConfig(t, "echo.test:7"))
 	if err != nil {

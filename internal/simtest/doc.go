@@ -6,7 +6,7 @@
 //     ([NewHandset], [InitializedHandset]);
 //   - [FaultyTransport], a transport that fails on cue: deaf to the escape
 //     or to DTR, panicking, unplugged, losing a hang-up, without +CPAS;
-//   - [ByteTransport], a mobile.ByteTransport over any satlink.Transport,
+//   - [ByteTransport], a mobile.ByteTransport over any iridium.Transport,
 //     standing in for the host app's USB transport;
 //   - [Eventually], which waits for a condition instead of sleeping for a
 //     guess.

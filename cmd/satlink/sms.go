@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -15,13 +15,13 @@ import (
 // smsFilters are the filters `sms list` takes, the default first.
 var smsFilters = [...]struct {
 	name   string
-	filter satlink.SMSFilter
+	filter iridium.SMSFilter
 }{
-	{name: "all", filter: satlink.SMSFilterAll},
-	{name: "unread", filter: satlink.SMSFilterUnread},
-	{name: "read", filter: satlink.SMSFilterRead},
-	{name: "unsent", filter: satlink.SMSFilterUnsent},
-	{name: "sent", filter: satlink.SMSFilterSent},
+	{name: "all", filter: iridium.SMSFilterAll},
+	{name: "unread", filter: iridium.SMSFilterUnread},
+	{name: "read", filter: iridium.SMSFilterRead},
+	{name: "unsent", filter: iridium.SMSFilterUnsent},
+	{name: "sent", filter: iridium.SMSFilterSent},
 }
 
 // smsCommand is `satlink sms` and its subcommands.
@@ -37,7 +37,7 @@ func (c *cli) smsSendCommand() *command {
 		Use:   "send",
 		Short: "Send a text message",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				reference, err := handset.SendSMS(number, text)
 				if err != nil {
 					return err
@@ -50,12 +50,12 @@ func (c *cli) smsSendCommand() *command {
 
 // smsListCommand is `satlink sms list`.
 func (c *cli) smsListCommand() *command {
-	var filter satlink.SMSFilter
+	var filter iridium.SMSFilter
 	return newCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List stored messages",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				messages, err := handset.ListSMS(filter)
 				if err != nil {
 					return err
@@ -69,7 +69,7 @@ func (c *cli) smsListCommand() *command {
 
 // smsReadCommand is `satlink sms read`.
 func (c *cli) smsReadCommand() *command {
-	return c.storedMessageCommand("read", "Show one message", func(handset *satlink.Handset, index int) error {
+	return c.storedMessageCommand("read", "Show one message", func(handset *iridium.Handset, index int) error {
 		message, err := handset.ReadSMS(index)
 		if err != nil {
 			return err
@@ -80,20 +80,20 @@ func (c *cli) smsReadCommand() *command {
 
 // smsDeleteCommand is `satlink sms delete`.
 func (c *cli) smsDeleteCommand() *command {
-	return c.storedMessageCommand("delete", "Delete one message", func(handset *satlink.Handset, index int) error {
+	return c.storedMessageCommand("delete", "Delete one message", func(handset *iridium.Handset, index int) error {
 		return handset.DeleteSMS(index)
 	})
 }
 
 // storedMessageCommand is the `satlink sms` subcommand name, which acts on
 // the message stored at the index it is given, a u32.
-func (c *cli) storedMessageCommand(name, short string, act func(*satlink.Handset, int) error) *command {
+func (c *cli) storedMessageCommand(name, short string, act func(*iridium.Handset, int) error) *command {
 	var index uint32
 	return newCommand(&cobra.Command{
 		Use:   name,
 		Short: short,
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				return act(handset, int(index))
 			}))
 		},
@@ -111,7 +111,7 @@ func smsFilterValues() []possibleValue {
 
 // smsFilterValue keeps the filter that `sms list` was given by name.
 type smsFilterValue struct {
-	target *satlink.SMSFilter
+	target *iridium.SMSFilter
 }
 
 // Set chooses the filter called name. The command line gives it only the
@@ -129,7 +129,7 @@ func (v smsFilterValue) Set(name string) error {
 
 // printMessages writes each message's header line — index, status, address
 // and time — then its text, and a blank line.
-func printMessages(w io.Writer, messages []satlink.SMSMessage) error {
+func printMessages(w io.Writer, messages []iridium.SMSMessage) error {
 	p := printer{w: w}
 	for _, message := range messages {
 		p.printf("[%d] %s %s %s\n%s\n\n", message.Index, message.Status, message.Address,
@@ -140,7 +140,7 @@ func printMessages(w io.Writer, messages []satlink.SMSMessage) error {
 
 // printMessage writes a message's sender, time and status, a blank line,
 // and its text.
-func printMessage(w io.Writer, message satlink.SMSMessage) error {
+func printMessage(w io.Writer, message iridium.SMSMessage) error {
 	return writef(w, "From: %s\nTime: %s\nStatus: %s\n\n%s\n", message.Address,
 		cmp.Or(message.Timestamp, "-"), message.Status, message.Text)
 }

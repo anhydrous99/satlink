@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
-// What the switches watch for, written in one piece as satlink.Handset
+// What the switches watch for, written in one piece as iridium.Handset
 // writes it.
 var (
 	// escapeSequence is the Hayes escape, as a hang-up writes it.
@@ -35,7 +35,7 @@ const (
 // on cue. Every switch starts off and may be flipped while the transport is
 // in use; with all of them off, the FaultyTransport changes nothing.
 //
-// It implements satlink.Transport, satlink.DTRController and io.Closer, and
+// It implements iridium.Transport, iridium.DTRController and io.Closer, and
 // is safe for concurrent use as far as the transport it wraps is. The zero
 // FaultyTransport is not usable; create one with [NewFaultyTransport].
 type FaultyTransport struct {
@@ -54,34 +54,34 @@ type FaultyTransport struct {
 	// bug", turning itself off as it does.
 	PanicsOnNextRead atomic.Bool
 	// FailsNextHangUp makes the next "ATH\r", written in one piece, fail with
-	// a *satlink.Error of kind satlink.ErrTransport, "USB write failed",
+	// an *iridium.Error of kind iridium.ErrTransport, "USB write failed",
 	// turning itself off as it does: that ATH never reaches the handset.
 	FailsNextHangUp atomic.Bool
 	// WithoutCPAS makes "AT+CPAS\r", written in one piece, reach the handset
 	// as a command it does not know, which it answers with ERROR, as older
 	// firmware does.
 	WithoutCPAS atomic.Bool
-	// Unplugged makes every call but Close fail with a *satlink.Error of
-	// kind satlink.ErrTransport, "unplugged": nothing gets through any
+	// Unplugged makes every call but Close fail with an *iridium.Error of
+	// kind iridium.ErrTransport, "unplugged": nothing gets through any
 	// more, DTR included, as if the cable had been pulled.
 	Unplugged atomic.Bool
 
-	transport satlink.Transport
+	transport iridium.Transport
 	dtrDrops  atomic.Int64
 }
 
 // A FaultyTransport is a handset's port, faults and all.
 var (
-	_ satlink.Transport     = (*FaultyTransport)(nil)
-	_ satlink.DTRController = (*FaultyTransport)(nil)
+	_ iridium.Transport     = (*FaultyTransport)(nil)
+	_ iridium.DTRController = (*FaultyTransport)(nil)
 	_ io.Closer             = (*FaultyTransport)(nil)
 )
 
 // NewFaultyTransport returns a FaultyTransport over transport, usually a
 // *sim.Handset, with every switch off. DTR changes get through only if
-// transport implements satlink.DTRController; without it, RaiseDTR and
-// DropDTR fail as satlink.Handset does ("this transport has no DTR line").
-func NewFaultyTransport(transport satlink.Transport) *FaultyTransport {
+// transport implements iridium.DTRController; without it, RaiseDTR and
+// DropDTR fail as iridium.Handset does ("this transport has no DTR line").
+func NewFaultyTransport(transport iridium.Transport) *FaultyTransport {
 	return &FaultyTransport{transport: transport}
 }
 
@@ -98,7 +98,7 @@ func (f *FaultyTransport) WriteAll(p []byte) error {
 	case bytes.Equal(p, escapeSequence):
 		return f.writeEscape(p)
 	case bytes.Equal(p, hangUpCommand) && f.FailsNextHangUp.CompareAndSwap(true, false):
-		return &satlink.Error{Kind: satlink.ErrTransport, Message: lostHangUp}
+		return &iridium.Error{Kind: iridium.ErrTransport, Message: lostHangUp}
 	case bytes.Equal(p, activityStatusQuery) && f.WithoutCPAS.Load():
 		return f.transport.WriteAll([]byte(unknownCommand))
 	default:
@@ -133,7 +133,7 @@ func (f *FaultyTransport) ReadTimeout(p []byte, timeout time.Duration) (int, err
 // RaiseDTR raises the wrapped transport's DTR line, unless Unplugged fails
 // it or DeafToDTR drops it while reporting success.
 func (f *FaultyTransport) RaiseDTR() error {
-	return f.changeDTR(satlink.DTRController.RaiseDTR)
+	return f.changeDTR(iridium.DTRController.RaiseDTR)
 }
 
 // DropDTR drops the wrapped transport's DTR line, unless Unplugged fails it
@@ -141,7 +141,7 @@ func (f *FaultyTransport) RaiseDTR() error {
 // [FaultyTransport.DTRDrops].
 func (f *FaultyTransport) DropDTR() error {
 	f.dtrDrops.Add(1)
-	return f.changeDTR(satlink.DTRController.DropDTR)
+	return f.changeDTR(iridium.DTRController.DropDTR)
 }
 
 // DTRDrops returns how many times DropDTR has been called, whatever the
@@ -165,14 +165,14 @@ func (f *FaultyTransport) Close() error {
 // checkPluggedIn fails while Unplugged is on.
 func (f *FaultyTransport) checkPluggedIn() error {
 	if f.Unplugged.Load() {
-		return &satlink.Error{Kind: satlink.ErrTransport, Message: "unplugged"}
+		return &iridium.Error{Kind: iridium.ErrTransport, Message: "unplugged"}
 	}
 	return nil
 }
 
 // changeDTR makes change to the wrapped transport's DTR line, unless
 // Unplugged fails it or DeafToDTR drops it while reporting success.
-func (f *FaultyTransport) changeDTR(change func(satlink.DTRController) error) error {
+func (f *FaultyTransport) changeDTR(change func(iridium.DTRController) error) error {
 	if err := f.checkPluggedIn(); err != nil {
 		return err
 	}

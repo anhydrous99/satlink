@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
 func TestErrorMessages(t *testing.T) {
-	coreErr := &satlink.Error{Kind: satlink.ErrBusy}
+	coreErr := &iridium.Error{Kind: iridium.ErrBusy}
 	for _, c := range []struct {
 		err  *Error
 		text string
@@ -104,12 +104,12 @@ func TestTimeoutsAreTemporaryNetErrors(t *testing.T) {
 }
 
 func TestErrorsUnwrapToTheirCause(t *testing.T) {
-	cause := &satlink.Error{Kind: satlink.ErrTimeout, Command: "ATD"}
+	cause := &iridium.Error{Kind: iridium.ErrTimeout, Command: "ATD"}
 
 	err := &Error{Kind: ErrHandset, Err: cause}
 
-	var coreErr *satlink.Error
-	if !errors.As(err, &coreErr) || coreErr != cause || !errors.Is(err, satlink.ErrTimeout) {
+	var coreErr *iridium.Error
+	if !errors.As(err, &coreErr) || coreErr != cause || !errors.Is(err, iridium.ErrTimeout) {
 		t.Errorf("%v does not unwrap to %v", err, cause)
 	}
 	if got := (&Error{Kind: ErrInvalidConfig, Message: "bad", Err: ppp.ErrMRUTooSmall}).Error(); got != "invalid configuration: bad: MRU too small" {
@@ -118,7 +118,7 @@ func TestErrorsUnwrapToTheirCause(t *testing.T) {
 }
 
 func TestAFailedHangUpMatchesCallMayStillBeUp(t *testing.T) {
-	coreFailure := &satlink.Error{Kind: satlink.ErrTimeout, Command: "+++", CallMayStillBeUp: true}
+	coreFailure := &iridium.Error{Kind: iridium.ErrTimeout, Command: "+++", CallMayStillBeUp: true}
 	for name, c := range map[string]struct {
 		err  error
 		want bool
@@ -128,9 +128,9 @@ func TestAFailedHangUpMatchesCallMayStillBeUp(t *testing.T) {
 		"wrapped by the app":    {fmt.Errorf("closing: %w", &Error{Kind: ErrHandset, CallMayStillBeUp: true}), true},
 		"in the handset's flag": {&Error{Kind: ErrHandset, Err: coreFailure}, true},
 		"handsetError":          {handsetError(coreFailure), true},
-		"a clean handset error": {handsetError(&satlink.Error{Kind: satlink.ErrBusy}), false},
+		"a clean handset error": {handsetError(&iridium.Error{Kind: iridium.ErrBusy}), false},
 	} {
-		if got := errors.Is(c.err, satlink.ErrCallMayStillBeUp); got != c.want {
+		if got := errors.Is(c.err, iridium.ErrCallMayStillBeUp); got != c.want {
 			t.Errorf("%s: errors.Is(%v, ErrCallMayStillBeUp) = %t, want %t", name, c.err, got, c.want)
 		}
 	}
@@ -140,7 +140,7 @@ func TestAFailedHangUpMatchesCallMayStillBeUp(t *testing.T) {
 }
 
 func TestHandsetErrorsCarryTheHandsetsFlag(t *testing.T) {
-	err := handsetError(&satlink.Error{Kind: satlink.ErrTimeout, Command: "+++", CallMayStillBeUp: true})
+	err := handsetError(&iridium.Error{Kind: iridium.ErrTimeout, Command: "+++", CallMayStillBeUp: true})
 
 	if !err.CallMayStillBeUp || err.Kind != ErrHandset {
 		t.Errorf("handsetError = %+v", err)

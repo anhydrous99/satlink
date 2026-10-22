@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -56,8 +56,8 @@ type Link struct {
 // Establish dials handset, brings up PPP, and returns once IP traffic can
 // flow. It blocks for the whole call setup — typically half a minute over
 // Iridium — unless config.Call.Cancellation stops it, from another
-// goroutine: it then fails with ErrHandset wrapping a *satlink.Error of
-// kind satlink.ErrCancelled, whether the call had connected or not — a
+// goroutine: it then fails with ErrHandset wrapping an *iridium.Error of
+// kind iridium.ErrCancelled, whether the call had connected or not — a
 // dial still in progress is aborted, and a call that came up is hung up.
 // Once the link is up, close it instead. A context can drive the
 // cancellation:
@@ -69,20 +69,20 @@ type Link struct {
 // config is checked before dialling, as [Config.Validate] does, so a
 // configuration that cannot work never costs airtime; the link keeps its
 // own copy of it. From the dial on, handset is busy: its own methods fail
-// with satlink.ErrBusy until the link has hung up.
+// with iridium.ErrBusy until the link has hung up.
 //
 // On failure handset is released. The call has been hung up and the
 // handset is in command mode, unless that hang-up failed too: the error
 // then still says why the link did not come up, and its CallMayStillBeUp is set — errors.Is(err,
-// satlink.ErrCallMayStillBeUp) — as the call may still be up and billing;
+// iridium.ErrCallMayStillBeUp) — as the call may still be up and billing;
 // the handset's EndDataCall retries once the handset answers again, and
 // power-cycling it is the last resort. The error is an [*Error]:
 // ErrInvalidConfig for a configuration that cannot work, ErrHandset when
-// the dial fails (wrapping the *satlink.Error, for example ErrBusy or a
+// the dial fails (wrapping the *iridium.Error, for example ErrBusy or a
 // refused number, and carrying its CallMayStillBeUp), and ErrLinkDown when
 // the call came up but the link did not — PPP failed or timed out, the call
 // dropped — with Reason saying why.
-func Establish(handset *satlink.Handset, config Config) (*Link, error) {
+func Establish(handset *iridium.Handset, config Config) (*Link, error) {
 	// The map is the caller's still: the copy is taken before it is checked
 	// and before the dial, during which the caller may change it.
 	config.Hosts = maps.Clone(config.Hosts)
@@ -142,9 +142,9 @@ func awaitUp(sharedEngine *shared) error {
 // setupFailure is the error of a link that did not come up for err: the
 // handset's ErrCancelled once cancellation was cancelled — hung up for it,
 // with the same error as when cancelled before CONNECT — and otherwise err.
-func setupFailure(err error, cancellation *satlink.Cancellation) error {
+func setupFailure(err error, cancellation *iridium.Cancellation) error {
 	if cancellation.Cancelled() {
-		return handsetError(&satlink.Error{Kind: satlink.ErrCancelled})
+		return handsetError(&iridium.Error{Kind: iridium.ErrCancelled})
 	}
 	return err
 }
@@ -156,7 +156,7 @@ func setupFailure(err error, cancellation *satlink.Cancellation) error {
 func failedToComeUp(err error, outcome *driverOutcome) error {
 	hangUpErr := outcome.wait()
 	var linkErr *Error
-	if errors.Is(hangUpErr, satlink.ErrCallMayStillBeUp) && errors.As(err, &linkErr) {
+	if errors.Is(hangUpErr, iridium.ErrCallMayStillBeUp) && errors.As(err, &linkErr) {
 		linkErr.CallMayStillBeUp = true
 	}
 	return err
@@ -267,7 +267,7 @@ func (l *Link) DialContext(ctx context.Context, network, address string) (net.Co
 // DTR drop was confirmed), the call may still be up and billing:
 // Close returns an [*Error] of kind ErrHandset wrapping the handset's
 // failure, with CallMayStillBeUp set — errors.Is(err,
-// satlink.ErrCallMayStillBeUp) — and [Status].CallMayStillBeUp is true.
+// iridium.ErrCallMayStillBeUp) — and [Status].CallMayStillBeUp is true.
 // The handset is released all the same: retry with its EndDataCall once it
 // answers again, or power-cycle it. Should the hang-up itself panic (a
 // faulty transport), the link still reports itself closed, and Close

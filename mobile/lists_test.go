@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // outOfRange are indices outside a two-item list.
@@ -60,7 +60,7 @@ func TestZeroListsAreEmpty(t *testing.T) {
 }
 
 func TestKnownProductsAreTheDriversProducts(t *testing.T) {
-	want := satlink.KnownProducts()
+	want := iridium.KnownProducts()
 
 	got := KnownProducts()
 

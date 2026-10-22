@@ -4,35 +4,35 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
 
 func TestTheSMSFiltersAreTheHandsets(t *testing.T) {
 	// ListSMS passes its filter on as it is, so each constant must be the
 	// handset's own.
-	cases := map[int]satlink.SMSFilter{
-		SMSFilterAll:    satlink.SMSFilterAll,
-		SMSFilterUnread: satlink.SMSFilterUnread,
-		SMSFilterRead:   satlink.SMSFilterRead,
-		SMSFilterUnsent: satlink.SMSFilterUnsent,
-		SMSFilterSent:   satlink.SMSFilterSent,
+	cases := map[int]iridium.SMSFilter{
+		SMSFilterAll:    iridium.SMSFilterAll,
+		SMSFilterUnread: iridium.SMSFilterUnread,
+		SMSFilterRead:   iridium.SMSFilterRead,
+		SMSFilterUnsent: iridium.SMSFilterUnsent,
+		SMSFilterSent:   iridium.SMSFilterSent,
 	}
 	for constant, filter := range cases {
-		if satlink.SMSFilter(constant) != filter {
-			t.Errorf("SMS filter %d is the handset's %v", constant, satlink.SMSFilter(constant))
+		if iridium.SMSFilter(constant) != filter {
+			t.Errorf("SMS filter %d is the handset's %v", constant, iridium.SMSFilter(constant))
 		}
 	}
 }
 
 func TestEveryChargeStatusHasItsConstant(t *testing.T) {
-	cases := map[satlink.ChargeStatus]int{
-		satlink.ChargeStatusOnBattery:     ChargeStatusOnBattery,
-		satlink.ChargeStatusExternalPower: ChargeStatusExternalPower,
-		satlink.ChargeStatusNoBattery:     ChargeStatusNoBattery,
-		satlink.ChargeStatusPowerFault:    ChargeStatusPowerFault,
-		satlink.ChargeStatus(7):           ChargeStatusUnknown,
+	cases := map[iridium.ChargeStatus]int{
+		iridium.ChargeStatusOnBattery:     ChargeStatusOnBattery,
+		iridium.ChargeStatusExternalPower: ChargeStatusExternalPower,
+		iridium.ChargeStatusNoBattery:     ChargeStatusNoBattery,
+		iridium.ChargeStatusPowerFault:    ChargeStatusPowerFault,
+		iridium.ChargeStatus(7):           ChargeStatusUnknown,
 	}
 	for status, want := range cases {
 		if got := chargeStatusOf(status); got != want {
@@ -42,14 +42,14 @@ func TestEveryChargeStatusHasItsConstant(t *testing.T) {
 }
 
 func TestEveryRegistrationStatusHasItsConstant(t *testing.T) {
-	cases := map[satlink.RegistrationStatus]int{
-		satlink.RegistrationStatusNotRegistered: RegistrationStatusNotRegistered,
-		satlink.RegistrationStatusHome:          RegistrationStatusHome,
-		satlink.RegistrationStatusSearching:     RegistrationStatusSearching,
-		satlink.RegistrationStatusDenied:        RegistrationStatusDenied,
-		satlink.RegistrationStatusUnknown:       RegistrationStatusUnknown,
-		satlink.RegistrationStatusRoaming:       RegistrationStatusRoaming,
-		satlink.RegistrationStatus(9):           RegistrationStatusUnknown,
+	cases := map[iridium.RegistrationStatus]int{
+		iridium.RegistrationStatusNotRegistered: RegistrationStatusNotRegistered,
+		iridium.RegistrationStatusHome:          RegistrationStatusHome,
+		iridium.RegistrationStatusSearching:     RegistrationStatusSearching,
+		iridium.RegistrationStatusDenied:        RegistrationStatusDenied,
+		iridium.RegistrationStatusUnknown:       RegistrationStatusUnknown,
+		iridium.RegistrationStatusRoaming:       RegistrationStatusRoaming,
+		iridium.RegistrationStatus(9):           RegistrationStatusUnknown,
 	}
 	for status, want := range cases {
 		if got := registrationStatusOf(status); got != want {
@@ -59,7 +59,7 @@ func TestEveryRegistrationStatusHasItsConstant(t *testing.T) {
 }
 
 func TestAStoredMessageIsCopiedWhole(t *testing.T) {
-	stored := satlink.SMSMessage{Index: 3, Status: "REC READ", Address: "+881600000000", Timestamp: "26/10/19,04:00:00+00", Text: "hi"}
+	stored := iridium.SMSMessage{Index: 3, Status: "REC READ", Address: "+881600000000", Timestamp: "26/10/19,04:00:00+00", Text: "hi"}
 
 	got := smsMessageOf(stored)
 
@@ -69,11 +69,11 @@ func TestAStoredMessageIsCopiedWhole(t *testing.T) {
 	}
 }
 
-// assertCoreError fails the test unless err is a *satlink.Error equal to
+// assertCoreError fails the test unless err is an *iridium.Error equal to
 // want.
-func assertCoreError(t *testing.T, err error, want *satlink.Error) {
+func assertCoreError(t *testing.T, err error, want *iridium.Error) {
 	t.Helper()
-	var got *satlink.Error
+	var got *iridium.Error
 	if !errors.As(err, &got) || *got != *want {
 		t.Errorf("error is %#v, want %#v", err, want)
 	}
@@ -84,7 +84,7 @@ func TestAFailureWhileACallMayStillBeUpSaysSo(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
-		want *satlink.Error
+		want *iridium.Error
 	}{
 		{
 			name: "the handset's own report is kept",
@@ -93,13 +93,13 @@ func TestAFailureWhileACallMayStillBeUpSaysSo(t *testing.T) {
 		},
 		{
 			name: "another failure gives its text",
-			err:  &satlink.Error{Kind: satlink.ErrTransport, Message: "unplugged"},
+			err:  &iridium.Error{Kind: iridium.ErrTransport, Message: "unplugged"},
 			want: callMayStillBeUpError("transport error: unplugged"),
 		},
 		{
 			// The flag on an error of another kind does not make it a hang-up failure.
 			name: "a failure of another kind with the flag gives its text",
-			err:  &satlink.Error{Kind: satlink.ErrTimeout, Command: "+++", CallMayStillBeUp: true},
+			err:  &iridium.Error{Kind: iridium.ErrTimeout, Command: "+++", CallMayStillBeUp: true},
 			want: callMayStillBeUpError(`timed out waiting for a response to "+++"`),
 		},
 	}
@@ -114,7 +114,7 @@ func TestEndingAStrandedCallSaysTheCallMayStillBeUpWhateverFailed(t *testing.T) 
 	cases := []struct {
 		name  string
 		fault func(*simtest.FaultyTransport)
-		want  *satlink.Error
+		want  *iridium.Error
 	}{
 		{
 			name:  "a handset that does not answer",
@@ -133,7 +133,7 @@ func TestEndingAStrandedCallSaysTheCallMayStillBeUpWhateverFailed(t *testing.T) 
 			faulty := simtest.NewFaultyTransport(simtest.NewSimulator(t, sim.DefaultConfig()))
 			c.fault(faulty)
 
-			err := endStrandedCall(satlink.NewHandset(faulty))
+			err := endStrandedCall(iridium.NewHandset(faulty))
 
 			assertCoreError(t, err, c.want)
 		})
@@ -142,7 +142,7 @@ func TestEndingAStrandedCallSaysTheCallMayStillBeUpWhateverFailed(t *testing.T) 
 
 func TestEndingAStrandedCallThatIsOverSucceeds(t *testing.T) {
 	t.Parallel()
-	handset := satlink.NewHandset(simtest.NewSimulator(t, sim.DefaultConfig()))
+	handset := iridium.NewHandset(simtest.NewSimulator(t, sim.DefaultConfig()))
 
 	if err := endStrandedCall(handset); err != nil {
 		t.Errorf("endStrandedCall: %v", err)

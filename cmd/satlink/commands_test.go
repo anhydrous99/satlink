@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
 	"github.com/anhydrous99/satlink/internal/logtext"
 	"github.com/anhydrous99/satlink/internal/simtest"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/serial"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -257,7 +257,7 @@ func TestAPortThatCannotBeOpenedFailsTheCommand(t *testing.T) {
 
 func TestADialThatCannotBeAnnouncedCostsNoCall(t *testing.T) {
 	var control *sim.Control
-	keepingControl := world{handset: func(t *testing.T, config sim.Config) satlink.Transport {
+	keepingControl := world{handset: func(t *testing.T, config sim.Config) iridium.Transport {
 		simulator := simtest.NewSimulator(t, config)
 		control = simulator.Control()
 		return simulator

@@ -3,7 +3,7 @@ package main
 import (
 	"io"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -13,7 +13,7 @@ func (c *cli) infoCommand() *command {
 		Use:   "info",
 		Short: "Manufacturer, model, firmware and IMEI",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				info, err := handset.Info()
 				if err != nil {
 					return err
@@ -25,7 +25,7 @@ func (c *cli) infoCommand() *command {
 }
 
 // printInfo writes the handset's identity, a field per line.
-func printInfo(w io.Writer, info satlink.DeviceInfo) error {
+func printInfo(w io.Writer, info iridium.DeviceInfo) error {
 	p := printer{w: w}
 	p.printf("Manufacturer: %s\n", info.Manufacturer)
 	p.printf("Model:        %s\n", info.Model)

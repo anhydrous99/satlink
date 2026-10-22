@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ func (c *cli) statusCommand() *command {
 		Use:   "status",
 		Short: "Signal strength, battery and network registration",
 		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				return printStatus(c.streams.stdout, handset)
 			}))
 		},
@@ -29,7 +29,7 @@ func (c *cli) statusCommand() *command {
 // the signal must be known; the others may be unavailable, and then say why.
 // Each is asked for once the lines before it are written: output that nobody
 // can read costs no further exchange.
-func printStatus(w io.Writer, handset *satlink.Handset) error {
+func printStatus(w io.Writer, handset *iridium.Handset) error {
 	bars, err := handset.SignalQuality()
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func printStatus(w io.Writer, handset *satlink.Handset) error {
 
 // describeBattery is the charge level and status, or why they are
 // unavailable.
-func describeBattery(battery satlink.Battery, err error) string {
+func describeBattery(battery iridium.Battery, err error) string {
 	if err != nil {
 		return fmt.Sprintf("unavailable (%v)", err)
 	}
@@ -54,7 +54,7 @@ func describeBattery(battery satlink.Battery, err error) string {
 
 // describeRegistration is the registration status, or why it is
 // unavailable.
-func describeRegistration(registration satlink.Registration, err error) string {
+func describeRegistration(registration iridium.Registration, err error) string {
 	if err != nil {
 		return fmt.Sprintf("unavailable (%v)", err)
 	}

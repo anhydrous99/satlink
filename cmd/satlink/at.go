@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func (c *cli) atCommand() *command {
 		Short: "Send a raw AT command, e.g. `" + programName + " at AT+CSQ`",
 		RunE: func(*cobra.Command, []string) error {
 			timeout := saturatingDuration(timeoutSeconds, time.Second)
-			return c.withHandset(c.reportingEvents(func(handset *satlink.Handset) error {
+			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
 				response, err := handset.CommandTimeout(request, timeout)
 				if err != nil {
 					return err
@@ -41,7 +41,7 @@ func (c *cli) atCommand() *command {
 
 // printResponse writes the response's information lines, then its final
 // result: OK, or CONNECT and what followed it.
-func printResponse(w io.Writer, response satlink.Response) error {
+func printResponse(w io.Writer, response iridium.Response) error {
 	if err := printLines(w, response.Lines); err != nil {
 		return err
 	}

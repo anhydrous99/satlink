@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // The handset as a transport, its Close, and I/O after Close.
@@ -60,8 +60,8 @@ func readUntilContains(t *testing.T, handset *Handset, want string) {
 // assertClosedError fails the test unless err is the closed handset's.
 func assertClosedError(t *testing.T, err error) {
 	t.Helper()
-	var handsetErr *satlink.Error
-	if !errors.As(err, &handsetErr) || handsetErr.Kind != satlink.ErrTransport || handsetErr.Message != closedMessage {
+	var handsetErr *iridium.Error
+	if !errors.As(err, &handsetErr) || handsetErr.Kind != iridium.ErrTransport || handsetErr.Message != closedMessage {
 		t.Errorf("got %v; want a transport error %q", err, closedMessage)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink"
+	"github.com/anhydrous99/satlink/iridium"
 )
 
 // errPortGone is the failure of a port that went away.
@@ -96,12 +96,12 @@ func (r *failureRecorder) Fatalf(format string, args ...any) {
 	r.failures = append(r.failures, fmt.Sprintf(format, args...))
 }
 
-// assertTransportError fails the test unless err is a *satlink.Error of kind
+// assertTransportError fails the test unless err is an *iridium.Error of kind
 // ErrTransport with message.
 func assertTransportError(t *testing.T, err error, message string) {
 	t.Helper()
-	var handsetErr *satlink.Error
-	if !errors.As(err, &handsetErr) || handsetErr.Kind != satlink.ErrTransport || handsetErr.Message != message {
+	var handsetErr *iridium.Error
+	if !errors.As(err, &handsetErr) || handsetErr.Kind != iridium.ErrTransport || handsetErr.Message != message {
 		t.Errorf("got %v; want a transport error %q", err, message)
 	}
 }

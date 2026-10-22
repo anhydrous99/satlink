@@ -61,7 +61,7 @@
 // # The handset
 //
 // While a link is up its handset is busy: the handset's own methods fail
-// with satlink.ErrBusy. Once the link has hung up — when [Link.Close]
+// with iridium.ErrBusy. Once the link has hung up — when [Link.Close]
 // returns, or when [Watcher.WaitClosed] reports the link closed — the
 // handset is released, back in command mode. A Link that is garbage
 // collected without Close still hangs up, in the background.
@@ -69,7 +69,7 @@
 // If the hang-up cannot be confirmed — neither ATH after the escape nor a
 // DTR drop was — [Status].CallMayStillBeUp says so, and Close
 // (or Establish, for a link that never came up) fails with an error for
-// which errors.Is(err, satlink.ErrCallMayStillBeUp) holds: the call may
+// which errors.Is(err, iridium.ErrCallMayStillBeUp) holds: the call may
 // still be billing. The handset's EndDataCall retries once the handset
 // answers; power-cycling it is the last resort.
 //
@@ -125,7 +125,7 @@
 // An Error of kind ErrTimedOut is also a net.Error whose Timeout and
 // Temporary methods report true, so crypto/tls and net/http treat it as a
 // timeout and a TLS session survives a read that timed out. An Error of
-// kind ErrHandset wraps the *satlink.Error from the handset. An Error whose
+// kind ErrHandset wraps the *iridium.Error from the handset. An Error whose
 // CallMayStillBeUp is set, a failed hang-up, also matches
-// satlink.ErrCallMayStillBeUp.
+// iridium.ErrCallMayStillBeUp.
 package satnet
