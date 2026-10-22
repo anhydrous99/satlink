@@ -19,7 +19,7 @@ func TestJaroSimilarityIsStrsims(t *testing.T) {
 		{"MARTHA", "MARHTA", 0.944},
 		{"DWAYNE", "DUANE", 0.822},
 		{"DIXON", "DICKSONX", 0.767},
-		// Why clap suggested 'list' for "--simulate instant".
+		// Why "--simulate instant" suggests 'list'.
 		{"instant", "list", 0.726},
 		{"ver", "verbose", 0.810},
 		{"ver", "version", 0.810},

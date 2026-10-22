@@ -1,4 +1,4 @@
-// Package udp is the stack's UDP socket, modelled on smoltcp's socket::udp.
+// Package udp is the stack's UDP socket, modelled on smoltcp's UDP socket.
 //
 // A Socket is bound to a local port (and optionally address) and keeps two
 // packet buffers: datagrams received for it, and datagrams queued to send,

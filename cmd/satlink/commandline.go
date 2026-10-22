@@ -9,18 +9,33 @@ import (
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
-// Reading the command line as clap reads it. Each command
-// takes the tokens up to the name of its subcommand, which takes the rest,
-// and global options can be given to any of them: the deepest one given
-// wins. A token is an option if it starts with '-' — so a value that does
-// may only follow '=' — and the value of an option waiting for one
-// otherwise, even if it names a subcommand; "--" ends the options. Every
-// problem is reported as clap reported it. A value in a token of its own —
-// an option's that follows it, or a positional argument's — clap checked
-// only once the command line had moved on: at the command's next argument,
-// once its tokens were over, or once its subcommand had been read in full.
-// So a later problem may be reported first, and help may be shown; and a
-// later token that is itself a problem is reported instead.
+// Reading the command line. The parser is the CLI's own, rather than
+// cobra's or pflag's, so that help, error messages and option precedence
+// stay under this package's control. The rules:
+//
+//   - Each command takes the tokens up to the name of its subcommand, which
+//     takes the rest.
+//   - Global options (-p, -b, --simulate, -v) may be given at any level. The
+//     deepest level that gives one wins outright; counts add up only within
+//     a level.
+//   - A token that starts with '-' is an option, so a value that starts with
+//     '-' must follow '=' or come after "--". An option waiting for a value
+//     takes the next token, even one that names a subcommand. --simulate
+//     takes a value only after '='.
+//   - An option may be given once per level, except --allow and -v.
+//   - -h shows the summary and --help the long help; -V exists on the root
+//     only. Each acts once the value pending at its own level is checked, so
+//     "-b x -h" refuses "x". Every group has a help subcommand.
+//   - A group given nothing shows its summary on standard error, with status
+//     2. A group given options but no subcommand needs a subcommand.
+//   - An environment variable set to "" is set.
+//
+// A value attached to its option (--x=v, -xv) is checked at once. A value in
+// a token of its own, an option's or a positional argument's, is checked only
+// once the command line moves on: at the command's next argument, at the end
+// of its tokens, or once its subcommand has been read in full. So a later
+// problem may be reported first, help may be shown, and a later token that
+// is itself a problem is reported instead.
 
 // surroundings are what reading a command line needs of the world: its
 // environment variables, and the palette of what it shows.
@@ -61,8 +76,8 @@ type parser struct {
 // reading has got.
 type level struct {
 	command *command
-	// given are the arguments the command line gave, in the order clap
-	// recorded them; counts says how often each came.
+	// given are the arguments the command line gave, in the order they
+	// are recorded (see note); counts says how often each came.
 	given  []*argument
 	counts map[*argument]int
 	// awaiting is an option waiting for its value in the next token, and
@@ -113,10 +128,11 @@ func (p *parser) read(lvl *level, args []string) (*command, *commandLineExit) {
 }
 
 // readSubcommand reads rest for subcommand, which lvl's command line names,
-// and returns the command they name. clap checked the value that lvl's
-// command line left pending only once rest had been read in full, so a
-// problem there comes first, and so does help; the value is stored before
-// theirs all the same, as the deepest command to give a global option wins.
+// and returns the command they name. The value that lvl's command line left
+// pending is checked only once rest has been read in full, so a problem
+// there comes first, and so does help. The value is stored before theirs all
+// the same, as the deepest command to give a global option wins: with
+// "--simulate=instant -b x info -b y", "y" is the one reported.
 // A command with subcommands takes no positional arguments, and no option
 // of it can be waiting for a value, which would have taken the name.
 func (p *parser) readSubcommand(lvl *level, subcommand *command, rest []string) (*command, *commandLineExit) {
@@ -175,7 +191,7 @@ func (p *parser) readLong(lvl *level, body string, rest []string) *commandLineEx
 		return p.explain.unknownLong(lvl, lossy(name), rest)
 	case !option.takesValue() && hasEquals:
 		// The usage line names what was given before the value left
-		// pending, which clap had not recorded yet.
+		// pending, which is not recorded yet.
 		return p.explain.unneededValue(lvl.command, option, lossy(attached), lvl.given)
 	case !option.takesValue():
 		return p.act(lvl, option, longHelp)
@@ -218,16 +234,15 @@ func (p *parser) readShorts(lvl *level, cluster string) *commandLineExit {
 	return nil
 }
 
-// lossy is text from the command line or the environment as clap showed
-// it: with U+FFFD for each part that is not UTF-8.
+// lossy is text from the command line or the environment as errors and help
+// show it: with U+FFFD for each part that is not UTF-8.
 func lossy(text string) string {
 	return utf8lossy.String([]byte(text))
 }
 
-// unknownShortToken is how clap named a short option it does not know at
-// the start of rest, the remains of a cluster: -x, or, at a byte that is not
-// UTF-8, the whole rest read lossily, as clap stopped telling letters apart
-// there.
+// unknownShortToken names a short option that is not known at the start of
+// rest, the remains of a cluster: -x. At a byte that is not UTF-8, letters
+// can no longer be told apart, so it is the whole rest, read lossily.
 func unknownShortToken(rest string) string {
 	letter, size := utf8.DecodeRuneInString(rest)
 	if letter == utf8.RuneError && size == 1 {
@@ -255,8 +270,8 @@ func (p *parser) readPositional(lvl *level, token string) *commandLineExit {
 	return nil
 }
 
-// take gives option the value text, given in the same token: clap checked
-// such a value at once, once it had checked the value left pending.
+// take gives option the value text, given in the same token. Such a value is
+// checked at once, after the value left pending.
 func (p *parser) take(lvl *level, option *argument, text string) *commandLineExit {
 	if exit := p.resolve(lvl); exit != nil {
 		return exit
@@ -289,9 +304,9 @@ func (p *parser) store(cmd *command, arg *argument, text string) *commandLineExi
 	return nil
 }
 
-// check refuses text for arg, an argument of cmd, as clap's value parsers
-// did before they read it: it must be one of arg's possible values, if it
-// has them, and UTF-8 otherwise.
+// check refuses text for arg, an argument of cmd, before its value reads
+// it: the text must be one of arg's possible values, if it has them, and
+// UTF-8 otherwise.
 func (p *parser) check(cmd *command, arg *argument, text string) *commandLineExit {
 	switch {
 	case len(arg.possibleValues) > 0 && !slices.Contains(possibleValueNames(arg), text):
@@ -332,8 +347,8 @@ func (p *parser) await(lvl *level, option *argument) *commandLineExit {
 }
 
 // resolve checks and stores the value that lvl's command line left pending,
-// as clap did once the command line moved on. An option still waiting for
-// its value has none.
+// now that the command line has moved on. An option still waiting for its
+// value has none.
 func (p *parser) resolve(lvl *level) *commandLineExit {
 	awaiting, pending := lvl.awaiting, lvl.pending
 	lvl.awaiting, lvl.pending = nil, nil
@@ -348,10 +363,10 @@ func (p *parser) resolve(lvl *level) *commandLineExit {
 }
 
 // settleBeforeAProblem drops the value left pending when the next token is
-// itself a problem, which clap reported instead of the value's. The value
-// still counts as given, as clap had recorded it before it read it, but for
-// an option given twice, which clap took out of what was given, earlier
-// occurrence and all.
+// itself a problem, which is reported instead of the value's: --baud x
+// --frob reports --frob. The value still counts as given in the usage line,
+// except for an option given twice, which is taken out of what was given,
+// earlier occurrence and all.
 func (l *level) settleBeforeAProblem() {
 	pending := l.pending
 	l.awaiting, l.pending = nil, nil
@@ -365,7 +380,7 @@ func (l *level) settleBeforeAProblem() {
 }
 
 // note records that arg was given once more. A flag that counts goes last
-// among those given, as clap recorded it afresh with every occurrence.
+// among those given, as it is recorded afresh with every occurrence.
 func (l *level) note(arg *argument) {
 	switch {
 	case arg.action == actionCount:
@@ -388,8 +403,8 @@ func isArgument(arg *argument) func(*argument) bool {
 }
 
 // finish checks what the command was given, once the command line has no
-// more for it, as clap's validator did, once the value left pending is
-// checked, and the environment variables of the options not given: no
+// more for it, once the value left pending is checked, and the environment
+// variables of the options not given: no
 // option may be waiting for a value; a command that only groups others needs
 // one of them, and shows its help if it was given nothing at all; every
 // required positional argument needs its value. Options whose environment
@@ -421,11 +436,11 @@ func (p *parser) finish(lvl *level) *commandLineExit {
 }
 
 // checkEnvironment checks the environment variables that stand in for the
-// options lvl's command line did not give, as clap read them for every
-// command that took the option, the deepest first, before it checked what
-// the command was given; giveAbsentValues stores the values once every
-// command has been read. Those variables stand in for text, so being UTF-8
-// is all their values are checked for.
+// options lvl's command line did not give. Every command that takes the
+// option checks them, the deepest first, before it checks what the command
+// was given; giveAbsentValues stores the values once every command has been
+// read. Those variables stand in for text, so being UTF-8 is all their
+// values are checked for.
 func (p *parser) checkEnvironment(lvl *level) *commandLineExit {
 	for _, arg := range p.fromEnvironment(lvl) {
 		text, _ := p.environmentValue(arg)

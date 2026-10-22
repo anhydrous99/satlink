@@ -7,7 +7,7 @@ Usage: satlink net get [OPTIONS] <URL>
 
 Arguments:
   <URL>
-          
+          http:// or https:// URL to fetch
 
 Options:
   -p, --port <PORT>
@@ -16,6 +16,8 @@ Options:
           [env: SATLINK_PORT=]
 
   -b, --baud <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       --simulate[=<SIMULATE>]

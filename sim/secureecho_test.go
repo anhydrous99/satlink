@@ -334,7 +334,7 @@ func TestTheEchoServesATLS12Client(t *testing.T) {
 	}
 }
 
-// The ring provider's TLS 1.2 suites, ECDHE with an AEAD cipher: a client
+// internal/ringprovider's TLS 1.2 suites, ECDHE with an AEAD cipher: a client
 // that offers one of them alone is served with it. Only the ECDSA ones can
 // be agreed: secure.test's key is on P-256.
 func TestTheEchoServesATLS12ClientThatOffersOnlyAnAEADSuite(t *testing.T) {
@@ -357,7 +357,7 @@ func TestTheEchoServesATLS12ClientThatOffersOnlyAnAEADSuite(t *testing.T) {
 	}
 }
 
-// The ring provider has no suite with CBC: a client that offers only such a
+// internal/ringprovider has no suite with CBC: a client that offers only such a
 // suite is refused. crypto/tls implements all three, and its defaults would
 // serve the first two.
 func TestTheEchoRefusesATLS12ClientThatOffersOnlyCBC(t *testing.T) {
@@ -380,7 +380,7 @@ func TestTheEchoRefusesATLS12ClientThatOffersOnlyCBC(t *testing.T) {
 	}
 }
 
-// The ring provider's key exchange groups, which include no post-quantum
+// internal/ringprovider's key exchange groups, which include no post-quantum
 // one: a client that prefers X25519MLKEM768, as crypto/tls's
 // clients do by default, agrees X25519, whose key share takes 32 bytes of
 // the ServerHello rather than 1120.

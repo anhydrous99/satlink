@@ -32,7 +32,7 @@ func (c *cli) atCommand() *command {
 			}))
 		},
 	},
-		requiredPositional("COMMAND", stringValue{target: &request}),
+		requiredPositional("COMMAND", "AT command to send, such as AT+CSQ", stringValue{target: &request}),
 		&argument{long: "timeout", short: 't', valueName: "TIMEOUT", help: "Seconds to wait for the final result",
 			hasDefault: true, defaultValue: strconv.Itoa(defaultATTimeoutSeconds),
 			value: unsignedValue{target: &timeoutSeconds}},

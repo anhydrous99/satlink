@@ -29,7 +29,7 @@ const colourVariable = "FIXTURE_COLOUR"
 func newFixture() *fixture {
 	f := &fixture{}
 	leaf := newCommand(&cobra.Command{Use: "leaf", Short: "A leaf"},
-		requiredPositional("FIRST", stringValue{target: &f.first}),
+		requiredPositional("FIRST", "", stringValue{target: &f.first}),
 		&argument{valueName: "REST", hasDefault: true, defaultValue: "none", value: stringValue{target: &f.rest}})
 	group := newCommand(&cobra.Command{Use: "group", Short: "A group"},
 		&argument{long: "tag", valueName: "TAG", action: actionAppend, value: stringsValue{target: &f.tags}},
@@ -113,7 +113,7 @@ func TestAnEnvironmentVariableStandsInForAnOptionNotGiven(t *testing.T) {
 		colour    givenText
 	}{
 		{"set", []string{"group", "leaf", "x"}, map[string]string{colourVariable: "blue"}, givenText{text: "blue", given: true}},
-		// As clap's: a variable set to "" is set.
+		// A variable set to "" is set.
 		{"set to nothing", []string{"group", "leaf", "x"}, map[string]string{colourVariable: ""}, givenText{given: true}},
 		{"overridden", []string{"group", "leaf", "-c", "red", "x"}, map[string]string{colourVariable: "blue"},
 			givenText{text: "red", given: true}},

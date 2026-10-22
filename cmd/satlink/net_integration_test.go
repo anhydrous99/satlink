@@ -295,8 +295,8 @@ func checkHungUpThenEndedBySIGINT(t *testing.T, status syscall.WaitStatus, print
 	}
 }
 
-// The process's own variables stand in for their options, as clap's env
-// reads them; the in-process tests make up the variables a run finds.
+// The process's own variables stand in for their options; the in-process
+// tests make up the variables a run finds.
 func TestTheProcessesVariablesStandInForTheirOptions(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "ttyACM9")
 	// The serial library's error, as the open of a port that is not there

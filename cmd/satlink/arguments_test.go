@@ -2,7 +2,7 @@ package main
 
 import "testing"
 
-// argumentForms are the ways clap wrote an argument: in errors, in help, in
+// argumentForms are the ways an argument is written: in errors, in help, in
 // a usage line as given or required, and as optional (positional ones only).
 type argumentForms struct {
 	inErrors, inHelp, asGiven, asOptional string
@@ -17,7 +17,7 @@ func formsOf(arg *argument) argumentForms {
 	return forms
 }
 
-func TestArgumentsAreWrittenAsClapWroteThem(t *testing.T) {
+func TestArgumentsAreWrittenInEachOfTheirForms(t *testing.T) {
 	tests := []struct {
 		name     string
 		argument argument

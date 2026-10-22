@@ -20,7 +20,7 @@ Talk to an Iridium satellite handset over USB
 
 [1m[4mOptions:[0m
   [1m-p[0m, [1m--port[0m <PORT>            Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
-  [1m-b[0m, [1m--baud[0m <BAUD>            [default: 19200]
+  [1m-b[0m, [1m--baud[0m <BAUD>            Serial port speed, in bits per second [default: 19200]
       [1m--simulate[0m[=<SIMULATE>]  Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
   [1m-v[0m, [1m--verbose[0m...             Log what the link is doing (-v), in more detail (-vv, -vvv)
   [1m-h[0m, [1m--help[0m                   Print help (see more with '--help')

@@ -25,7 +25,7 @@ type environment struct {
 	// whether someone may be typing standard input.
 	stdinIsTerminal, stdoutIsTerminal, stderrIsTerminal bool
 	// lookupEnv returns an environment variable's value, and whether it is
-	// set: one set to "" counts, as it did for clap.
+	// set: one set to "" counts.
 	lookupEnv func(key string) (string, bool)
 	// installLogger makes handler the destination of every package's log
 	// records: slog.SetDefault for the process.

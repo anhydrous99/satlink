@@ -7,9 +7,9 @@ import (
 	"runtime/debug"
 )
 
-// The exit statuses: clap's for a command line that does not parse, and 101
-// for a panic. Go's runtime would end a panicking program with clap's status
-// instead.
+// The exit statuses. A panic gets 101 of its own: Go's runtime would end a
+// panicking program with 2, the status of a command line that does not
+// parse.
 const (
 	exitSuccess  = 0
 	exitFailure  = 1
@@ -21,7 +21,7 @@ const (
 // status: exitSuccess, exitFailure when the command failed, exitUsage when
 // the command line does not parse, exitInterrupted when an interruption
 // asked a net call to stop, or exitPanicked when the run panicked. The
-// command line is read as clap read it; cobra then runs the command it
+// command line is read by parseCommandLine; cobra then runs the command it
 // names. Every call builds a fresh command tree, so runs share nothing.
 func run(ctx context.Context, env environment) (status int) {
 	// Log lines come from the link's goroutines while commands write.
@@ -35,10 +35,10 @@ func run(ctx context.Context, env environment) (status int) {
 		}
 	}()
 	root := c.rootCommand()
-	// Help and errors in clap's styles, which endBeforeRunning takes out for
-	// a stream that shows none.
-	clapStyles := palette{styled: true}
-	named, exit := parseCommandLine(root, env.args, surroundings{lookupEnv: env.lookupEnv, palette: clapStyles})
+	// Help and errors are styled, and endBeforeRunning takes the styles out
+	// for a stream that shows none.
+	styled := palette{styled: true}
+	named, exit := parseCommandLine(root, env.args, surroundings{lookupEnv: env.lookupEnv, palette: styled})
 	if exit != nil {
 		return endBeforeRunning(exit, env, stderr)
 	}
@@ -77,7 +77,10 @@ func (c *cli) panicked(value any) int {
 	return exitPanicked
 }
 
-// reportPanic writes a recovered panic and where it happened to stderr.
+// reportPanic writes a recovered panic and where it happened to stderr. Three
+// places recover one: run, the subcommand's work once the link is up
+// (outcomeOf), and the relay's sender, which then ends alone rather than end
+// the process before the hang-up.
 func reportPanic(stderr io.Writer, value any) {
 	// Best effort: what follows — the hang-up, or the end of the run —
 	// matters more.
@@ -87,7 +90,7 @@ func reportPanic(stderr io.Writer, value any) {
 // endBeforeRunning prints what a command line that runs no command calls
 // for — help or the version on env's standard output, or why it does not
 // parse on stderr — and returns the exit status. A stream that shows no
-// styles gets the text as anstream's StripStream passed it on to one.
+// styles gets the text without them (stripStyles).
 func endBeforeRunning(exit *commandLineExit, env environment, stderr io.Writer) int {
 	out, isTerminal := stderr, env.stderrIsTerminal
 	if exit.status == exitSuccess {
@@ -97,8 +100,8 @@ func endBeforeRunning(exit *commandLineExit, env environment, stderr io.Writer) 
 	if !showsStyles(isTerminal, env.lookupEnv) {
 		text = stripStyles(text)
 	}
-	// Best effort, as clap's: the stream may be a closed pipe, and the exit
-	// status says the rest.
+	// Best effort: the stream may be a closed pipe, and the exit status says
+	// the rest.
 	_, _ = io.WriteString(out, text)
 	return exit.status
 }

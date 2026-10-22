@@ -6,21 +6,35 @@ import (
 	"unicode/utf8"
 )
 
-// What a stream that shows no styles kept of clap's help and errors. clap
-// built them in its styles whatever stream they went to, and wrote them
-// through anstream, which took out of the text for such a stream the
-// sequences that ESC starts, and the C0 control characters and DEL but for
-// tab, line feed, form feed and carriage return: the styles, and whatever
-// of the kind the command line or the environment brought in. A C1
-// control, two bytes in UTF-8, stayed, as anstream kept every UTF-8
-// character whole. This is anstream 1.0.0's StripBytes (adapter/strip.rs)
-// over the state table of anstyle-parse 1.0.0 (state/codegen.rs), the
-// parser of DEC's terminals that Paul Williams described.
+// What a stream that shows no styles keeps of help and errors. They are
+// styled whatever stream they go to, so for such a stream the stripper takes
+// out the styles, and whatever of the kind a token or variable brought in:
+//
+//   - the sequences that ESC starts: CSI, OSC, DCS, SOS, PM and APC alike;
+//   - the C0 control characters and DEL, but for tab, line feed, form feed
+//     and carriage return.
+//
+// A C1 control, two bytes in UTF-8 (U+009B, CSI, and U+0085, NEL, among
+// them), stays with what follows it, as every UTF-8 character is kept whole.
+// The parser follows the state table of the VT500-series terminals that Paul
+// Williams described ("A parser for DEC's ANSI-compatible video terminals"),
+// reduced to what stripping can tell apart.
+//
+// Edge cases, where a terminal would differ:
+//
+//   - an unfinished sequence in a token ends at the CLI's own style, so
+//     $'\e[' gives '';
+//   - each run of kept bytes is judged from the ground state, so
+//     $'\e[\n1m' keeps '\n1m', where a terminal takes the 1 and the m
+//     into the CSI;
+//   - a kept byte leaves the parser where it was, so $'\e[\n\x01mz' gives
+//     '\nz', with the m ending the CSI;
+//   - only a kept character of more than one byte returns the parser to the
+//     ground: $'\e[\né\x01mz' gives '\némz'.
 
-// vtState is a state of the terminal parser. They are named as in
-// anstyle-parse: the ground, where characters show, and the parts of the
-// sequences that ESC starts — an escape, a CSI, a DCS, and the strings of
-// OSC and of SOS, PM and APC.
+// vtState is a state of the terminal parser: the ground, where characters
+// show, and the parts of the sequences that ESC starts. Those are an escape,
+// a CSI, a DCS, and the strings of OSC and of SOS, PM and APC.
 type vtState int
 
 const (
@@ -50,9 +64,9 @@ func (s *vtState) follow(next vtState) {
 	}
 }
 
-// vtAction is what the parser does with a byte, as far as stripping cares:
-// anstyle-parse's other actions — collecting a sequence, dispatching it,
-// passing a string on, ignoring the byte — all drop it.
+// vtAction is what the parser does with a byte, as far as stripping cares.
+// The parser's other actions (collecting a sequence, dispatching it, passing
+// a string on, ignoring the byte) all drop it.
 type vtAction int
 
 const (
@@ -74,11 +88,11 @@ type vtRule struct {
 	action      vtAction
 }
 
-// vtTransitions are anstyle-parse's rules, state by state, but for those
-// that leave the parser where it was and drop the byte, as every byte that
-// no rule names does. vtAnywhere's rules come before every state's own. The
-// parser stays on the ground through a UTF-8 character, which
-// anstyle-parse's Utf8 state follows to its end.
+// vtTransitions are the parser's rules, state by state, but for those that
+// leave the parser where it was and drop the byte, as every byte that no
+// rule names does. vtAnywhere's rules come before every state's own. The
+// parser stays on the ground through a UTF-8 character, which it follows to
+// its end.
 var vtTransitions = [...][]vtRule{
 	vtAnywhere: {
 		{0x18, 0x18, vtGround, vtExecute},
@@ -166,12 +180,12 @@ func vtTransition(state vtState, b byte) (vtState, vtAction) {
 	return vtAnywhere, vtDrop
 }
 
-// stripStyles returns text as anstream's StripStream passed it on to a
-// stream that shows no styles: without the sequences that ESC starts —
-// CSI, OSC, DCS, SOS, PM and APC alike — and without its C0 control
-// characters and DEL but for tab, line feed, form feed and carriage return.
-// A C1 control, two bytes in UTF-8, stays, as anstream kept every UTF-8
-// character whole. text is UTF-8, as clap's always was.
+// stripStyles returns text for a stream that shows no styles: without the
+// sequences that ESC starts (CSI, OSC, DCS, SOS, PM and APC alike), and
+// without its C0 control characters and DEL but for tab, line feed, form
+// feed and carriage return. A C1 control, two bytes in UTF-8, stays, as
+// every UTF-8 character is kept whole. text is UTF-8, as help and errors
+// always are.
 func stripStyles(text string) string {
 	var kept strings.Builder
 	state := vtGround
@@ -184,9 +198,9 @@ func stripStyles(text string) string {
 	return kept.String()
 }
 
-// droppedLength returns how many bytes at the start of text StripStream
-// dropped, moving the parser from state through them, and through the byte
-// it kept after them.
+// droppedLength returns how many bytes at the start of text are dropped,
+// moving the parser from state through them, and through the byte kept
+// after them.
 func droppedLength(text string, state *vtState) int {
 	for i := range len(text) {
 		next, action := vtTransition(*state, text[i])
@@ -198,9 +212,9 @@ func droppedLength(text string, state *vtState) int {
 	return len(text)
 }
 
-// printableLength returns how many bytes at the start of text StripStream
-// kept: it judged each as if the parser were on the ground, kept a UTF-8
-// character whole, and moved the parser only as those judgements did, so
+// printableLength returns how many bytes at the start of text are kept:
+// each is judged as if the parser were on the ground, a UTF-8 character is
+// kept whole, and the parser moves only as those judgements do, so
 // that a byte kept leaves the parser where it was, even inside a sequence,
 // and a character of more than one byte returns it to the ground.
 func printableLength(text string, state *vtState) int {
@@ -220,12 +234,12 @@ func printableLength(text string, state *vtState) int {
 	return len(text)
 }
 
-// isPrintable reports whether StripStream kept b, which the parser handled
-// with action: a character to show but DEL, the start of a UTF-8
+// isPrintable reports whether b is kept, which the parser handled with
+// action: a character to show but DEL, the start of a UTF-8
 // character, or a control character that is ASCII white space.
 func isPrintable(b byte, action vtAction) bool {
-	// DEL, which the parser shows as VT320s did, and anstream drops as the
-	// control character it is in UTF-8.
+	// DEL, which the parser shows as VT320s did, but which is dropped as
+	// the control character it is in UTF-8.
 	const del = 0x7f
 	switch action {
 	case vtPrint:

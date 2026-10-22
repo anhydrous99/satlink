@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestAUsageProblemIsLaidOutAsClapsErrors(t *testing.T) {
+func TestAUsageProblemIsLaidOutAsAnError(t *testing.T) {
 	f := newFixture()
 	helpSubcommand := f.root.subcommand(helpSubcommandName)
 	tests := []struct {
@@ -57,7 +57,7 @@ func TestValuesAreQuotedOnlyWhenTheirEndsWouldNotShow(t *testing.T) {
 		"a b":       `"a b"`,
 		"tab\there": `"tab\there"`,
 		"plain":     "plain",
-		// clap's escape for a vertical tab is \u{b}, where %q would write "\v".
+		// The escape for a vertical tab is \u{b}, where %q would write "\v".
 		"vertical\vtab": `"vertical\u{b}tab"`,
 	}
 	for text, want := range tests {

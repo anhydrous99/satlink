@@ -2,7 +2,8 @@ package tcp
 
 // Tests of the socket itself: its construction and settings, its states and
 // their predicates, and its endpoints. They also check the behaviour that the
-// consumers rely on, as described in docs/IPSTACK.md.
+// consumers rely on, as "What the consumers rely on" in docs/IPSTACK.md
+// describes.
 
 import (
 	"net/netip"

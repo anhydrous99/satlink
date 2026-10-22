@@ -10,10 +10,11 @@ import (
 	"time"
 )
 
-// Whole numbers from the command line, read as clap reads them, and their
-// conversions, which saturate instead of overflowing.
+// Whole numbers from the command line, and their conversions, which
+// saturate instead of overflowing. Decimal digits after an optional "+" are
+// a number, so "010" is ten and "0x10" is not a number.
 
-// The messages clap gives for a number it could not read.
+// The messages for a number that cannot be read.
 var (
 	errEmptyNumber    = errors.New("cannot parse integer from empty string")
 	errInvalidDigit   = errors.New("invalid digit found in string")
@@ -57,16 +58,16 @@ func parseSigned(text string) (int64, error) {
 	}
 }
 
-// unsignedValue keeps a whole number of at least minimum: a u64 argument
-// with clap's range(minimum..), as the net command's limits are, or any u64
-// when minimum is 0.
+// unsignedValue keeps a whole number of at least minimum: a uint64 argument
+// with a lower bound, as the net command's limits are, or any uint64 when
+// minimum is 0.
 type unsignedValue struct {
 	target  *uint64
 	minimum uint64
 }
 
-// Set reads text into the target, refusing a number below the minimum as
-// clap does: "0 is not in 1..18446744073709551615".
+// Set reads text into the target, refusing a number below the minimum: "0
+// is not in 1..18446744073709551615".
 func (v unsignedValue) Set(text string) error {
 	number, err := parseUnsigned(text)
 	if err != nil {
@@ -84,10 +85,9 @@ type unsignedInteger interface {
 	~uint16 | ~uint32
 }
 
-// boundedValue keeps a number of type T. clap read such numbers — a u16 or
-// u32 — as an i64 and then checked their range, so a
-// negative number is out of range rather than not a number: "-1 is not in
-// 0..=65535".
+// boundedValue keeps a number of type T, a uint16 or uint32. It reads the
+// number as an int64 and then checks its range, so a negative number is out
+// of range rather than not a number: "-1 is not in 0..=65535".
 type boundedValue[T unsignedInteger] struct {
 	target *T
 }

@@ -89,7 +89,7 @@ func newSecureEchoConfig() *tls.Config {
 		Certificates: []tls.Certificate{serverCertificate()},
 		// TLS 1.2 and 1.3, the usual safe defaults.
 		MinVersion: tls.VersionTLS12,
-		// The TLS 1.2 suites are the ring provider's. crypto/tls's defaults
+		// The TLS 1.2 suites are internal/ringprovider's. crypto/tls's defaults
 		// would also serve a client that offers only the ECDHE suites with
 		// CBC and HMAC-SHA1, which this echo refuses. crypto/tls ignores the
 		// list's order: of the suites a client offers, it picks by its own
@@ -101,7 +101,7 @@ func newSecureEchoConfig() *tls.Config {
 		// crypto/tls's clients, satnet's among them, agree the same suite at
 		// TLS 1.2 with either echo on the same machine.
 		CipherSuites: ringprovider.TLS12CipherSuites(),
-		// The key exchange groups of the ring provider, which include no
+		// The key exchange groups of internal/ringprovider, which include no
 		// post-quantum one.
 		CurvePreferences: ringprovider.KeyExchangeGroups(),
 		// Records as large as TLS allows, up to 16 KiB of plaintext.

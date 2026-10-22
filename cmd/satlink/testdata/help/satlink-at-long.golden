@@ -7,7 +7,7 @@ Usage: satlink at [OPTIONS] <COMMAND>
 
 Arguments:
   <COMMAND>
-          
+          AT command to send, such as AT+CSQ
 
 Options:
   -p, --port <PORT>
@@ -21,6 +21,8 @@ Options:
           [default: 10]
 
   -b, --baud <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       --simulate[=<SIMULATE>]

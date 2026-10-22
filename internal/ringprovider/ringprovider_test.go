@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// The lists are the defaults of rustls's ring provider: its TLS 1.2 cipher
-// suites and its key exchange groups, written out in the provider's order.
+// The lists are written out here in order of preference, so that a change
+// to either one is deliberate.
 
-func TestTheTLS12CipherSuitesAreTheProvidersInItsOrder(t *testing.T) {
+func TestTheTLS12CipherSuitesAreTheChosenOnesInOrder(t *testing.T) {
 	t.Parallel()
 	want := []uint16{
 		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
@@ -25,7 +25,7 @@ func TestTheTLS12CipherSuitesAreTheProvidersInItsOrder(t *testing.T) {
 	}
 }
 
-func TestTheKeyExchangeGroupsAreTheProvidersInItsOrder(t *testing.T) {
+func TestTheKeyExchangeGroupsAreTheChosenOnesInOrder(t *testing.T) {
 	t.Parallel()
 	want := []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384}
 

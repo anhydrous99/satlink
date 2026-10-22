@@ -28,6 +28,8 @@ Options:
           Also allow a destination such as `example.com:443` (repeatable); the command's own target is always allowed
 
   -b, --baud <BAUD>
+          Serial port speed, in bits per second
+          
           [default: 19200]
 
       --simulate[=<SIMULATE>]

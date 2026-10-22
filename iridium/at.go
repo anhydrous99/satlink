@@ -262,10 +262,10 @@ type fieldWidth int
 
 // The widths of the numeric fields the handset reports.
 const (
-	// byteField is a u8: the +CSQ bars, the +CBC status and level, the
-	// +CREG stat.
+	// byteField is 8 bits wide: the +CSQ bars, the +CBC status and level,
+	// the +CREG stat.
 	byteField fieldWidth = 8
-	// wordField is a u32: the +CMGL index, the +CMGS reference.
+	// wordField is 32 bits wide: the +CMGL index, the +CMGS reference.
 	wordField fieldWidth = 32
 )
 
@@ -276,8 +276,8 @@ const (
 func parseNumber(fields []string, index int, what string, width fieldWidth) (int, error) {
 	if index < len(fields) {
 		value, err := strconv.ParseUint(strings.TrimPrefix(fields[index], "+"), 10, int(width))
-		// An int holds every u32 on 64-bit platforms, but not on the 32-bit
-		// ones gomobile builds for.
+		// An int holds every 32-bit field on 64-bit platforms, but not on
+		// the 32-bit ones gomobile builds for.
 		if err == nil && value <= math.MaxInt {
 			return int(value), nil
 		}

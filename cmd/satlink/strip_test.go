@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-// What anstream 1.0.0's StripStream passed on to a stream that shows no
-// styles: its own tests' cases first, then sequences and control characters
-// that the command line can bring into clap's styles, the sequences finished
-// or not. The parser's rules are checked one by one against anstyle-parse's
-// below; these cases check the two passes over the text that use them.
-func TestStrippingKeepsWhatAnstreamKept(t *testing.T) {
+// What a stream that shows no styles gets: common cases first, then
+// sequences and control characters that the command line can bring into the
+// CLI's styles, the sequences finished or not. The parser's rules are
+// checked one by one against the full parser table below; these cases check
+// the two passes over the text that use them.
+func TestStrippingKeepsWhatAStreamWithoutStylesShows(t *testing.T) {
 	tests := []struct {
 		name, text, kept string
 	}{
@@ -57,7 +57,7 @@ func TestStrippingKeepsWhatAnstreamKept(t *testing.T) {
 
 // The tests read command lines with the zero palette, so that they can say
 // what the text is: it must be what a stream that shows no styles gets.
-func TestStrippingClapsStylesLeavesWhatTheZeroPaletteWrites(t *testing.T) {
+func TestStrippingTheStylesLeavesWhatTheZeroPaletteWrites(t *testing.T) {
 	for _, test := range slices.Concat(helpCases(), usageCases(), environmentCases(), styleCases()) {
 		t.Run(test.name, func(t *testing.T) {
 			styled := commandLineExitText(t, test.world, test.args, palette{styled: true})
@@ -83,17 +83,17 @@ func commandLineExitText(t *testing.T, w world, args []string, p palette) string
 	return exit.text
 }
 
-// The stripper's rules against anstyle-parse 1.0.0's own, for every state and
-// every byte. The stripper leaves out the rules that stripping cannot tell from
-// no rule at all, so the two are compared as stripping sees them:
-// each byte must move the parser where anstyle-parse moved it, and be
-// dropped or kept as anstream dropped or kept it.
-func TestTheParsersRulesAreAnstyleParsesAsStrippingSeesThem(t *testing.T) {
-	for state := range anstyleParseRules {
+// The stripper's rules against the full parser table, for every state and
+// every byte. The stripper leaves out the rules that stripping cannot tell
+// from no rule at all, so the two are compared as stripping sees them: each
+// byte must move the parser where the full table moves it, and be dropped or
+// kept as referenceFate says.
+func TestTheStrippersRulesMatchTheFullParserTable(t *testing.T) {
+	for state := range referenceRules {
 		for b := range 256 {
-			got, want := vtStep(vtState(state), byte(b)), anstreamStep(vtState(state), byte(b))
+			got, want := vtStep(vtState(state), byte(b)), referenceStep(vtState(state), byte(b))
 			if got != want {
-				t.Errorf("state %d, byte %#02x: the stripper moves to state %d, %v; anstyle-parse moved to %d, %v",
+				t.Errorf("state %d, byte %#02x: the stripper moves to state %d, %v; the full table moves to %d, %v",
 					state, b, got.next, got.fate, want.next, want.fate)
 				// The first difference in a state shows which rule to look at.
 				break
@@ -139,19 +139,19 @@ func vtStep(state vtState, b byte) strippingStep {
 	}
 }
 
-// anstreamStep is the step that b took from state by anstyle-parse's rules,
-// Anywhere's first, as its state_change looks them up, with anstream's
-// judgement of the byte. The stripper stays on the ground through a UTF-8
-// character, which anstyle-parse follows in its Utf8 state.
-func anstreamStep(state vtState, b byte) strippingStep {
-	for _, rules := range [][]anstyleRule{anstyleParseRules[vtAnywhere], anstyleParseRules[state]} {
+// referenceStep is the step that b takes from state by the full table's
+// rules, Anywhere's first, with referenceFate's judgement of the byte. The
+// stripper stays on the ground through a UTF-8 character, which the full
+// table follows in a state of its own.
+func referenceStep(state vtState, b byte) strippingStep {
+	for _, rules := range [][]referenceRule{referenceRules[vtAnywhere], referenceRules[state]} {
 		for _, rule := range rules {
 			if rule.first <= b && b <= rule.last {
 				next := rule.next
 				if next == vtUTF8 {
 					next = vtGround
 				}
-				return strippingStep{next, anstreamFate(b, rule.action)}
+				return strippingStep{next, referenceFate(b, rule.action)}
 			}
 		}
 	}
@@ -159,202 +159,201 @@ func anstreamStep(state vtState, b byte) strippingStep {
 	return strippingStep{vtAnywhere, byteDropped}
 }
 
-// anstreamFate is whether anstream kept b, which anstyle-parse handled with
-// action (adapter/strip.rs, is_printable_bytes): a character to show but
-// DEL, the start of a UTF-8 character, or a control character that is ASCII
-// white space.
-func anstreamFate(b byte, action anstyleAction) byteFate {
+// referenceFate is whether a stream without styles keeps b, which the full
+// table handles with action: a character to show but DEL, the start of a
+// UTF-8 character, or a control character that is ASCII white space.
+func referenceFate(b byte, action parserAction) byteFate {
 	const del = 0x7f
 	// The ASCII whitespace bytes: space, tab, line feed, form feed and carriage return.
 	const asciiWhiteSpace = " \t\n\f\r"
 	switch {
-	case action == anstyleBeginUTF8:
+	case action == parserBeginUTF8:
 		return characterKept
-	case action == anstylePrint && b != del,
-		action == anstyleExecute && strings.IndexByte(asciiWhiteSpace, b) >= 0:
+	case action == parserPrint && b != del,
+		action == parserExecute && strings.IndexByte(asciiWhiteSpace, b) >= 0:
 		return byteKept
 	default:
 		return byteDropped
 	}
 }
 
-// anstyleAction is one of anstyle-parse's actions (state/definitions.rs),
-// of which stripping tells three apart: Print, Execute and BeginUtf8.
-type anstyleAction int
+// parserAction is one of the full table's actions, of which stripping tells
+// three apart: Print, Execute and BeginUTF8.
+type parserAction int
 
 const (
-	anstyleNop anstyleAction = iota
-	anstyleCollect
-	anstyleCSIDispatch
-	anstyleESCDispatch
-	anstyleExecute
-	anstyleIgnore
-	anstyleOSCPut
-	anstyleParam
-	anstylePrint
-	anstylePut
-	anstyleBeginUTF8
+	parserNop parserAction = iota
+	parserCollect
+	parserCSIDispatch
+	parserESCDispatch
+	parserExecute
+	parserIgnore
+	parserOSCPut
+	parserParam
+	parserPrint
+	parserPut
+	parserBeginUTF8
 )
 
-// anstyleRule is a line of anstyle-parse's rules: a byte from first to last
+// referenceRule is a line of the full table: a byte from first to last
 // moves the parser to next, with action.
-type anstyleRule struct {
+type referenceRule struct {
 	first, last byte
 	next        vtState
-	action      anstyleAction
+	action      parserAction
 }
 
-// vtUTF8 is anstyle-parse's state inside a UTF-8 character, which the stripper
-// does without: a number that none of its states has.
+// vtUTF8 is the full table's state inside a UTF-8 character, which the
+// stripper does without: a number that none of its states has.
 const vtUTF8 = vtSOSPMAPCString + 1
 
-// anstyleParseRules are anstyle-parse 1.0.0's rules (state/codegen.rs),
-// state by state and line by line, in its order and with its actions; only
-// the states have the stripper's names. A byte that no rule of a state names
-// leaves the parser where it was and does nothing (Anywhere, Nop).
-var anstyleParseRules = [...][]anstyleRule{
+// referenceRules are the full VT500-series parser table that Paul Williams
+// described, state by state and line by line, with every action, extended
+// with a state that follows UTF-8 characters. A byte that no rule of a state
+// names leaves the parser where it was and does nothing (Anywhere, Nop).
+var referenceRules = [...][]referenceRule{
 	vtAnywhere: {
-		{0x18, 0x18, vtGround, anstyleExecute},
-		{0x1a, 0x1a, vtGround, anstyleExecute},
-		{0x1b, 0x1b, vtEscape, anstyleNop},
+		{0x18, 0x18, vtGround, parserExecute},
+		{0x1a, 0x1a, vtGround, parserExecute},
+		{0x1b, 0x1b, vtEscape, parserNop},
 	},
 	vtGround: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x20, 0x7f, vtAnywhere, anstylePrint},
-		{0x80, 0x8f, vtAnywhere, anstyleExecute},
-		{0x91, 0x9a, vtAnywhere, anstyleExecute},
-		{0x9c, 0x9c, vtAnywhere, anstyleExecute},
-		{0xc2, 0xdf, vtUTF8, anstyleBeginUTF8},
-		{0xe0, 0xef, vtUTF8, anstyleBeginUTF8},
-		{0xf0, 0xf4, vtUTF8, anstyleBeginUTF8},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x20, 0x7f, vtAnywhere, parserPrint},
+		{0x80, 0x8f, vtAnywhere, parserExecute},
+		{0x91, 0x9a, vtAnywhere, parserExecute},
+		{0x9c, 0x9c, vtAnywhere, parserExecute},
+		{0xc2, 0xdf, vtUTF8, parserBeginUTF8},
+		{0xe0, 0xef, vtUTF8, parserBeginUTF8},
+		{0xf0, 0xf4, vtUTF8, parserBeginUTF8},
 	},
 	vtEscape: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x2f, vtEscapeIntermediate, anstyleCollect},
-		{0x30, 0x4f, vtGround, anstyleESCDispatch},
-		{0x51, 0x57, vtGround, anstyleESCDispatch},
-		{0x59, 0x59, vtGround, anstyleESCDispatch},
-		{0x5a, 0x5a, vtGround, anstyleESCDispatch},
-		{0x5c, 0x5c, vtGround, anstyleESCDispatch},
-		{0x60, 0x7e, vtGround, anstyleESCDispatch},
-		{0x5b, 0x5b, vtCSIEntry, anstyleNop},
-		{0x5d, 0x5d, vtOSCString, anstyleNop},
-		{0x50, 0x50, vtDCSEntry, anstyleNop},
-		{0x58, 0x58, vtSOSPMAPCString, anstyleNop},
-		{0x5e, 0x5e, vtSOSPMAPCString, anstyleNop},
-		{0x5f, 0x5f, vtSOSPMAPCString, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x20, 0x2f, vtEscapeIntermediate, parserCollect},
+		{0x30, 0x4f, vtGround, parserESCDispatch},
+		{0x51, 0x57, vtGround, parserESCDispatch},
+		{0x59, 0x59, vtGround, parserESCDispatch},
+		{0x5a, 0x5a, vtGround, parserESCDispatch},
+		{0x5c, 0x5c, vtGround, parserESCDispatch},
+		{0x60, 0x7e, vtGround, parserESCDispatch},
+		{0x5b, 0x5b, vtCSIEntry, parserNop},
+		{0x5d, 0x5d, vtOSCString, parserNop},
+		{0x50, 0x50, vtDCSEntry, parserNop},
+		{0x58, 0x58, vtSOSPMAPCString, parserNop},
+		{0x5e, 0x5e, vtSOSPMAPCString, parserNop},
+		{0x5f, 0x5f, vtSOSPMAPCString, parserNop},
 	},
 	vtEscapeIntermediate: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x20, 0x2f, vtAnywhere, anstyleCollect},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x30, 0x7e, vtGround, anstyleESCDispatch},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x20, 0x2f, vtAnywhere, parserCollect},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x30, 0x7e, vtGround, parserESCDispatch},
 	},
 	vtCSIEntry: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x2f, vtCSIIntermediate, anstyleCollect},
-		{0x30, 0x39, vtCSIParam, anstyleParam},
-		{0x3a, 0x3b, vtCSIParam, anstyleParam},
-		{0x3c, 0x3f, vtCSIParam, anstyleCollect},
-		{0x40, 0x7e, vtGround, anstyleCSIDispatch},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x20, 0x2f, vtCSIIntermediate, parserCollect},
+		{0x30, 0x39, vtCSIParam, parserParam},
+		{0x3a, 0x3b, vtCSIParam, parserParam},
+		{0x3c, 0x3f, vtCSIParam, parserCollect},
+		{0x40, 0x7e, vtGround, parserCSIDispatch},
 	},
 	vtCSIIgnore: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x20, 0x3f, vtAnywhere, anstyleIgnore},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x40, 0x7e, vtGround, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x20, 0x3f, vtAnywhere, parserIgnore},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x40, 0x7e, vtGround, parserNop},
 	},
 	vtCSIParam: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x30, 0x39, vtAnywhere, anstyleParam},
-		{0x3a, 0x3b, vtAnywhere, anstyleParam},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x3c, 0x3f, vtCSIIgnore, anstyleNop},
-		{0x20, 0x2f, vtCSIIntermediate, anstyleCollect},
-		{0x40, 0x7e, vtGround, anstyleCSIDispatch},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x30, 0x39, vtAnywhere, parserParam},
+		{0x3a, 0x3b, vtAnywhere, parserParam},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x3c, 0x3f, vtCSIIgnore, parserNop},
+		{0x20, 0x2f, vtCSIIntermediate, parserCollect},
+		{0x40, 0x7e, vtGround, parserCSIDispatch},
 	},
 	vtCSIIntermediate: {
-		{0x00, 0x17, vtAnywhere, anstyleExecute},
-		{0x19, 0x19, vtAnywhere, anstyleExecute},
-		{0x1c, 0x1f, vtAnywhere, anstyleExecute},
-		{0x20, 0x2f, vtAnywhere, anstyleCollect},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x30, 0x3f, vtCSIIgnore, anstyleNop},
-		{0x40, 0x7e, vtGround, anstyleCSIDispatch},
+		{0x00, 0x17, vtAnywhere, parserExecute},
+		{0x19, 0x19, vtAnywhere, parserExecute},
+		{0x1c, 0x1f, vtAnywhere, parserExecute},
+		{0x20, 0x2f, vtAnywhere, parserCollect},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x30, 0x3f, vtCSIIgnore, parserNop},
+		{0x40, 0x7e, vtGround, parserCSIDispatch},
 	},
 	vtDCSEntry: {
-		{0x00, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x2f, vtDCSIntermediate, anstyleCollect},
-		{0x30, 0x39, vtDCSParam, anstyleParam},
-		{0x3a, 0x3b, vtDCSParam, anstyleParam},
-		{0x3c, 0x3f, vtDCSParam, anstyleCollect},
-		{0x40, 0x7e, vtDCSPassthrough, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x20, 0x2f, vtDCSIntermediate, parserCollect},
+		{0x30, 0x39, vtDCSParam, parserParam},
+		{0x3a, 0x3b, vtDCSParam, parserParam},
+		{0x3c, 0x3f, vtDCSParam, parserCollect},
+		{0x40, 0x7e, vtDCSPassthrough, parserNop},
 	},
 	vtDCSIntermediate: {
-		{0x00, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x2f, vtAnywhere, anstyleCollect},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x30, 0x3f, vtDCSIgnore, anstyleNop},
-		{0x40, 0x7e, vtDCSPassthrough, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x20, 0x2f, vtAnywhere, parserCollect},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x30, 0x3f, vtDCSIgnore, parserNop},
+		{0x40, 0x7e, vtDCSPassthrough, parserNop},
 	},
 	vtDCSIgnore: {
-		{0x00, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x9c, 0x9c, vtGround, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x20, 0x7f, vtAnywhere, parserIgnore},
+		{0x9c, 0x9c, vtGround, parserNop},
 	},
 	vtDCSParam: {
-		{0x00, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x30, 0x39, vtAnywhere, anstyleParam},
-		{0x3a, 0x3b, vtAnywhere, anstyleParam},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x3c, 0x3f, vtDCSIgnore, anstyleNop},
-		{0x20, 0x2f, vtDCSIntermediate, anstyleCollect},
-		{0x40, 0x7e, vtDCSPassthrough, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x30, 0x39, vtAnywhere, parserParam},
+		{0x3a, 0x3b, vtAnywhere, parserParam},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x3c, 0x3f, vtDCSIgnore, parserNop},
+		{0x20, 0x2f, vtDCSIntermediate, parserCollect},
+		{0x40, 0x7e, vtDCSPassthrough, parserNop},
 	},
 	vtDCSPassthrough: {
-		{0x00, 0x17, vtAnywhere, anstylePut},
-		{0x19, 0x19, vtAnywhere, anstylePut},
-		{0x1c, 0x1f, vtAnywhere, anstylePut},
-		{0x20, 0x7e, vtAnywhere, anstylePut},
-		{0x7f, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x9c, 0x9c, vtGround, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserPut},
+		{0x19, 0x19, vtAnywhere, parserPut},
+		{0x1c, 0x1f, vtAnywhere, parserPut},
+		{0x20, 0x7e, vtAnywhere, parserPut},
+		{0x7f, 0x7f, vtAnywhere, parserIgnore},
+		{0x9c, 0x9c, vtGround, parserNop},
 	},
 	vtSOSPMAPCString: {
-		{0x00, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x20, 0x7f, vtAnywhere, anstyleIgnore},
-		{0x9c, 0x9c, vtGround, anstyleNop},
+		{0x00, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x20, 0x7f, vtAnywhere, parserIgnore},
+		{0x9c, 0x9c, vtGround, parserNop},
 	},
 	vtOSCString: {
-		{0x00, 0x06, vtAnywhere, anstyleIgnore},
-		{0x07, 0x07, vtGround, anstyleNop},
-		{0x08, 0x17, vtAnywhere, anstyleIgnore},
-		{0x19, 0x19, vtAnywhere, anstyleIgnore},
-		{0x1c, 0x1f, vtAnywhere, anstyleIgnore},
-		{0x20, 0xff, vtAnywhere, anstyleOSCPut},
+		{0x00, 0x06, vtAnywhere, parserIgnore},
+		{0x07, 0x07, vtGround, parserNop},
+		{0x08, 0x17, vtAnywhere, parserIgnore},
+		{0x19, 0x19, vtAnywhere, parserIgnore},
+		{0x1c, 0x1f, vtAnywhere, parserIgnore},
+		{0x20, 0xff, vtAnywhere, parserOSCPut},
 	},
 }

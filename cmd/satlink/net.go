@@ -80,8 +80,8 @@ func limitArgument(long, help string, target *uint64, defaultValue string) *argu
 		defaultValue: defaultValue, value: unsignedValue{target: target, minimum: leastLimit}}
 }
 
-// valueNameOf is the name clap gave an option's value when it had none of
-// its own: the option's, in capitals, with underscores — IDLE_SECS.
+// valueNameOf is the name of an option's value when it has none of its own:
+// the option's, in capitals, with underscores: IDLE_SECS.
 func valueNameOf(long string) string {
 	name := []byte(long)
 	for i, letter := range name {
@@ -305,5 +305,5 @@ func netSubcommand(cobraCommand *cobra.Command, start func(netAction) error, new
 func resolveCommand(start func(netAction) error) *command {
 	var action resolveAction
 	return netSubcommand(&cobra.Command{Use: "resolve", Short: "Look up a host name over the link"},
-		start, func() netAction { return action }, requiredPositional("HOST", stringValue{target: &action.host}))
+		start, func() netAction { return action }, requiredPositional("HOST", "Host name to look up", stringValue{target: &action.host}))
 }

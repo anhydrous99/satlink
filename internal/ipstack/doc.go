@@ -42,5 +42,8 @@
 // sockets, TCP congestion control, or async wakers, and the interface does not
 // answer pings.
 //
+// The design notes for maintainers, with the contracts between the layers
+// and the behaviour satnet and sim rely on, are in docs/IPSTACK.md.
+//
 // Derived from smoltcp, 0BSD licence; see LICENSE-smoltcp in this directory.
 package ipstack

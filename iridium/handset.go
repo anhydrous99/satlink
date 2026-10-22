@@ -374,9 +374,9 @@ func (h *Handset) Clock() (string, error) {
 	return exchange(h, h.clock)
 }
 
-// SendSMS sends a text message and returns the message reference the
-// network assigned. Submission goes over the satellite link and may take up
-// to two minutes.
+// SendSMS sends a text message (AT+CMGS, in text mode) and returns the
+// message reference the network assigned. Submission goes over the
+// satellite link and may take up to two minutes.
 //
 // number must be dialable (digits, '*' and '#' after an optional '+') and
 // text must not contain Ctrl-Z or ESC, which end or abort text entry;

@@ -17,7 +17,7 @@ Use a data call as an IP link that only this program can use
       [1m--number[0m <NUMBER>            Number to dial for the data call [env: SATLINK_DATA_NUMBER=] [default: 008816000025]
   [1m-p[0m, [1m--port[0m <PORT>                Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
       [1m--allow[0m <RULE>               Also allow a destination such as `example.com:443` (repeatable); the command's own target is always allowed
-  [1m-b[0m, [1m--baud[0m <BAUD>                [default: 19200]
+  [1m-b[0m, [1m--baud[0m <BAUD>                Serial port speed, in bits per second [default: 19200]
       [1m--simulate[0m[=<SIMULATE>]      Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
       [1m--username[0m <USERNAME>        PPP user name (Iridium's gateway accepts any) [default: ""]
       [1m--password[0m <PASSWORD>        PPP password (Iridium's gateway accepts any) [default: ""]

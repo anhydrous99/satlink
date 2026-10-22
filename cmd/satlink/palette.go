@@ -1,9 +1,9 @@
 package main
 
-// The styles that clap gives its help and errors — the ANSI rendering of its
-// default styles — and the streams that showed them.
+// The styles of help and errors, as ANSI sequences, and the streams that
+// show them.
 
-// The ANSI sequences of clap's default styles.
+// The ANSI sequences of the styles.
 const (
 	ansiReset     = "\x1b[0m"
 	ansiBold      = "\x1b[1m"
@@ -13,8 +13,7 @@ const (
 	ansiYellow    = "\x1b[33m"
 )
 
-// The environment variables that decide whether a stream is styled, as the
-// anstream crate that clap wrote through read them.
+// The environment variables that decide whether a stream is styled.
 const (
 	// noColorVariable, set to anything but "", styles nothing
 	// (no-color.org).
@@ -33,17 +32,18 @@ const (
 // dumbTerminal is the TERM of a terminal without styles.
 const dumbTerminal = "dumb"
 
-// palette styles help and errors. The CLI builds them in clap's styles,
-// whatever stream they go to, as clap did, and a stream that shows no
-// styles takes them out again (stripStyles). The zero palette, clap's plain
-// styles, styles nothing.
+// palette styles help and errors. The CLI styles them whatever stream they
+// go to, and a stream that shows no styles takes them out again
+// (stripStyles). The zero palette styles nothing.
 type palette struct {
 	styled bool
 }
 
 // showsStyles reports whether a stream, which isTerminal says is a
-// terminal, shows styles in the environment that lookupEnv finds: anstream's
-// choice, which kept clap's styles for the stream or took them out.
+// terminal, shows styles in the environment that lookupEnv finds. NO_COLOR
+// wins over CLICOLOR_FORCE, which wins over CLICOLOR=0. Otherwise only a
+// terminal shows styles, and only when TERM names one that is not dumb, or
+// CLICOLOR or CI is set.
 func showsStyles(isTerminal bool, lookupEnv func(string) (string, bool)) bool {
 	isSet := func(variable string) bool {
 		_, set := lookupEnv(variable)
@@ -92,7 +92,7 @@ func (p palette) invalid(text string) string {
 	return p.paint(ansiYellow, text)
 }
 
-// paint gives text a style, even an empty text, as clap did.
+// paint gives text a style, even an empty text.
 func (p palette) paint(style, text string) string {
 	if !p.styled {
 		return text
