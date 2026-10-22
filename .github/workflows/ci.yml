@@ -1,4 +1,4 @@
-# The checks every change passes (README.md, Testing).
+# The checks every change passes (CONTRIBUTING.md).
 name: CI
 
 on:

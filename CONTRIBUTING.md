@@ -45,6 +45,9 @@ go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -over 15 .
 go test -race -cover ./...
 ```
 
+[CI](.github/workflows/ci.yml) runs them on every pull request: the first four
+on Linux, and the tests on Linux, macOS and Windows. Run them locally first.
+
 ## Code
 
 - Follow the [conventions](docs/DESIGN.md#conventions): names, constants,
