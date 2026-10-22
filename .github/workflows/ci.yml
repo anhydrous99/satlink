@@ -1,0 +1,52 @@
+# The checks every change passes (README.md, Testing).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+      - name: gocyclo
+        run: go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -over 15 .
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: go test
+        run: go test -race -cover ./...
