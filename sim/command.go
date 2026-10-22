@@ -18,9 +18,10 @@ const (
 	// attention is what every command line addressed to the handset starts
 	// with.
 	attention = "AT"
-	// textMode is the AT+CMGF value of text mode, the only SMS format
-	// simulated.
-	textMode = "1"
+	// pduMode is the AT+CMGF value of PDU mode, the only SMS format Iridium
+	// handsets have. A real handset refuses text mode with +CME ERROR:
+	// operation not supported; the simulated one with ERROR.
+	pduMode = "0"
 	// bearerFields is how many fields AT+CBST takes: speed, name and
 	// connection element.
 	bearerFields = 3
@@ -30,6 +31,9 @@ const (
 const (
 	bearerFieldBits = 8
 	smsIndexBits    = 32
+	// pduLengthBits holds the length AT+CMGS is given: a TPDU is at most
+	// 164 octets.
+	pduLengthBits = 8
 )
 
 // commandKind says what a [command] is.
@@ -42,7 +46,7 @@ const (
 	commandSetting
 	// commandQuery reports something.
 	commandQuery
-	// commandSMS is a text-mode SMS command.
+	// commandSMS is an SMS command, in PDU mode.
 	commandSMS
 	// commandCall places, ends or resumes a call.
 	commandCall
@@ -62,7 +66,7 @@ type settingKind int
 
 const (
 	// settingIgnored is accepted for compatibility but not simulated: ATV1,
-	// AT+CMEE, AT+CMGF=1, AT&C, AT&K, ATS<n>=<v> and AT+CR.
+	// AT+CMEE, AT+CMGF=0, AT&C, AT&K, ATS<n>=<v> and AT+CR.
 	settingIgnored settingKind = iota
 	// settingReset is ATZ: back to the default settings.
 	settingReset
@@ -102,6 +106,7 @@ const (
 	queryClock                          // AT+CCLK?
 	queryCallRelease                    // AT+CEER: why the last call ended
 	queryActivityStatus                 // AT+CPAS: whether a data call is up
+	queryServiceCentre                  // AT+CSCA?: the SIM's SMS centre
 )
 
 // extendedQueries are the queries by their name after the +.
@@ -119,16 +124,17 @@ var extendedQueries = map[string]query{
 	"CCLK?": queryClock,
 	"CEER":  queryCallRelease,
 	"CPAS":  queryActivityStatus,
+	"CSCA?": queryServiceCentre,
 }
 
 // smsCommandKind says what an [smsCommand] does.
 type smsCommandKind int
 
 const (
-	// smsSend is AT+CMGS="<number>", followed by the text after a "> "
+	// smsSend is AT+CMGS=<length>, followed by the PDU after a "> "
 	// prompt.
 	smsSend smsCommandKind = iota
-	// smsList is AT+CMGL[="<status>"].
+	// smsList is AT+CMGL[=<status>].
 	smsList
 	// smsRead is AT+CMGR=<index>.
 	smsRead
@@ -136,10 +142,11 @@ const (
 	smsDelete
 )
 
-// smsCommand is a text-mode SMS command (3GPP TS 27.005).
+// smsCommand is an SMS command in PDU mode (3GPP TS 27.005 §3).
 type smsCommand struct {
-	kind   smsCommandKind
-	number string    // smsSend
+	kind smsCommandKind
+	// length is the length of the TPDU to come (smsSend).
+	length int
 	filter smsFilter // smsList
 	index  uint32    // smsRead, smsDelete
 }
@@ -291,8 +298,8 @@ func parseExtended(text string) (command, bool) {
 		return parseExtendedAssignment(name, value)
 	}
 	if text == "CMGL" {
-		// Without a status, +CMGL lists the unread messages (TS 27.005
-		// §3.4.2).
+		// Without a status, +CMGL lists the unread messages (ISU AT Command
+		// Reference, +CMGL).
 		return smsCommandOf(smsCommand{kind: smsList, filter: smsFilterUnread}), true
 	}
 	known, ok := extendedQueries[text]
@@ -308,15 +315,15 @@ func parseExtendedAssignment(name, value string) (command, bool) {
 	case "CMEE", "CR":
 		return acceptedIf(ignored, isNumber(value))
 	case "CMGF":
-		return acceptedIf(ignored, value == textMode)
+		return acceptedIf(ignored, value == pduMode)
 	case "CBST":
 		service, ok := parseBearer(value)
 		return acceptedIf(settingCommand(setting{kind: settingBearer, bearer: service}), ok)
 	case "CMGS":
-		number := unquote(value)
-		return acceptedIf(smsCommandOf(smsCommand{kind: smsSend, number: number}), isDialable(number))
+		length, ok := parseUnsigned(value, pduLengthBits)
+		return acceptedIf(smsCommandOf(smsCommand{kind: smsSend, length: int(length)}), ok)
 	case "CMGL":
-		filter, ok := parseSMSFilter(unquote(value))
+		filter, ok := parseSMSFilter(value)
 		return acceptedIf(smsCommandOf(smsCommand{kind: smsList, filter: filter}), ok)
 	case "CMGR":
 		return parseSMSIndexCommand(smsRead, value)
@@ -355,17 +362,6 @@ func parseBearer(value string) (bearer, bool) {
 func parseUnsigned(text string, bits int) (uint64, bool) {
 	number, err := strconv.ParseUint(strings.TrimPrefix(text, "+"), 10, bits)
 	return number, err == nil
-}
-
-// unquote returns value without the double quotes around it, if it has
-// both.
-func unquote(value string) string {
-	if inner, ok := strings.CutPrefix(value, `"`); ok {
-		if unquoted, ok := strings.CutSuffix(inner, `"`); ok {
-			return unquoted
-		}
-	}
-	return value
 }
 
 // cutAnyPrefix returns text without the first of prefixes it starts with,

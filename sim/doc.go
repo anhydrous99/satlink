@@ -6,8 +6,9 @@
 //
 //   - AT commands: identity, signal, battery, registration and clock
 //     queries, with echo and verbose result codes as on the real handset.
-//   - SMS in text mode: sending with AT+CMGS, and a SIM inbox that
-//     [Control.ReceiveSMS] fills, announced with +CMTI.
+//   - SMS in PDU mode, the only one Iridium handsets have: sending with
+//     AT+CMGS, and a SIM inbox that [Control.ReceiveSMS] fills, announced
+//     with +CMTI. Text mode is refused, as on the real handset.
 //   - Calls: voice calls are accepted, without audio. Data calls connect
 //     after the [LinkProfile]'s setup time. +++ with guard times switches to
 //     online-command mode, and ATO back. AT&D2, DTR and AT+CPAS behave as on
@@ -37,7 +38,9 @@
 //	}
 //	bars, err := handset.SignalQuality() // 4
 //	...
-//	control.ReceiveSMS("+881631234567", "Hello from orbit")
+//	if err := control.ReceiveSMS("+881631234567", "Hello from orbit"); err != nil {
+//		return err
+//	}
 //	inbox, err := handset.ListSMS(iridium.SMSFilterUnread)
 //	// inbox[0].Text == "Hello from orbit"
 //

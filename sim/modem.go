@@ -194,11 +194,15 @@ func (m *modem) dropDTR() {
 }
 
 // receiveSMS stores a message that arrived at now and announces it with
-// +CMTI.
-func (m *modem) receiveSMS(from, text string, now time.Time) {
-	index := m.inbox.store(from, text, timestampAt(now))
+// +CMTI. It fails, storing nothing, if the message has no PDU.
+func (m *modem) receiveSMS(from, text string, now time.Time) error {
+	index, err := m.inbox.store(from, text, now)
+	if err != nil {
+		return err
+	}
 	m.unsolicited = append(m.unsolicited, fmt.Sprintf(`+CMTI: "SM",%d`, index))
 	m.reportUnsolicited()
+	return nil
 }
 
 // shutDown ends what the modem keeps running in the background, for a
@@ -271,9 +275,9 @@ func (m *modem) receiveText(b byte) {
 	case entryCancelled:
 		m.input = commandInput()
 		m.reply(okReply())
-	case entryTooLong:
+	case entryRefused:
 		m.input = commandInput()
-		m.reply(smsErrorReply(smsErrorInvalidTextModeParameter))
+		m.reply(smsErrorReply(smsErrorInvalidPDUModeParameter))
 	}
 }
 

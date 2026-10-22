@@ -43,9 +43,10 @@ const (
 type smsError int
 
 const (
-	// smsErrorInvalidTextModeParameter reports a text longer than the
-	// handset accepts.
-	smsErrorInvalidTextModeParameter smsError = 305
+	// smsErrorInvalidPDUModeParameter reports a PDU the handset cannot
+	// send: not hexadecimal, too long, no SMS-SUBMIT, or of another length
+	// than AT+CMGS was given.
+	smsErrorInvalidPDUModeParameter smsError = 304
 	// smsErrorInvalidMemoryIndex reports that no message is stored at that
 	// index.
 	smsErrorInvalidMemoryIndex smsError = 321

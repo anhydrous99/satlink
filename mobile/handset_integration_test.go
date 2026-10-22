@@ -100,7 +100,7 @@ func TestAnIncomingSMSIsAnnouncedReadAndDeleted(t *testing.T) {
 	handset, control := simulatedHandset(t)
 	want := mobile.SMSMessage{Index: 1, Status: "REC UNREAD", Address: "+881600000000", Text: "are you there?"}
 
-	control.ReceiveSMS(want.Address, want.Text)
+	simtest.ReceiveSMS(t, control, want.Address, want.Text)
 	events, err := handset.PollEvents(eventTimeoutMillis)
 	if err != nil {
 		t.Fatalf("PollEvents: %v", err)
@@ -153,7 +153,7 @@ func assertSMS(t *testing.T, got *mobile.SMSMessage, want mobile.SMSMessage) {
 func TestTakeEventsReturnsTheQueuedEventsOnce(t *testing.T) {
 	t.Parallel()
 	handset, control := simulatedHandset(t)
-	control.ReceiveSMS("+881600000000", "hello")
+	simtest.ReceiveSMS(t, control, "+881600000000", "hello")
 
 	var events *mobile.StringList
 	simtest.Eventually(t, patience, "the announcement is queued", func() bool {

@@ -47,7 +47,7 @@ func (m *modem) execute(c command, now time.Time) {
 	}
 }
 
-// submitSMS sends a message typed after AT+CMGS.
+// submitSMS sends a message whose PDU was typed after AT+CMGS.
 func (m *modem) submitSMS(message outgoingSMS) {
 	m.messageReference++ // A one-byte reference, which wraps as on the handset.
 	logInfo(fmt.Sprintf("simulated handset: SMS to %s", message.number))
@@ -100,6 +100,8 @@ func (m *modem) report(q query, now time.Time) string {
 		return fmt.Sprintf("+CEER: %v", m.lastRelease)
 	case queryActivityStatus:
 		return m.activityStatus()
+	case queryServiceCentre:
+		return fmt.Sprintf(`+CSCA: "%s",%d`, serviceCentre, internationalNumber)
 	default:
 		panic(fmt.Sprintf("sim: an unknown query %d", q))
 	}
@@ -122,7 +124,7 @@ func (m *modem) signalBars() int {
 func (m *modem) executeSMS(c smsCommand) reply {
 	switch c.kind {
 	case smsSend:
-		m.input = inputMode{kind: inputTextEntry, draft: newSMSDraft(c.number)}
+		m.input = inputMode{kind: inputTextEntry, draft: newSMSDraft(c.length)}
 		return reply{kind: replyTextPrompt}
 	case smsList:
 		return okReply(m.inbox.list(c.filter)...)

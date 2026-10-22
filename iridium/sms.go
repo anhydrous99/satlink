@@ -1,20 +1,31 @@
 package iridium
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/anhydrous99/satlink/internal/debugtext"
+	"github.com/anhydrous99/satlink/internal/smspdu"
 )
 
-// SMS in text mode (3GPP TS 27.005, AT+CMGF=1): submitting messages and
-// listing, reading and deleting stored ones.
+// SMS in PDU mode (3GPP TS 27.005 §3, AT+CMGF=0), the only mode Iridium
+// handsets have (ISU AT Command Reference, +CMGF): submitting messages,
+// and listing, reading and deleting stored ones. Package smspdu encodes
+// and decodes the PDUs.
 
-// smsTimeout bounds SMS submission, which goes over the satellite link and
-// can take a while.
-const smsTimeout = 120 * time.Second
+// How long the SMS commands that take a while wait for their final result.
+const (
+	// smsTimeout bounds SMS submission, which goes over the satellite link.
+	smsTimeout = 120 * time.Second
+	// smsListTimeout bounds a listing: a 9555A takes about a third of a
+	// second for each message it lists, so a SIM full of fifty takes
+	// seventeen.
+	smsListTimeout = 60 * time.Second
+)
 
-// The control characters of SMS text entry, which a message's text must
-// not contain.
+// The control characters of SMS text entry.
 const (
 	// ctrlZ ends text entry: the message is submitted.
 	ctrlZ = 0x1A
@@ -22,19 +33,31 @@ const (
 	esc = 0x1B
 )
 
+// iridiumServiceCentre is Iridium's SMS centre, which a 9555A names in its
+// own messages. Messages go through it unless the SIM names another
+// (AT+CSCA): a 9555A whose SIM names none refuses a PDU that leaves the
+// choice to it, with +CMS ERROR: 303.
+const iridiumServiceCentre = "+881662900005"
+
+// smsStatusNames are the storage statuses as text mode names them, by
+// their codes in PDU mode.
+var smsStatusNames = [...]string{"REC UNREAD", "REC READ", "STO UNSENT", "STO SENT"}
+
 // sendSMS is SendSMS, with the handset's lock held.
 func (h *Handset) sendSMS(number, text string) (int, error) {
 	if err := validateNumber(number); err != nil {
 		return 0, err
 	}
-	if strings.IndexByte(text, ctrlZ) >= 0 || strings.IndexByte(text, esc) >= 0 {
-		return 0, invalidArgument("SMS text must not contain Ctrl-Z or ESC")
+	tpdu, err := smspdu.EncodeSubmit(number, text)
+	if err != nil {
+		return 0, invalidArgument(err.Error())
 	}
+	pdu := append(h.serviceCentreAddress(), tpdu...)
 	response, err := h.exec(request{
-		command:    fmt.Sprintf(`AT+CMGS="%s"`, number),
+		command:    fmt.Sprintf("AT+CMGS=%d", len(tpdu)),
 		timeout:    smsTimeout,
 		completion: untilFinalResult,
-		textEntry:  append([]byte(text), ctrlZ),
+		textEntry:  append([]byte(strings.ToUpper(hex.EncodeToString(pdu))), ctrlZ),
 	})
 	if err != nil {
 		return 0, err
@@ -46,13 +69,28 @@ func (h *Handset) sendSMS(number, text string) (int, error) {
 	return parseNumber(fields, 0, "+CMGS", wordField)
 }
 
+// serviceCentreAddress returns the address of the SMS centre the SIM
+// names (AT+CSCA?), or of Iridium's when it names none. A handset that
+// cannot say gets Iridium's too: what fails then fails again at AT+CMGS,
+// which reports it.
+func (h *Handset) serviceCentreAddress() []byte {
+	if fields, err := h.queryFields("AT+CSCA?", "+CSCA"); err == nil && fieldAt(fields, 0) != "" {
+		if address, err := smspdu.EncodeServiceCentre(fields[0]); err == nil {
+			return address
+		}
+	}
+	// Encoding a constant number cannot fail.
+	address, _ := smspdu.EncodeServiceCentre(iridiumServiceCentre)
+	return address
+}
+
 // listSMS is ListSMS, with the handset's lock held.
 func (h *Handset) listSMS(filter SMSFilter) ([]SMSMessage, error) {
 	status, ok := filter.storageStatus()
 	if !ok {
 		return nil, invalidArgument(fmt.Sprintf("%d is not an SMS filter", int(filter)))
 	}
-	response, err := h.command(fmt.Sprintf(`AT+CMGL="%s"`, status))
+	response, err := h.commandWithTimeout(fmt.Sprintf("AT+CMGL=%d", status), smsListTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -80,22 +118,22 @@ func (h *Handset) deleteSMS(index int) error {
 	return err
 }
 
-// storageStatus returns the <stat> value text-mode +CMGL selects f with,
+// storageStatus returns the <stat> value PDU-mode +CMGL selects f with,
 // and false for a filter without a constant of its own.
-func (f SMSFilter) storageStatus() (string, bool) {
+func (f SMSFilter) storageStatus() (int, bool) {
 	switch f {
 	case SMSFilterAll:
-		return "ALL", true
+		return 4, true
 	case SMSFilterUnread:
-		return "REC UNREAD", true
+		return 0, true
 	case SMSFilterRead:
-		return "REC READ", true
+		return 1, true
 	case SMSFilterUnsent:
-		return "STO UNSENT", true
+		return 2, true
 	case SMSFilterSent:
-		return "STO SENT", true
+		return 3, true
 	default:
-		return "", false
+		return 0, false
 	}
 }
 
@@ -107,69 +145,77 @@ func validateIndex(index int) error {
 	return nil
 }
 
-// parseSMSList parses text-mode +CMGL output: a header line per message
-// followed by its body.
+// parseSMSList parses PDU-mode +CMGL output: for each message, the header
+// +CMGL: <index>,<stat>,[<alpha>],<length>, then its PDU on a line of its
+// own.
 func parseSMSList(lines []string) ([]SMSMessage, error) {
 	var messages []SMSMessage
-	var body []string
-	for _, line := range lines {
-		header, isHeader := strings.CutPrefix(line, "+CMGL:")
+	for i := 0; i < len(lines); i += 2 {
+		header, isHeader := strings.CutPrefix(lines[i], "+CMGL:")
 		if !isHeader {
-			body = append(body, line)
-			continue
+			return nil, parseError(fmt.Sprintf("no +CMGL header in %s", debugtext.Quote(lines[i])))
 		}
-		setLastText(messages, body)
-		body = nil
-		message, err := parseListedSMS(header)
+		fields := SplitCSV(header)
+		index, err := parseNumber(fields, 0, "+CMGL", wordField)
+		if err != nil {
+			return nil, err
+		}
+		if i+1 == len(lines) {
+			return nil, parseError(fmt.Sprintf("+CMGL: message %d has no PDU", index))
+		}
+		message, err := decodeStoredSMS(index, fields[1:], lines[i+1], "+CMGL")
 		if err != nil {
 			return nil, err
 		}
 		messages = append(messages, message)
 	}
-	setLastText(messages, body)
 	return messages, nil
 }
 
-// parseListedSMS parses a +CMGL header, without its prefix:
-// <index>,<stat>,<oa/da>,[<alpha>],[<scts>].
-func parseListedSMS(header string) (SMSMessage, error) {
-	fields := SplitCSV(header)
-	index, err := parseNumber(fields, 0, "+CMGL", wordField)
-	if err != nil {
-		return SMSMessage{}, err
-	}
-	return SMSMessage{
-		Index:     index,
-		Status:    fieldAt(fields, 1),
-		Address:   fieldAt(fields, 2),
-		Timestamp: fieldAt(fields, 4),
-	}, nil
-}
-
-// setLastText gives the last of messages, if any, the body lines that
-// followed its header.
-func setLastText(messages []SMSMessage, body []string) {
-	if len(messages) > 0 {
-		messages[len(messages)-1].Text = strings.Join(body, "\n")
-	}
-}
-
-// parseReadSMS parses text-mode +CMGR output for the message at index: the
-// header +CMGR: <stat>,<oa>,[<alpha>],<scts>, then the text.
+// parseReadSMS parses PDU-mode +CMGR output for the message at index: the
+// header +CMGR: <stat>,[<alpha>],<length>, then its PDU.
 func parseReadSMS(index int, lines []string) (SMSMessage, error) {
 	header, isHeader := "", false
 	if len(lines) > 0 {
 		header, isHeader = strings.CutPrefix(lines[0], "+CMGR:")
 	}
-	if !isHeader {
-		return SMSMessage{}, parseError(fmt.Sprintf("no +CMGR header in %s", debugList(lines)))
+	if !isHeader || len(lines) < 2 {
+		return SMSMessage{}, parseError(fmt.Sprintf("no +CMGR header and PDU in %s", debugList(lines)))
 	}
-	fields := SplitCSV(header)
+	return decodeStoredSMS(index, SplitCSV(header), lines[1], "+CMGR")
+}
+
+// decodeStoredSMS returns the message at index from the header fields
+// that follow its index, <stat>,[<alpha>],<length>, and its PDU in
+// hexadecimal. The handset's <length> goes unread: a 9555A's is one more
+// than TS 27.005 says, and the PDU holds its own lengths.
+func decodeStoredSMS(index int, fields []string, pdu, prefix string) (SMSMessage, error) {
+	status, err := parseNumber(fields, 0, prefix, byteField)
+	if err != nil {
+		return SMSMessage{}, err
+	}
+	octets, err := hex.DecodeString(strings.TrimSpace(pdu))
+	if err != nil {
+		return SMSMessage{}, parseError(fmt.Sprintf("%s: message %d: the PDU is not hexadecimal", prefix, index))
+	}
+	message, err := smspdu.Decode(octets)
+	if err != nil {
+		return SMSMessage{}, parseError(fmt.Sprintf("%s: message %d: %v", prefix, index, err))
+	}
 	return SMSMessage{
 		Index:     index,
-		Status:    fieldAt(fields, 0),
-		Address:   fieldAt(fields, 1),
-		Timestamp: fieldAt(fields, 3),
-		Text:      strings.Join(lines[1:], "\n"),
+		Status:    smsStatusName(status),
+		Address:   message.Address,
+		Timestamp: message.Timestamp,
+		Text:      message.Text,
 	}, nil
+}
+
+// smsStatusName returns the text-mode name of a PDU-mode storage status,
+// such as "REC UNREAD", or "Unknown(7)" for a code without one.
+func smsStatusName(code int) string {
+	if code < len(smsStatusNames) {
+		return smsStatusNames[code]
+	}
+	return fmt.Sprintf("Unknown(%d)", code)
 }

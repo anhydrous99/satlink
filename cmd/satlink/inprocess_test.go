@@ -194,7 +194,7 @@ func inboxHolding(senders ...string) func(*testing.T, sim.Config) iridium.Transp
 	return func(t *testing.T, config sim.Config) iridium.Transport {
 		simulator := simtest.NewSimulator(t, config)
 		for _, sender := range senders {
-			simulator.Control().ReceiveSMS(sender, "Hello from "+sender)
+			simtest.ReceiveSMS(t, simulator.Control(), sender, "Hello from "+sender)
 		}
 		return simulator
 	}
@@ -204,7 +204,7 @@ func inboxHolding(senders ...string) func(*testing.T, sim.Config) iridium.Transp
 // is written to them, so that its announcement comes during the command.
 func smsArrivingOn(command string) func(*testing.T, sim.Config) iridium.Transport {
 	return func(t *testing.T, config sim.Config) iridium.Transport {
-		return &smsOnCommand{Handset: simtest.NewSimulator(t, config), command: command}
+		return &smsOnCommand{Handset: simtest.NewSimulator(t, config), t: t, command: command}
 	}
 }
 
@@ -212,13 +212,14 @@ func smsArrivingOn(command string) func(*testing.T, sim.Config) iridium.Transpor
 // first written to it.
 type smsOnCommand struct {
 	*sim.Handset
+	t       testing.TB
 	command string
 	once    sync.Once
 }
 
 func (h *smsOnCommand) WriteAll(p []byte) error {
 	if bytes.HasPrefix(p, []byte(h.command)) {
-		h.once.Do(func() { h.Control().ReceiveSMS("+881631234567", "Hello from orbit") })
+		h.once.Do(func() { simtest.ReceiveSMS(h.t, h.Control(), "+881631234567", "Hello from orbit") })
 	}
 	return h.Handset.WriteAll(p)
 }

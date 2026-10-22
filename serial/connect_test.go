@@ -78,7 +78,7 @@ func TestConnectInitialisesTheHandset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	for _, command := range []string{"AT\r", "AT+CPAS\r", "ATE0\r", "ATV1\r", "AT+CMEE=2\r", "AT+CMGF=1\r"} {
+	for _, command := range []string{"AT\r", "AT+CPAS\r", "ATE0\r", "ATV1\r", "AT+CMEE=2\r", "AT+CMGF=0\r"} {
 		if !strings.Contains(string(port.written), command) {
 			t.Errorf("written %q, want %q among it", port.written, command)
 		}

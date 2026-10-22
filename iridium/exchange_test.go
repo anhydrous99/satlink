@@ -30,16 +30,16 @@ func TestTextEntryThatTimesOutIsLeftWithESC(t *testing.T) {
 	handset := NewHandset(transport)
 
 	_, err := handset.exec(request{
-		command:    `AT+CMGS="+1"`,
+		command:    "AT+CMGS=19",
 		timeout:    20 * time.Millisecond,
 		completion: untilFinalResult,
-		textEntry:  []byte("hi\x1a"),
+		textEntry:  []byte("00\x1a"),
 	})
 
-	if timeout, ok := err.(*Error); !ok || timeout.Kind != ErrTimeout || timeout.Command != `AT+CMGS="+1"` {
+	if timeout, ok := err.(*Error); !ok || timeout.Kind != ErrTimeout || timeout.Command != "AT+CMGS=19" {
 		t.Errorf("exec = %v, want ErrTimeout", err)
 	}
-	if !bytes.Equal(transport.written, []byte("AT+CMGS=\"+1\"\r\x1b")) {
+	if !bytes.Equal(transport.written, []byte("AT+CMGS=19\r\x1b")) {
 		t.Errorf("written %q, want the command, then ESC to leave text entry", transport.written)
 	}
 }

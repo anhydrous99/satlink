@@ -122,7 +122,7 @@ func TestMonitorPrintsEventsUntilInterrupted(t *testing.T) {
 	args := []string{instant, "monitor"}
 	// The last of the handset's initialisation, so that the SMS arrives
 	// before the monitoring starts.
-	env, _, stderr := world{handset: smsArrivingOn("AT+CMGF=1")}.environment(t, args)
+	env, _, stderr := world{handset: smsArrivingOn("AT+CMGF=0")}.environment(t, args)
 	// Long enough to see the event, and the end of a test that hangs.
 	ctx, giveUp := context.WithTimeout(context.Background(), 10*time.Second)
 	defer giveUp()
@@ -299,7 +299,7 @@ func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 		{"at", []string{instant, "at", "AT+CSQ"}, world{}},
 		// The last of the handset's initialisation, so that the SMS arrives
 		// before the monitoring starts.
-		{"monitor", []string{instant, "monitor"}, world{handset: smsArrivingOn("AT+CMGF=1")}},
+		{"monitor", []string{instant, "monitor"}, world{handset: smsArrivingOn("AT+CMGF=0")}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

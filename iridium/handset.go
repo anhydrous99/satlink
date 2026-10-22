@@ -217,16 +217,20 @@ func (f SMSFilter) String() string {
 type SMSMessage struct {
 	// Index is the message's storage index, for ReadSMS and DeleteSMS.
 	Index int
-	// Status is the storage status as the handset words it, such as
-	// "REC UNREAD".
+	// Status is the storage status as TS 27.005's text mode names it:
+	// "REC UNREAD", "REC READ", "STO UNSENT" or "STO SENT", or
+	// "Unknown(n)" for a status code without a name.
 	Status string
 	// Address is the sender (received messages) or recipient (stored
-	// messages) number.
+	// messages) number, with a '+' when it is international, or the
+	// sender's name when the network gives one.
 	Address string
-	// Timestamp is the service-centre timestamp as the handset sent it
-	// (yy/MM/dd,hh:mm:ss±zz); empty when there is none.
+	// Timestamp is a received message's service-centre timestamp,
+	// yy/MM/dd,hh:mm:ss±zz with zz in quarter hours; empty for a message
+	// stored to send.
 	Timestamp string
-	// Text is the message text, its lines joined by "\n".
+	// Text is the message text. The header of a part of a concatenated
+	// message is left out: each part is a message of its own.
 	Text string
 }
 
@@ -325,11 +329,10 @@ func NewHandset(transport Transport) *Handset {
 
 // SetTimeout sets how long ordinary commands wait for their final result;
 // the default is five seconds. Commands with their own timeout (signal
-// readings, SMS submission, dialling, [Handset.CommandTimeout]) are not
-// affected. A
-// timeout of zero or less waits for nothing: every command it bounds is
-// sent and fails with ErrTimeout at once, even when its answer has
-// arrived. The longest, math.MaxInt64, means no deadline.
+// readings, SMS listing and submission, dialling, [Handset.CommandTimeout])
+// are not affected. A timeout of zero or less waits for nothing: every
+// command it bounds is sent and fails with ErrTimeout at once, even when
+// its answer has arrived. The longest, math.MaxInt64, means no deadline.
 //
 // It also bounds, to at most ten seconds, the wait for the handset's
 // answer to ATH — [Handset.HangUp]'s, and the one that ends a data call —
@@ -354,8 +357,9 @@ func (h *Handset) hangUpTimeout() time.Duration {
 
 // Initialize synchronises with the handset and puts it into a known state:
 // echo off (ATE0), verbose result codes (ATV1), verbose +CME ERROR
-// (AT+CMEE=2) and SMS text mode (AT+CMGF=1). The last two are optional on
-// some firmware and their failure is ignored.
+// (AT+CMEE=2) and SMS PDU mode (AT+CMGF=0), the only one Iridium handsets
+// have. The last two are optional on some firmware and their failure is
+// ignored.
 //
 // Any half-entered SMS a previous session left is aborted (ESC) and stale
 // input discarded first, for at most two seconds: a handset left in a call
@@ -444,17 +448,23 @@ func (h *Handset) Clock() (string, error) {
 	return exchange(h, h.clock)
 }
 
-// SendSMS sends a text message (AT+CMGS, in text mode) and returns the
+// SendSMS sends a text message (AT+CMGS, in PDU mode) and returns the
 // message reference the network assigned. Submission goes over the
 // satellite link and may take up to two minutes.
 //
-// number must be dialable (digits, '*' and '#' after an optional '+') and
-// text must not contain Ctrl-Z or ESC, which end or abort text entry;
-// otherwise it fails with ErrInvalidArgument before anything is sent. When
-// the handset's prompt for the text does not come in time, it is sent ESC
-// to leave text entry, so that it accepts commands again. Once the text has
-// been entered, a timeout leaves the handset submitting the message, and
-// its late answer may still follow.
+// The text goes in the GSM 7-bit alphabet when it can, and in UCS-2
+// otherwise. number must be dialable (digits, '*' and '#' after an
+// optional '+'), and text must fit one message: 160 GSM characters, those
+// of its extension table such as '€' or '[' counting two, or else 70 UCS-2
+// ones, a character outside the Basic Multilingual Plane counting two.
+// Otherwise it fails with ErrInvalidArgument before anything is sent.
+//
+// The message goes through the SMS centre the SIM names (AT+CSCA?), or
+// Iridium's, +881662900005, when it names none. When the handset's prompt
+// for the PDU does not come in time, it is sent ESC to leave text entry,
+// so that it accepts commands again. Once the PDU has been entered, a
+// timeout leaves the handset submitting the message, and its late answer
+// may still follow.
 func (h *Handset) SendSMS(number, text string) (int, error) {
 	return exchange(h, func() (int, error) { return h.sendSMS(number, text) })
 }
@@ -462,7 +472,9 @@ func (h *Handset) SendSMS(number, text string) (int, error) {
 // ListSMS lists the stored messages filter selects (AT+CMGL). Listing marks
 // unread messages read, as 3GPP TS 27.005 specifies. A filter without a
 // constant of its own fails with ErrInvalidArgument, "%d is not an SMS
-// filter", before anything is sent.
+// filter", before anything is sent. A handset takes a while for each
+// message it lists, so ListSMS waits up to a minute, whatever SetTimeout
+// says.
 func (h *Handset) ListSMS(filter SMSFilter) ([]SMSMessage, error) {
 	return exchange(h, func() ([]SMSMessage, error) { return h.listSMS(filter) })
 }

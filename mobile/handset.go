@@ -198,7 +198,7 @@ type IridiumHandset struct {
 }
 
 // NewIridiumHandset connects through a transport the app provides and
-// initialises the handset (echo off, verbose errors, SMS text mode), ending
+// initialises the handset (echo off, verbose errors, SMS PDU mode), ending
 // a data call an earlier session left up. If the handset does not answer
 // and a data call it may be relaying could not be ended, it fails with
 // SatlinkErrorHangUpFailed.

@@ -84,7 +84,7 @@ func (h *Handset) endCallHeldInCommandMode() error {
 }
 
 // configure puts a synchronised handset into a known state: echo off,
-// verbose results, verbose +CME ERROR, SMS text mode.
+// verbose results, verbose +CME ERROR, SMS PDU mode.
 func (h *Handset) configure() error {
 	if _, err := h.command("ATE0"); err != nil {
 		return err
@@ -94,7 +94,7 @@ func (h *Handset) configure() error {
 	}
 	// Optional on some firmware; the handset still works without them.
 	_, _ = h.command("AT+CMEE=2")
-	_, _ = h.command("AT+CMGF=1")
+	_, _ = h.command("AT+CMGF=0")
 	return nil
 }
 

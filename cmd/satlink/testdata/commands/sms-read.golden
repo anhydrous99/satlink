@@ -3,7 +3,7 @@ exit status 0
 --- stdout
 From: +881639876543
 Time: <time>
-Status: REC READ
+Status: REC UNREAD
 
 Hello from +881639876543
 --- stderr

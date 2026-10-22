@@ -197,10 +197,17 @@ func (c *Control) RestartPPP(clientAddress netip.Addr) error {
 // handset announces it with +CMTI: "SM",<index>, using the lowest free
 // storage index.
 //
+// The handset stores messages as PDUs, as real ones do: from must be a
+// dialable number, digits, '*' and '#' after an optional '+', and text must
+// fit one message, 160 GSM 7-bit characters or else 70 UCS-2 ones.
+// Otherwise ReceiveSMS fails and delivers nothing.
+//
 // The announcement waits while a call is up or an SMS is being typed, and
 // until the app has read the handset's earlier output.
-func (c *Control) ReceiveSMS(from, text string) {
-	c.shared.locked.use(func(m *modem, now time.Time) { m.receiveSMS(from, text, now) })
+func (c *Control) ReceiveSMS(from, text string) error {
+	var err error
+	c.shared.locked.use(func(m *modem, now time.Time) { err = m.receiveSMS(from, text, now) })
+	return err
 }
 
 // Stats returns what the handset has done so far, as a copy for the caller
