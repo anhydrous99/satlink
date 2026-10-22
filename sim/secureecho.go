@@ -9,11 +9,11 @@ import (
 	"io"
 	"net"
 	"net/netip"
-	"slices"
 	"sync"
 	"time"
 
 	"github.com/anhydrous99/satlink/internal/memconn"
+	"github.com/anhydrous99/satlink/internal/ringprovider"
 )
 
 // The TLS side of the secure echo service: plaintext that a client sends
@@ -80,22 +80,6 @@ var serverCertificate = sync.OnceValue(func() tls.Certificate {
 	return certificate
 })
 
-// tls12CipherSuites are the TLS 1.2 cipher suites of rustls's ring
-// provider, which the Rust echo served: ECDHE key exchange with an AEAD
-// cipher. crypto/tls's defaults would also serve a client that offers only
-// the ECDHE suites with CBC and HMAC-SHA1, which the Rust echo refused.
-// crypto/tls ignores the list's order: of the suites a client offers, it
-// picks by its own order, where rustls's server followed the client's. Its
-// TLS 1.3 suites, which a server cannot choose, are rustls's three.
-var tls12CipherSuites = []uint16{
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-}
-
 // newSecureEchoConfig returns the TLS settings of one simulated internet.
 // Its connections share them, and with them the session ticket keys
 // crypto/tls draws for each configuration, so that a client can resume a
@@ -104,11 +88,23 @@ func newSecureEchoConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{serverCertificate()},
 		// TLS 1.2 and 1.3, as rustls's safe defaults.
-		MinVersion:   tls.VersionTLS12,
-		CipherSuites: slices.Clone(tls12CipherSuites),
+		MinVersion: tls.VersionTLS12,
+		// The TLS 1.2 suites the Rust echo served: crypto/tls's defaults
+		// would also serve a client that offers only the ECDHE suites with
+		// CBC and HMAC-SHA1, which the Rust echo refused. crypto/tls ignores
+		// the list's order: of the suites a client offers, it picks by its
+		// own order, where rustls's server followed the client's. Its TLS
+		// 1.3 suites, which a server can neither choose nor order, are
+		// rustls's three. TLS 1.2 keeps crypto/tls's order too, one rule for
+		// both versions: following the client's there, through a
+		// GetConfigForClient, would matter only to a client of another TLS
+		// library that speaks TLS 1.2 at most, as crypto/tls's clients,
+		// satnet's among them, agree the same suite at TLS 1.2 with either
+		// echo on the same machine (docs/PORTING.md, section 3).
+		CipherSuites: ringprovider.TLS12CipherSuites(),
 		// The key exchange groups of rustls's ring provider, without a
 		// post-quantum one, which the Rust server could not offer.
-		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384},
+		CurvePreferences: ringprovider.KeyExchangeGroups(),
 		// Records as large as rustls makes them, up to 16 KiB of plaintext.
 		DynamicRecordSizingDisabled: true,
 	}

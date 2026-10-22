@@ -47,10 +47,11 @@ func TestQuoteWritesAStrAsRustsDebugWritesIt(t *testing.T) {
 // A Rust str cannot hold a byte that is not UTF-8, so this text is Quote's
 // own: the byte as \xNN, in lower case as Rust's u8::escape_ascii writes
 // it, where the replacement character before it, which is UTF-8, is
-// written as it is.
+// written as it is. The text after the byte is still quoted: its vertical
+// tab is written \u{b}.
 func TestQuoteWritesAByteThatIsNotUTF8AsAnEscape(t *testing.T) {
 	t.Parallel()
-	text, want := "a\ufffdb\xff", "\"a\ufffdb\\xff\""
+	text, want := "a\ufffdb\xff\v", "\"a\ufffdb\\xff\\u{b}\""
 	if got := rustdebug.Quote(text); got != want {
 		t.Errorf("Quote(%q) = %s, want %s", text, got, want)
 	}

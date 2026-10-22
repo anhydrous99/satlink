@@ -92,9 +92,10 @@ func isWrittenAsCodePoint(character rune) bool {
 }
 
 // extendsAGrapheme reports whether character has Unicode's Grapheme_Extend
-// property, which Rust's Debug escapes wherever the character stands: the
-// enclosing and non-spacing marks, and the other characters that Unicode
-// counts with them.
+// property: the enclosing and non-spacing marks, and the other characters
+// that Unicode counts with them. Rust's Debug escapes them wherever they
+// stand, but for the halfwidth katakana sound marks (see
+// isWrittenAsCodePoint).
 func extendsAGrapheme(character rune) bool {
 	return unicode.In(character, unicode.Mn, unicode.Me, unicode.Other_Grapheme_Extend)
 }

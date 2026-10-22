@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
+	"github.com/anhydrous99/satlink/internal/ringprovider"
 	"golang.org/x/crypto/x509roots/fallback/bundle"
 )
 
@@ -39,21 +40,6 @@ const (
 // errMalformedPEMSection is why PEM data that holds a section which does not
 // decode is invalid.
 var errMalformedPEMSection = errors.New("a section is malformed")
-
-// tls12CipherSuites are the TLS 1.2 cipher suites rustls's ring backend
-// offers: ECDHE key exchange with an AEAD cipher. crypto/tls's defaults
-// would add ECDHE suites with CBC and HMAC-SHA1, which rustls never offers,
-// as their MAC-then-encrypt construction is what padding oracles attack.
-// crypto/tls ignores the list's order. Its TLS 1.3 suites, which a client
-// cannot choose, are rustls's three.
-var tls12CipherSuites = []uint16{
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-}
 
 // TLSOptions are the trust settings for a [TLSConnector]. The zero value
 // trusts the public web PKI, pins nothing and offers no ALPN.
@@ -132,13 +118,16 @@ func NewTLSConnector(options TLSOptions) (*TLSConnector, error) {
 		return nil, err
 	}
 	config := &tls.Config{
-		MinVersion:   tls.VersionTLS12,
-		CipherSuites: slices.Clone(tls12CipherSuites),
+		MinVersion: tls.VersionTLS12,
+		// The TLS 1.2 suites rustls offers. crypto/tls ignores the list's
+		// order; its TLS 1.3 suites, which a client cannot choose, are
+		// rustls's three.
+		CipherSuites: ringprovider.TLS12CipherSuites(),
 		// The groups of rustls's ring backend, without the post-quantum ones:
 		// X25519MLKEM768 would add about 2.3 KB to every handshake, 1.2 KB of
 		// it in the ClientHello. crypto/tls ignores the list's order and
 		// sends a key share for the first of its own order, X25519.
-		CurvePreferences:   []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384},
+		CurvePreferences:   ringprovider.KeyExchangeGroups(),
 		ClientSessionCache: caseBlindSessionCache{sessions: tls.NewLRUClientSessionCache(0)},
 		RootCAs:            roots,
 		// Refuses chains holding an RSA key of under 2041 or over 8192 bits,

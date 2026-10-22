@@ -397,7 +397,9 @@ const closeWait = 10 * time.Second
 // Go only: Rust's tests leave the stream's drop unchecked. The relay's
 // connection closes, gracefully, once the relay and the sender of standard
 // input are both done with it, whichever is done last, as the Rust
-// version's TcpStream closed once both had dropped the Arc that held it.
+// version's TcpStream closed once both had dropped the Arc that held it;
+// and at once when the relay cannot say that it is connected, before the
+// sender starts, as the Rust relay's `?` dropped the only Arc.
 func TestARelaysConnectionClosesOnceTheRelayAndTheSenderAreDone(t *testing.T) {
 	t.Run("the sender first", func(t *testing.T) {
 		t.Parallel()
@@ -435,5 +437,20 @@ func TestARelaysConnectionClosesOnceTheRelayAndTheSenderAreDone(t *testing.T) {
 		// Closing a pipe cannot fail.
 		_ = typing.Close()
 		simtest.Eventually(t, closeWait, "the connection is closed", func() bool { return isConnectionClosed(link.dialled) })
+	})
+	t.Run("the relay alone", func(t *testing.T) {
+		t.Parallel()
+		link := &dialRecorder{Link: echoLink(t)}
+
+		err := tcpAction{host: "echo.test", port: 7}.execute(link,
+			streams{stdin: strings.NewReader("hello"), stdout: io.Discard, stderr: brokenWriter{}})
+
+		if !errors.Is(err, errBrokenOutput) {
+			t.Fatalf("the relay returned %v, want the failure to say that it is connected", err)
+		}
+		// No sender has started to hold the connection.
+		if !isConnectionClosed(link.dialled) {
+			t.Error("the relay left its connection open")
+		}
 	})
 }

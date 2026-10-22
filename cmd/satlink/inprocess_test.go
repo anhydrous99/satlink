@@ -388,10 +388,13 @@ func (w *gatedWriter) open() {
 	}
 }
 
+// errBrokenOutput is why a brokenWriter cannot be written to.
+var errBrokenOutput = errors.New("broken pipe")
+
 // brokenWriter is an output stream that cannot be written to, such as a
 // closed pipe.
 type brokenWriter struct{}
 
 func (brokenWriter) Write([]byte) (int, error) {
-	return 0, errors.New("broken pipe")
+	return 0, errBrokenOutput
 }

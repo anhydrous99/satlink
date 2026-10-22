@@ -35,7 +35,7 @@ serial/             serial transport + discovery by USB VID/PID
 cmd/satlink/        the satlink command-line tool
 mobile/             gomobile bindings: Kotlin and Java (Android), Swift and Objective-C (macOS)
 internal/ipstack/   TCP/IP: a Go port of the part of smoltcp the link uses
-internal/…          shared internals: log rendering, Rust's Debug texts, lossy UTF-8, ASCII case, OS error texts, test support
+internal/…          shared internals: log rendering, Rust's Debug texts, rustls's TLS suites, lossy UTF-8, ASCII case, OS error texts, test support
 android/            Kotlin USB-host transport, examples, USB device filter
 linux/              udev rule
 scripts/            gomobile build scripts
@@ -326,13 +326,17 @@ Every command shows a summary of its arguments with `-h`, and more with `--help`
 `satlink help COMMAND…`, as in `satlink help net get`. The exit status is:
 
 - 0 on success;
-- 1 when the command failed: standard output that cannot be written, a pipe to a
+- 1 when the command failed: a standard output that cannot be written, a pipe to a
   `head` that has had enough, included, and a panic once the link is up, which
   hangs up first and is reported on standard error;
 - 2 when the command line is wrong;
 - 101 when `satlink` panicked while readying the handset, in a handset command or
   while setting a call up (a bug, reported on standard error);
 - once interrupted, death by `SIGINT` (status 130 on Windows).
+
+Output to a standard output opened read-only on Unix, or to one that `satlink` was
+not handed on Windows, is dropped without an error, as in the Rust version. On
+Windows, one opened read-only fails the command.
 
 Use `--port /dev/ttyACM0` (or `SATLINK_PORT`) when more than one handset is
 attached, and `satlink net --number` (or `SATLINK_DATA_NUMBER`) for another
@@ -526,8 +530,12 @@ The behaviour is the Rust version's, with these deliberate exceptions; section 3
   to, so satnet takes chains with such keys, which rustls's ring backend cannot
   verify: a server that holds one next to a classical certificate may send it, and an
   ML-DSA-65 leaf adds about 5 KB (some 17 s) to a full handshake, where the Rust
-  version is sent the classical one. Chains with an RSA key under 2048 bits (or over
-  8192) or an ECDSA key on P-224 are refused, as in the Rust version.
+  version is sent the classical one. crypto/tls also asks for RSA-PSS signatures
+  before ECDSA ones, where rustls asks for ECDSA first, so a server that holds
+  several certificates may send satnet another one than the Rust version: pin the
+  key of each (`TLSOptions.PinnedPublicKeys`). Chains with an RSA key under 2041
+  bits (ring counts its 2048-bit minimum in whole bytes) or over 8192, or an ECDSA
+  key on P-224, are refused, as in the Rust version.
 - The handset is never moved into a link or a call: while one holds it, its methods
   fail with `satlink.ErrBusy`, and it is released when the call ends; a `DataCall`
   dropped without `HangUp` ends nothing, so hang up in a deferred function. Rust's
@@ -563,8 +571,10 @@ The behaviour is the Rust version's, with these deliberate exceptions; section 3
   more of airtime.
 - The mobile API keeps to what gomobile binds: lists with `Len`/`Get`, int constants
   for enumerations, `int64` milliseconds; in Java and Kotlin, handles of one class
-  all compare equal, records compare their fields, and settings compare without
-  their rules, hosts, roots, pins and ALPN protocols.
+  all compare equal, records compare their fields — but the lists they hold always
+  compare equal, and the `Data` of `Received` and `Datagram` compares by reference,
+  so compare contents — and settings compare without their rules, hosts, roots,
+  pins and ALPN protocols.
 - Rust bugs the port does not reproduce: PPP negotiations stuck after a stray
   Terminate-Ack, and a Nak that a hostile request could inflate into a panic; the
   CLI's handset commands panicking with status 101 when their output cannot be
@@ -572,7 +582,8 @@ The behaviour is the Rust version's, with these deliberate exceptions; section 3
   reaching past the receive buffer, a FIN taken after data the window cut short, and
   segments from half the sequence space away taken while the receive window ends
   before it starts. ipstack also keeps its `PollAt` from a panic of smoltcp's
-  `poll_at` after a peer's early SYN, which neither version reaches.
+  `poll_at` after a peer's early SYN, or a SYN|ACK to a socket without a receive
+  buffer, which neither version reaches.
 
 ## Testing
 

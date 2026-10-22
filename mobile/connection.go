@@ -8,16 +8,13 @@ import (
 	"github.com/anhydrous99/satlink/satnet"
 )
 
-// Connections over the satellite link. Receive returns at most 64 KiB, so
-// that a large maxLen cannot make the library allocate without bound. A
-// stream's maxLen must be at least 1; a datagram's may be 0, as in the
-// Rust bindings. A timeout of zero takes only what has already arrived.
-//
-// gomobile hands an empty byte array to Java as null and to Swift as nil —
-// where a nil result without an error even throws — so the end of a stream
-// is a flag of the result rather than an empty one.
+// Connections over the satellite link. gomobile hands an empty byte array
+// to Java as null and to Swift as nil — where a nil result without an error
+// even throws — so the end of a stream is a flag of the result rather than
+// an empty one.
 
-// maxReceiveLen is the most bytes one Receive returns.
+// maxReceiveLen is the most bytes one Receive returns, so that a large
+// maxLen cannot make the library allocate without bound.
 const maxReceiveLen = 64 * 1024
 
 // Received is what a stream connection's Receive returns: data, or the end
@@ -79,7 +76,9 @@ func (c *TCPConnection) SendSome(data []byte, timeoutMillis int64) (queued int64
 
 // Receive returns up to maxLen bytes (at most 64 KiB), waiting up to
 // timeoutMillis for the first, or a Received with Finished set once the
-// peer has finished sending.
+// peer has finished sending. A timeout of zero takes only what has already
+// arrived. maxLen must be at least 1, or Receive could return neither data
+// nor the end of the stream.
 func (c *TCPConnection) Receive(maxLen int, timeoutMillis int64) (received *Received, err error) {
 	defer recoverPanic(&err)
 	conn, err := made(c.conn, "TCPConnection")
@@ -195,7 +194,9 @@ func (c *TLSConnection) SendSome(data []byte, timeoutMillis int64) (taken int64,
 // Receive returns up to maxLen decrypted bytes (at most 64 KiB), waiting up
 // to timeoutMillis, or a Received with Finished set once the server has
 // ended the session. A connection closed without that fails with
-// SatlinkErrorTLSTruncated.
+// SatlinkErrorTLSTruncated. A timeout of zero takes only what has already
+// arrived. maxLen must be at least 1, or Receive could return neither data
+// nor the end of the session.
 func (c *TLSConnection) Receive(maxLen int, timeoutMillis int64) (received *Received, err error) {
 	defer recoverPanic(&err)
 	conn, err := made(c.conn, "TLSConnection")
@@ -321,8 +322,9 @@ func (c *UDPConnection) Send(datagram []byte, timeoutMillis int64) (err error) {
 }
 
 // Receive returns the next datagram from the peer, truncated to maxLen (at
-// most 64 KiB), waiting up to timeoutMillis. With maxLen 0 it waits for a
-// datagram and keeps none of it.
+// most 64 KiB), waiting up to timeoutMillis: a timeout of zero takes only a
+// datagram that has already arrived. With maxLen 0 it waits for a datagram
+// and keeps none of it, as in the Rust bindings.
 func (c *UDPConnection) Receive(maxLen int, timeoutMillis int64) (datagram *Datagram, err error) {
 	defer recoverPanic(&err)
 	conn, err := made(c.conn, "UDPConnection")
