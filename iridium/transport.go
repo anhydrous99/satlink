@@ -63,6 +63,9 @@ func (h *Handset) read(p []byte, timeout time.Duration) (int, error) {
 	if err != nil {
 		return 0, wrapTransportError(err)
 	}
+	if received > 0 {
+		h.lastReceived = time.Now()
+	}
 	return received, nil
 }
 

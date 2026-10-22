@@ -252,6 +252,10 @@ type Handset struct {
 	rx lineBuffer
 	// urcs are the unsolicited result codes received, oldest first.
 	urcs []string
+	// lastReceived is when the handset last sent something: the next
+	// command line waits commandSettle from then. A data call sets it too,
+	// as it reads through the handset.
+	lastReceived time.Time
 }
 
 // NewHandset returns a handset that talks through transport. Nothing is

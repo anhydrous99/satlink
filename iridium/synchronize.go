@@ -103,7 +103,7 @@ func (h *Handset) configure() error {
 // own result code, ending in a bare CR, shows that it is listening.
 func (h *Handset) synchronize() error {
 	for range syncAttempts {
-		if err := h.write([]byte(attentionCommand + commandEnd)); err != nil {
+		if err := h.writeCommandLine(attentionCommand); err != nil {
 			return err
 		}
 		answered, err := h.awaitOwnResult(deadlineAfter(syncTimeout))

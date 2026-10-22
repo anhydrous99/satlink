@@ -114,6 +114,35 @@ func TestDeviceInfo(t *testing.T) {
 	}
 }
 
+// handsetSettle is how long a command line waits after the handset last
+// sent something: a 9555A drops a command written straight after its
+// previous answer.
+const handsetSettle = 20 * time.Millisecond
+
+func TestACommandWaitsForTheHandsetToSettleAfterItsLastAnswer(t *testing.T) {
+	transport := newScripted(
+		step{"AT+CGMI\r", "\r\nIridium\r\n\r\nOK\r\n"},
+		// A 9555A's OK after AT+CGMM comes without a line break of its own.
+		step{"AT+CGMM\r", "\r\n9555A\r\nOK\r\n"},
+	)
+	handset := newTestHandset(transport)
+
+	_, firstErr := handset.Command("AT+CGMI")
+	model, secondErr := handset.Command("AT+CGMM")
+
+	if firstErr != nil || secondErr != nil {
+		t.Fatalf("Command = %v, %v", firstErr, secondErr)
+	}
+	if !slices.Equal(model.Lines, []string{"9555A"}) {
+		t.Errorf("AT+CGMM answered %q, want 9555A", model.Lines)
+	}
+	first, _ := transport.writtenAt("AT+CGMI\r")
+	second, _ := transport.writtenAt("AT+CGMM\r")
+	if gap := second.Sub(first); gap < handsetSettle {
+		t.Errorf("AT+CGMM written %v after AT+CGMI, which was answered at once; want at least %v", gap, handsetSettle)
+	}
+}
+
 func TestSignalBatteryRegistration(t *testing.T) {
 	handset := newTestHandset(newScripted(
 		step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"},

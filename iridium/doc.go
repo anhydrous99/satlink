@@ -33,6 +33,9 @@
 //     link;
 //   - dialling waits up to ninety seconds.
 //
+// A command waits 20 ms after the handset last sent something, as a 9555A
+// silently drops one written straight after its previous answer.
+//
 // A timeout too long for the clock, such as math.MaxInt64, means no
 // deadline. While waiting, the handset reads for at most a second at a
 // time, so a transport is never handed an absurd timeout. Call the methods
