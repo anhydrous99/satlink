@@ -1,0 +1,7 @@
+$ satlink --simulate=instant net status
+exit status 1
+--- stdout
+--- stderr
+Dialling 008816000025 — call setup over Iridium takes about half a minute…
+warning: the hang-up was not confirmed, so the call may still be up and billing. End it with `satlink hangup`, or power-cycle the handset.
+error: the satellite link is down: PPP authentication failed: Access denied

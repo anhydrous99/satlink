@@ -1,0 +1,9 @@
+$ satlink --simulate=instant sms list all -- read
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument 'read' found
+
+Usage: satlink sms list [OPTIONS] [FILTER]
+
+For more information, try '--help'.

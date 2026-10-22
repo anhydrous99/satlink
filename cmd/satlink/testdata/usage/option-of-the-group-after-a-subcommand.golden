@@ -1,0 +1,9 @@
+$ satlink --simulate=instant net status --number 5
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--number' found
+
+Usage: satlink net status [OPTIONS]
+
+For more information, try '--help'.

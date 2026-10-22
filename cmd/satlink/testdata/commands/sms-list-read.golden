@@ -1,0 +1,4 @@
+$ satlink --simulate=instant sms list read
+exit status 0
+--- stdout
+--- stderr

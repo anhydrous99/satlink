@@ -1,0 +1,11 @@
+$ satlink --simulate=instant dial --frob
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--frob' found
+
+  tip: to pass '--frob' as a value, use '-- --frob'
+
+Usage: satlink dial [OPTIONS] <NUMBER>
+
+For more information, try '--help'.

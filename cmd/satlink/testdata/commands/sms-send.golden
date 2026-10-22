@@ -1,0 +1,5 @@
+$ satlink --simulate=instant sms send +881631234567 'hello from the field'
+exit status 0
+--- stdout
+Sent (message reference 1)
+--- stderr

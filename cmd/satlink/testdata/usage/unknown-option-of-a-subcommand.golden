@@ -1,0 +1,9 @@
+$ satlink --simulate=instant sms --frob list
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--frob' found
+
+Usage: satlink sms [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

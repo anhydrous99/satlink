@@ -1,0 +1,8 @@
+$ satlink --simulate=instant sms list bogus
+exit status 2
+--- stdout
+--- stderr
+error: invalid value 'bogus' for '[FILTER]'
+  [possible values: all, unread, read, unsent, sent]
+
+For more information, try '--help'.

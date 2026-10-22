@@ -1,0 +1,11 @@
+$ satlink --simulate=instant --idle-secs 5 net status
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m unexpected argument '[33m--idle-secs[0m' found
+
+  [32mtip:[0m '[32mnet --idle-secs[0m' exists
+
+[1m[4mUsage:[0m [1msatlink[0m [1m--simulate[0m[=<SIMULATE>] <COMMAND>
+
+For more information, try '[1m--help[0m'.

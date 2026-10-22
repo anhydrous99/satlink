@@ -1,0 +1,9 @@
+$ satlink --simulate=instant -t 3 at AT
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '-t' found
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

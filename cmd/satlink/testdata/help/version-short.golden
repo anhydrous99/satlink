@@ -1,0 +1,5 @@
+$ satlink -V
+exit status 0
+--- stdout
+satlink 0.1.0
+--- stderr

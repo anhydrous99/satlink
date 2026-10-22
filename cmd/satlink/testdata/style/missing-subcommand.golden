@@ -1,0 +1,10 @@
+$ satlink -v
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m '[33msatlink[0m' requires a subcommand but one was not provided
+  [subcommands: [32mlist[0m, [32minfo[0m, [32mstatus[0m, [32msms[0m, [32mdial[0m, [32manswer[0m, [32mhangup[0m, [32mat[0m, [32mmonitor[0m, [32mnet[0m, [32mhelp[0m]
+
+[1m[4mUsage:[0m [1msatlink[0m [OPTIONS] <COMMAND>
+
+For more information, try '[1m--help[0m'.

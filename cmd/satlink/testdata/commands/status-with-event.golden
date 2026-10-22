@@ -1,0 +1,8 @@
+$ satlink --simulate=instant status
+exit status 0
+--- stdout
+Signal:       4/5
+Battery:      80% (ExternalPower)
+Registration: Home
+--- stderr
+(event) +CMTI: "SM",1

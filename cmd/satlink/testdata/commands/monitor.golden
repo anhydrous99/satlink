@@ -1,0 +1,5 @@
+$ satlink --simulate=instant monitor
+exit status 0
+--- stdout
++CMTI: "SM",1
+--- stderr

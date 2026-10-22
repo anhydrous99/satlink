@@ -1,0 +1,9 @@
+$ satlink --simulate=instant net tcp h 7 --help=x
+exit status 2
+--- stdout
+--- stderr
+error: unexpected value 'x' for '--help' found; no more were expected
+
+Usage: satlink net tcp --help <HOST|PORT>
+
+For more information, try '--help'.

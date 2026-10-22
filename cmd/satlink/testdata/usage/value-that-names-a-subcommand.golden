@@ -1,0 +1,10 @@
+$ satlink --port info
+exit status 2
+--- stdout
+--- stderr
+error: 'satlink' requires a subcommand but one was not provided
+  [subcommands: list, info, status, sms, dial, answer, hangup, at, monitor, net, help]
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

@@ -1,0 +1,11 @@
+$ satlink --simulate=instant dial --frob
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m unexpected argument '[33m--frob[0m' found
+
+  [32mtip:[0m to pass '[33m--frob[0m' as a value, use '[32m-- --frob[0m'
+
+[1m[4mUsage:[0m [1msatlink dial[0m [OPTIONS] <NUMBER>
+
+For more information, try '[1m--help[0m'.

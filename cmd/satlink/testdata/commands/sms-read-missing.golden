@@ -1,0 +1,5 @@
+$ satlink --simulate=instant sms read 9
+exit status 1
+--- stdout
+--- stderr
+error: +CMS ERROR: 321

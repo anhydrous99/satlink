@@ -1,0 +1,11 @@
+$ satlink --simulate=instant --idle-secs 5 net status
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--idle-secs' found
+
+  tip: 'net --idle-secs' exists
+
+Usage: satlink --simulate[=<SIMULATE>] <COMMAND>
+
+For more information, try '--help'.

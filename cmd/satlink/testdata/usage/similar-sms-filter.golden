@@ -1,0 +1,10 @@
+$ satlink --simulate=instant sms list unred
+exit status 2
+--- stdout
+--- stderr
+error: invalid value 'unred' for '[FILTER]'
+  [possible values: all, unread, read, unsent, sent]
+
+  tip: a similar value exists: 'unread'
+
+For more information, try '--help'.

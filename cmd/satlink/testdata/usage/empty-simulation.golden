@@ -1,0 +1,8 @@
+$ satlink --simulate= info
+exit status 2
+--- stdout
+--- stderr
+error: a value is required for '--simulate[=<SIMULATE>]' but none was supplied
+  [possible values: iridium, instant]
+
+For more information, try '--help'.

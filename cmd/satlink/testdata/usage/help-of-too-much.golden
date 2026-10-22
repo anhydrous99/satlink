@@ -1,0 +1,9 @@
+$ satlink help info extra
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'extra'
+
+Usage: satlink info [OPTIONS]
+
+For more information, try '--help'.

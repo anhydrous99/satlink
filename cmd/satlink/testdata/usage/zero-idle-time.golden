@@ -1,0 +1,7 @@
+$ satlink --simulate=instant net --idle-secs 0 status
+exit status 2
+--- stdout
+--- stderr
+error: invalid value '0' for '--idle-secs <IDLE_SECS>': 0 is not in 1..18446744073709551615
+
+For more information, try '--help'.

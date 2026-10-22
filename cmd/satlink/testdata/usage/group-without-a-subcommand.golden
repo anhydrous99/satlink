@@ -1,0 +1,10 @@
+$ satlink --simulate=instant net --allow x
+exit status 2
+--- stdout
+--- stderr
+error: 'satlink net' requires a subcommand but one was not provided
+  [subcommands: status, resolve, get, tcp, help]
+
+Usage: satlink net [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

@@ -1,0 +1,5 @@
+$ satlink list
+exit status 0
+--- stdout
+No Iridium handsets found.
+--- stderr

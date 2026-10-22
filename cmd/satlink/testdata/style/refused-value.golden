@@ -1,0 +1,7 @@
+$ satlink -b= info
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m invalid value '[33m[0m' for '[1m--baud <BAUD>[0m': cannot parse integer from empty string
+
+For more information, try '[1m--help[0m'.

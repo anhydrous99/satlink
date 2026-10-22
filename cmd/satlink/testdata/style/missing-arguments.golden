@@ -1,0 +1,11 @@
+$ satlink --simulate=instant net tcp
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m the following required arguments were not provided:
+  [32m<HOST>[0m
+  [32m<PORT>[0m
+
+[1m[4mUsage:[0m [1msatlink net tcp[0m <HOST> <PORT>
+
+For more information, try '[1m--help[0m'.

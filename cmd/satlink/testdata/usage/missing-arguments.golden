@@ -1,0 +1,11 @@
+$ satlink --simulate=instant net tcp
+exit status 2
+--- stdout
+--- stderr
+error: the following required arguments were not provided:
+  <HOST>
+  <PORT>
+
+Usage: satlink net tcp <HOST> <PORT>
+
+For more information, try '--help'.

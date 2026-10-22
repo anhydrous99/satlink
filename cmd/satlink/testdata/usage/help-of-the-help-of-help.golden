@@ -1,0 +1,7 @@
+$ satlink help help help
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'help'
+
+Usage: satlink help [COMMAND]...

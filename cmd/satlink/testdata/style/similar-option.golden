@@ -1,0 +1,11 @@
+$ satlink --verbos info
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m unexpected argument '[33m--verbos[0m' found
+
+  [32mtip:[0m a similar argument exists: '[32m--verbose[0m'
+
+[1m[4mUsage:[0m [1msatlink[0m [1m--verbose[0m... <COMMAND>
+
+For more information, try '[1m--help[0m'.

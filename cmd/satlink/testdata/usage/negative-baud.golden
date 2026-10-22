@@ -1,0 +1,7 @@
+$ satlink --baud=-5 --simulate=instant info
+exit status 2
+--- stdout
+--- stderr
+error: invalid value '-5' for '--baud <BAUD>': -5 is not in 0..=4294967295
+
+For more information, try '--help'.

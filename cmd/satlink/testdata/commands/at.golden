@@ -1,0 +1,6 @@
+$ satlink --simulate=instant at AT+CSQ
+exit status 0
+--- stdout
++CSQ:4
+OK
+--- stderr

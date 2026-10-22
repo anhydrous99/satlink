@@ -1,0 +1,8 @@
+$ satlink --simulate=
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m a value is required for '[33m--simulate[=<SIMULATE>][0m' but none was supplied
+  [possible values: [32miridium[0m, [32minstant[0m]
+
+For more information, try '[1m--help[0m'.

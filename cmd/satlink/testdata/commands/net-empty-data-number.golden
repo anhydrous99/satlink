@@ -1,0 +1,6 @@
+$ satlink --simulate=instant net status
+exit status 1
+--- stdout
+--- stderr
+Dialling  — call setup over Iridium takes about half a minute…
+error: handset: invalid argument: "" is not a dialable number

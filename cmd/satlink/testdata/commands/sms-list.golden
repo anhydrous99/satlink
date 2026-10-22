@@ -1,0 +1,10 @@
+$ satlink --simulate=instant sms list
+exit status 0
+--- stdout
+[1] REC UNREAD +881631234567 <time>
+Hello from +881631234567
+
+[2] REC UNREAD +881639876543 <time>
+Hello from +881639876543
+
+--- stderr

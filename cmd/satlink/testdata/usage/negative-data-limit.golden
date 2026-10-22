@@ -1,0 +1,9 @@
+$ satlink --simulate=instant net --max-kb -5 status
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '-5' found
+
+Usage: satlink net [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

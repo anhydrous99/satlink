@@ -1,0 +1,7 @@
+$ satlink --simulate=instant sms read ''
+exit status 2
+--- stdout
+--- stderr
+error: invalid value '' for '<INDEX>': cannot parse integer from empty string
+
+For more information, try '--help'.

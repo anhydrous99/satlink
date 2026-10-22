@@ -1,0 +1,14 @@
+$ satlink --simulate=instant net get http://web.test/
+exit status 0
+--- stdout
+Hello from the simulated Iridium network!
+--- stderr
+Dialling 008816000025 — call setup over Iridium takes about half a minute…
+Connected (19200).
+  address:     10.64.0.2
+  gateway:     10.64.0.1
+  DNS servers: 10.64.0.1
+HTTP/1.0 200 OK
+Content-Type: text/plain
+Content-Length: 42
+Call lasted <n> s: <n> bytes sent, <n> received.

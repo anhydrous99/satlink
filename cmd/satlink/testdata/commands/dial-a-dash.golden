@@ -1,0 +1,5 @@
+$ satlink --simulate=instant dial -- -5
+exit status 1
+--- stdout
+--- stderr
+error: invalid argument: "-5" is not a dialable number

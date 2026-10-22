@@ -1,0 +1,325 @@
+package satlink
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/anhydrous99/satlink/internal/asciicase"
+)
+
+// Command execution: writing a command, and collecting its answer and its
+// final result. Everything here runs with the handset's lock held.
+
+// commandEnd ends every command line: register S3, carriage return.
+const commandEnd = "\r"
+
+// readChunk is the most read from the transport at a time.
+const readChunk = 512
+
+// Cancelling a dial or an answer while it waits for CONNECT.
+const (
+	// abortIgnoredFor is how long a cancellation waits after the command it
+	// stops: a handset may ignore what it receives in the first 125 ms
+	// after a command (V.250 §5.6.1), so an abort sent sooner could be
+	// lost.
+	abortIgnoredFor = 200 * time.Millisecond
+	// cancellationCheck is how often a cancellable wait looks at its
+	// cancellation.
+	cancellationCheck = 200 * time.Millisecond
+)
+
+// completion says what ends a command.
+type completion int
+
+const (
+	// untilFinalResult waits for the command's final result code. CONNECT
+	// only counts for commands that can take the handset online.
+	untilFinalResult completion = iota
+	// untilConnect waits for CONNECT or a failure. A handset may answer OK
+	// to a dial command before the call connects, so OK does not end it.
+	untilConnect
+)
+
+// endsWith reports whether result ends a wait until c: every final result
+// does, except an OK while CONNECT is awaited.
+func (c completion) endsWith(result FinalResult) bool {
+	return c != untilConnect || result.Kind != FinalResultOK
+}
+
+// request is a command for exec to run.
+type request struct {
+	// command is the command line without its CR.
+	command string
+	// timeout bounds the wait for the final result.
+	timeout time.Duration
+	// completion says what ends the command.
+	completion completion
+	// textEntry is written once the handset prompts with "> ": an SMS text
+	// and the Ctrl-Z that ends it. Empty when the command takes no text.
+	textEntry []byte
+	// cancellation, once cancelled, ends the wait of a dial or answer as a
+	// timeout does, with ErrCancelled: the attempt may still be in
+	// progress. nil for a command that cannot be cancelled.
+	cancellation *Cancellation
+}
+
+// commandRun is a command between its write and its final result.
+type commandRun struct {
+	request
+	// ownPrefix is the prefix of the command's own information lines, such
+	// as "+CSQ"; "" when it has none.
+	ownPrefix string
+	// sentAt is when the command was written.
+	sentAt time.Time
+	// lines are the information lines received so far.
+	lines []string
+}
+
+// command runs command within the handset's timeout, waiting for its final
+// result.
+func (h *Handset) command(command string) (Response, error) {
+	return h.commandWithTimeout(command, h.commandTimeout())
+}
+
+// commandWithTimeout runs command within timeout, waiting for its final
+// result.
+func (h *Handset) commandWithTimeout(command string, timeout time.Duration) (Response, error) {
+	return h.exec(request{command: command, timeout: timeout, completion: untilFinalResult})
+}
+
+// exec sends req's command and waits for what ends it.
+func (h *Handset) exec(req request) (Response, error) {
+	if strings.ContainsAny(req.command, "\r\n") {
+		return Response{}, invalidArgument("command must not contain CR or LF")
+	}
+	// Anything complete in the buffer now predates this command.
+	h.queueCompleteLines()
+	if err := h.write([]byte(req.command + commandEnd)); err != nil {
+		return Response{}, err
+	}
+	run := &commandRun{request: req, ownPrefix: responsePrefix(req.command), sentAt: time.Now()}
+	return h.awaitResponse(run)
+}
+
+// awaitResponse reads run's answer until its final result, entering its text
+// when the handset prompts for it, or until its time is up or it is
+// cancelled.
+func (h *Handset) awaitResponse(run *commandRun) (Response, error) {
+	deadline := deadlineAfter(run.timeout)
+	for {
+		if result, ended := h.takeAnswerLines(run); ended {
+			return run.finish(result)
+		}
+		if run.awaitsPrompt() && h.rx.takePrompt() {
+			if err := h.enterText(run); err != nil {
+				return Response{}, err
+			}
+			continue
+		}
+		wait, ok := timeToWait(deadline)
+		if !ok {
+			return Response{}, h.giveUp(run)
+		}
+		wait, err := run.cancellableWait(wait)
+		if err != nil {
+			return Response{}, err
+		}
+		if err := h.fill(wait); err != nil {
+			return Response{}, err
+		}
+	}
+}
+
+// cancellableWait returns how long run may read before it looks at its
+// cancellation again, at most wait, or ErrCancelled once it is cancelled
+// and abortIgnoredFor has passed since its command. A run without a
+// cancellation reads for all of wait.
+func (run *commandRun) cancellableWait(wait time.Duration) (time.Duration, error) {
+	if run.cancellation == nil {
+		return wait, nil
+	}
+	// Not too soon: the abort that follows must not be ignored.
+	if run.cancellation.Cancelled() && time.Since(run.sentAt) >= abortIgnoredFor {
+		return 0, cancelledError()
+	}
+	return min(wait, cancellationCheck), nil
+}
+
+// takeAnswerLines takes the complete lines received so far as run's answer —
+// skipping the echo, queueing URCs and keeping information lines — until a
+// final result that ends run, which it reports.
+func (h *Handset) takeAnswerLines(run *commandRun) (FinalResult, bool) {
+	for {
+		line, ok := h.rx.nextLine()
+		if !ok {
+			return FinalResult{}, false
+		}
+		// The echo, whatever the case of its ASCII letters: Unicode case
+		// folding would take a line the handset never echoed for it.
+		if asciicase.EqualFold(line, run.command) {
+			continue
+		}
+		if result, isFinal := classifyFinalResult(line); isFinal {
+			if run.completion.endsWith(result) {
+				return result, true
+			}
+			continue
+		}
+		if isURC(line, run.ownPrefix) {
+			h.urcs = append(h.urcs, line)
+		} else {
+			run.lines = append(run.lines, line)
+		}
+	}
+}
+
+// awaitsPrompt reports whether run still has text to enter at the handset's
+// prompt.
+func (run *commandRun) awaitsPrompt() bool {
+	return len(run.textEntry) > 0
+}
+
+// enterText writes run's text, now that the handset prompts for it.
+func (h *Handset) enterText(run *commandRun) error {
+	text := run.textEntry
+	run.textEntry = nil
+	return h.write(text)
+}
+
+// giveUp reports that run got no final result in time. A handset still
+// waiting for text is sent ESC first, to leave text-entry mode so that it
+// accepts commands again.
+func (h *Handset) giveUp(run *commandRun) error {
+	if run.awaitsPrompt() {
+		// Best effort: the timeout is what the caller needs to hear about,
+		// and a handset that cannot be written to fails the next command.
+		_ = h.write([]byte{esc})
+	}
+	return timeoutError(run.command)
+}
+
+// finish turns run's final result into its response or its error. A
+// CONNECT after a command that cannot take the handset online is an error:
+// a late CONNECT from an abandoned dial must not pass for an answer.
+func (run *commandRun) finish(result FinalResult) (Response, error) {
+	if result.Kind == FinalResultConnect && run.completion == untilFinalResult && !mayGoOnline(run.command) {
+		return Response{}, callError(fmt.Sprintf("unexpected CONNECT after %s: the handset is online", run.command))
+	}
+	return run.response(result)
+}
+
+// response turns run's final result into the command's response, with the
+// information lines received, or into its error.
+func (run *commandRun) response(result FinalResult) (Response, error) {
+	switch result.Kind {
+	case FinalResultOK:
+		return Response{Lines: run.lines}, nil
+	case FinalResultConnect:
+		return Response{Lines: run.lines, Connected: true, ConnectMessage: result.ConnectMessage}, nil
+	case FinalResultError:
+		return Response{}, &Error{Kind: ErrCommandFailed, Command: run.command}
+	case FinalResultCME:
+		return Response{}, &Error{Kind: ErrEquipment, Code: result.Code}
+	case FinalResultCMS:
+		return Response{}, &Error{Kind: ErrSMS, Code: result.Code}
+	case FinalResultNoCarrier:
+		return Response{}, noCarrierError()
+	case FinalResultBusy:
+		return Response{}, callError("BUSY")
+	case FinalResultNoAnswer:
+		return Response{}, callError("NO ANSWER")
+	default:
+		return Response{}, callError("NO DIALTONE")
+	}
+}
+
+// mayGoOnline reports whether command, in whatever case of its ASCII
+// letters, can legitimately end in CONNECT: a data dial (ATD without ';'),
+// answering (ATA) and returning online (ATO).
+func mayGoOnline(command string) bool {
+	command = asciicase.Upper(command)
+	isDataDial := strings.HasPrefix(command, dialCommand) && !strings.HasSuffix(command, voiceCallSuffix)
+	return isDataDial || command == answerCommand || strings.HasPrefix(command, returnOnlineCommand)
+}
+
+// awaitFinalResult waits up to timeout for the final result of something
+// already under way, such as a call attempt being aborted, ending as until
+// says, and reports whether one arrived. URCs are queued and other lines
+// dropped meanwhile.
+func (h *Handset) awaitFinalResult(timeout time.Duration, until completion) (FinalResult, bool, error) {
+	deadline := deadlineAfter(timeout)
+	for {
+		if result, ok := h.takeFinalResult(until); ok {
+			return result, true, nil
+		}
+		wait, ok := timeToWait(deadline)
+		if !ok {
+			return FinalResult{}, false, nil
+		}
+		if err := h.fill(wait); err != nil {
+			return FinalResult{}, false, err
+		}
+	}
+}
+
+// takeFinalResult takes the complete lines received so far until a final
+// result that ends the wait, as until says, and reports it, queueing URCs
+// and dropping the rest.
+func (h *Handset) takeFinalResult(until completion) (FinalResult, bool) {
+	for {
+		line, ok := h.rx.nextLine()
+		if !ok {
+			return FinalResult{}, false
+		}
+		result, isFinal := classifyFinalResult(line)
+		switch {
+		case isFinal && until.endsWith(result):
+			return result, true
+		case !isFinal && isURC(line, ""):
+			h.urcs = append(h.urcs, line)
+		}
+	}
+}
+
+// queueCompleteLines moves every complete line received so far to the URC
+// queue.
+func (h *Handset) queueCompleteLines() {
+	for line, ok := h.rx.nextLine(); ok; line, ok = h.rx.nextLine() {
+		h.urcs = append(h.urcs, line)
+	}
+}
+
+// takeURCs empties the URC queue and returns what it held, oldest first.
+func (h *Handset) takeURCs() []string {
+	urcs := h.urcs
+	h.urcs = nil
+	return urcs
+}
+
+// pollURCs waits up to timeout for unsolicited result codes and returns
+// every queued one, as soon as there is one.
+func (h *Handset) pollURCs(timeout time.Duration) ([]string, error) {
+	deadline := deadlineAfter(timeout)
+	for {
+		h.queueCompleteLines()
+		wait, ok := timeToWait(deadline)
+		if !ok || len(h.urcs) > 0 {
+			return h.takeURCs(), nil
+		}
+		if err := h.fill(wait); err != nil {
+			return nil, err
+		}
+	}
+}
+
+// fill reads what arrives within timeout into the line buffer.
+func (h *Handset) fill(timeout time.Duration) error {
+	var buf [readChunk]byte
+	received, err := h.read(buf[:], timeout)
+	if err != nil {
+		return err
+	}
+	h.rx.push(buf[:received])
+	return nil
+}

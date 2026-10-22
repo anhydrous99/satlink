@@ -1,0 +1,5 @@
+$ satlink --simulate=instant net resolve 192.0.2.7
+exit status 0
+--- stdout
+192.0.2.7
+--- stderr

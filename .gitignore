@@ -1,0 +1,11 @@
+# The binary `go build ./cmd/satlink` leaves at the top.
+/satlink
+# What the build scripts write: the Android library, the Apple framework.
+/android/build/
+/build/
+*.aar
+*.xcframework
+# Coverage profiles.
+*.cover
+*.coverprofile
+cover.out

@@ -1,0 +1,5 @@
+$ satlink --simulate=instant info
+exit status 1
+--- stdout
+--- stderr
+error: transport error: unplugged

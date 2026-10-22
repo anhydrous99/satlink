@@ -1,0 +1,5 @@
+$ satlink --simulate=instant net --allow no-port status
+exit status 1
+--- stdout
+--- stderr
+error: "no-port" has no port; write host:port, host:first-last or host:*

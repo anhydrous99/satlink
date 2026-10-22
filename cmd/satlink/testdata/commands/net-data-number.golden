@@ -1,0 +1,10 @@
+$ satlink --simulate=instant net status
+exit status 0
+--- stdout
+--- stderr
+Dialling 12345 — call setup over Iridium takes about half a minute…
+Connected (19200).
+  address:     10.64.0.2
+  gateway:     10.64.0.1
+  DNS servers: 10.64.0.1
+Call lasted <n> s: <n> bytes sent, <n> received.

@@ -1,0 +1,9 @@
+$ satlink -vx info
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '-x' found
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

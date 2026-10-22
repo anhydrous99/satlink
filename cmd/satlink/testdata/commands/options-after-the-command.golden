@@ -1,0 +1,8 @@
+$ satlink info --simulate=instant -b 9600
+exit status 0
+--- stdout
+Manufacturer: Iridium
+Model:        9575
+Firmware:     Call Processor Version: SIM-1.0
+IMEI:         300234010000000
+--- stderr

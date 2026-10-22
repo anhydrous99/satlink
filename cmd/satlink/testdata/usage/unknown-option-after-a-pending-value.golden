@@ -1,0 +1,9 @@
+$ satlink --baud x --frob
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--frob' found
+
+Usage: satlink --baud <BAUD> <COMMAND>
+
+For more information, try '--help'.

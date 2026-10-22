@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Iridium handsets (vendor 0x1EDD). Reference from an <intent-filter> for
+     android.hardware.usb.action.USB_DEVICE_ATTACHED to launch on plug-in. -->
+<resources>
+    <usb-device vendor-id="7901" product-id="38229" /> <!-- 9555  (0x9555) -->
+    <usb-device vendor-id="7901" product-id="42325" /> <!-- 9555A (0xA555) -->
+    <usb-device vendor-id="7901" product-id="38261" /> <!-- 9575  (0x9575) -->
+    <usb-device vendor-id="7901" product-id="20564" /> <!-- 9575P (0x5054) -->
+    <usb-device vendor-id="7901" product-id="30021" /> <!-- 9575E (0x7545) -->
+    <usb-device vendor-id="7901" product-id="21004" /> <!-- ROC   (0x520C) -->
+</resources>

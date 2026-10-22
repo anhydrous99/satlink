@@ -1,0 +1,11 @@
+$ satlink net stat
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'stat'
+
+  tip: a similar subcommand exists: 'status'
+
+Usage: satlink net [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

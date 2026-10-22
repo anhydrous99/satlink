@@ -1,0 +1,11 @@
+$ satlink --simulate=instant -- info
+exit status 2
+--- stdout
+--- stderr
+[1m[31merror:[0m unexpected argument '[33minfo[0m' found
+
+  [32mtip:[0m subcommand '[32minfo[0m' exists; to use it, remove the '[33m--[0m' before it
+
+[1m[4mUsage:[0m [1msatlink[0m [OPTIONS] <COMMAND>
+
+For more information, try '[1m--help[0m'.

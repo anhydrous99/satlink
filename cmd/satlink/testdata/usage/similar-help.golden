@@ -1,0 +1,11 @@
+$ satlink hel
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'hel'
+
+  tip: a similar subcommand exists: 'help'
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

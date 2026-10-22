@@ -1,0 +1,11 @@
+$ satlink --simulate instant info
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand 'instant'
+
+  tip: a similar subcommand exists: 'list'
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

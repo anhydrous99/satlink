@@ -1,0 +1,81 @@
+package main
+
+import (
+	"errors"
+	"io"
+	"os"
+	"strconv"
+	"syscall"
+
+	"github.com/anhydrous99/satlink/internal/errnotext"
+)
+
+// The process's standard streams, whose failures read as the Rust
+// version's did: "error: Broken pipe (os error 32)" once standard output is
+// a pipe that nobody reads any more, where Go would write "write
+// /dev/stdout: broken pipe".
+
+// processStream is one of the process's standard streams. A read or write
+// that the operating system fails with an error number returns it as an
+// osError; the end of the stream stays io.EOF. As in Rust's standard
+// library, a stream whose descriptor is not open for the direction — on
+// Unix, a standard output opened read-only, say — fails with EBADF, which
+// reads as the end of the stream and takes every write: the Rust version
+// then ended standard input there and dropped its output without an error.
+type processStream struct {
+	file *os.File
+}
+
+// Read reads from the stream.
+func (s processStream) Read(p []byte) (int, error) {
+	count, err := s.file.Read(p)
+	if isBadDescriptor(err) {
+		return count, io.EOF
+	}
+	return count, withOSErrorText(err)
+}
+
+// Write writes to the stream.
+func (s processStream) Write(p []byte) (int, error) {
+	count, err := s.file.Write(p)
+	if isBadDescriptor(err) {
+		return len(p), nil
+	}
+	return count, withOSErrorText(err)
+}
+
+// isBadDescriptor reports whether err is EBADF, which Rust's standard
+// streams take for an empty input and a sink (std's handle_ebadf).
+func isBadDescriptor(err error) bool {
+	return errors.Is(err, syscall.EBADF)
+}
+
+// withOSErrorText returns err as an osError when an error number from the
+// operating system is why a read or write of a file failed, and err itself
+// otherwise.
+func withOSErrorText(err error) error {
+	var failure *os.PathError
+	var errno syscall.Errno
+	if errors.As(err, &failure) && errors.As(failure.Err, &errno) {
+		return osError{errno: errno}
+	}
+	return err
+}
+
+// osError is an error number from the operating system, written as Rust's
+// io::Error writes it: the C library's text, which is Go's with a capital
+// letter, and the number — "Broken pipe (os error 32)".
+type osError struct {
+	errno syscall.Errno
+}
+
+// Error returns the error number's text and the number.
+func (e osError) Error() string {
+	return errnotext.Text(e.errno) + " (os error " + strconv.Itoa(int(e.errno)) + ")"
+}
+
+// Unwrap returns the error number, so that errors.Is matches it and the
+// io/fs errors it stands for.
+func (e osError) Unwrap() error {
+	return e.errno
+}

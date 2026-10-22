@@ -1,0 +1,6 @@
+$ satlink list
+exit status 0
+--- stdout
+/dev/ttyACM0	9575	Iridium 9575	300234010000000
+/dev/ttyACM1	1234	unknown model	-
+--- stderr

@@ -1,0 +1,11 @@
+$ satlink --simulate=instant sms list all --frob
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--frob' found
+
+  tip: to pass '--frob' as a value, use '-- --frob'
+
+Usage: satlink sms list <FILTER>
+
+For more information, try '--help'.

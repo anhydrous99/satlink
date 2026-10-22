@@ -1,0 +1,5 @@
+$ satlink --simulate=instant dial +881631234567
+exit status 0
+--- stdout
+Dialling +881631234567…
+--- stderr

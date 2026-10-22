@@ -1,0 +1,7 @@
+$ satlink --simulate=instant net get ftp://example.com/
+exit status 2
+--- stdout
+--- stderr
+error: invalid value 'ftp://example.com/' for '<URL>': "ftp://example.com/" is not a valid http:// or https:// URL
+
+For more information, try '--help'.

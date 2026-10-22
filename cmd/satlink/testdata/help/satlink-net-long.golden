@@ -1,0 +1,68 @@
+$ satlink net --help
+exit status 0
+--- stdout
+Use a data call as an IP link that only this program can use
+
+Usage: satlink net [OPTIONS] <COMMAND>
+
+Commands:
+  status   Bring the link up, show what was negotiated, and hang up
+  resolve  Look up a host name over the link
+  get      Fetch an http:// or https:// URL and print its body
+  tcp      Connect to HOST PORT and relay standard input and output, like netcat
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --number <NUMBER>
+          Number to dial for the data call
+          
+          [env: SATLINK_DATA_NUMBER=]
+          [default: 008816000025]
+
+  -p, --port <PORT>
+          Serial device (auto-detected by USB vendor ID when omitted)
+          
+          [env: SATLINK_PORT=]
+
+      --allow <RULE>
+          Also allow a destination such as `example.com:443` (repeatable); the command's own target is always allowed
+
+  -b, --baud <BAUD>
+          [default: 19200]
+
+      --simulate[=<SIMULATE>]
+          Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses
+
+          Possible values:
+          - iridium: Call setup, latency and throughput as measured on Iridium
+          - instant: No delays: for quick experiments
+
+      --username <USERNAME>
+          PPP user name (Iridium's gateway accepts any)
+          
+          [default: ""]
+
+      --password <PASSWORD>
+          PPP password (Iridium's gateway accepts any)
+          
+          [default: ""]
+
+  -v, --verbose...
+          Log what the link is doing (-v), in more detail (-vv, -vvv)
+
+      --idle-secs <IDLE_SECS>
+          Hang up after this many seconds without traffic
+          
+          [default: 300]
+
+      --max-minutes <MAX_MINUTES>
+          Longest the call may last, in minutes, hanging up included
+          
+          [default: 60]
+
+      --max-kb <MAX_KB>
+          Hang up after this many kilobytes of traffic
+
+  -h, --help
+          Print help (see a summary with '-h')
+--- stderr

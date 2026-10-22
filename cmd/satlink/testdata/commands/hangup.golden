@@ -1,0 +1,4 @@
+$ satlink --simulate=instant hangup
+exit status 0
+--- stdout
+--- stderr

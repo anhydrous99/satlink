@@ -1,0 +1,12 @@
+$ satlink --simulate=instant net tcp echo.test 7
+exit status 0
+--- stdout
+hello over the satellite
+--- stderr
+Dialling 008816000025 — call setup over Iridium takes about half a minute…
+Connected (19200).
+  address:     10.64.0.2
+  gateway:     10.64.0.1
+  DNS servers: 10.64.0.1
+Connected to 192.0.2.7:7; type away, Ctrl-D to finish.
+Call lasted <n> s: <n> bytes sent, <n> received.

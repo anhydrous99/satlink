@@ -1,0 +1,7 @@
+$ satlink --simulate=instant sms read 4294967296
+exit status 2
+--- stdout
+--- stderr
+error: invalid value '4294967296' for '<INDEX>': 4294967296 is not in 0..=4294967295
+
+For more information, try '--help'.

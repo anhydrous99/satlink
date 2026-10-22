@@ -1,0 +1,5 @@
+$ satlink --simulate=instant net --idle-secs 24 status
+exit status 1
+--- stdout
+--- stderr
+error: invalid configuration: the idle limit must be at least 25s, or the link hangs up while waiting for an answer

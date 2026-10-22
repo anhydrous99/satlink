@@ -1,0 +1,4 @@
+$ satlink --simulate=instant sms delete 1
+exit status 0
+--- stdout
+--- stderr

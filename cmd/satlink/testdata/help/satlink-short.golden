@@ -1,0 +1,28 @@
+$ satlink -h
+exit status 0
+--- stdout
+Talk to an Iridium satellite handset over USB
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+Commands:
+  list     List connected handsets
+  info     Manufacturer, model, firmware and IMEI
+  status   Signal strength, battery and network registration
+  sms      SMS operations
+  dial     Place a voice call
+  answer   Answer an incoming call
+  hangup   End the current call
+  at       Send a raw AT command, e.g. `satlink at AT+CSQ`
+  monitor  Print unsolicited events (incoming SMS, RING, ...) until interrupted
+  net      Use a data call as an IP link that only this program can use
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -p, --port <PORT>            Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
+  -b, --baud <BAUD>            [default: 19200]
+      --simulate[=<SIMULATE>]  Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
+  -v, --verbose...             Log what the link is doing (-v), in more detail (-vv, -vvv)
+  -h, --help                   Print help (see more with '--help')
+  -V, --version                Print version
+--- stderr

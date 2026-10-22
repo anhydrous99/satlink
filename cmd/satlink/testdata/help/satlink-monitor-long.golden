@@ -1,0 +1,29 @@
+$ satlink monitor --help
+exit status 0
+--- stdout
+Print unsolicited events (incoming SMS, RING, ...) until interrupted
+
+Usage: satlink monitor [OPTIONS]
+
+Options:
+  -p, --port <PORT>
+          Serial device (auto-detected by USB vendor ID when omitted)
+          
+          [env: SATLINK_PORT=]
+
+  -b, --baud <BAUD>
+          [default: 19200]
+
+      --simulate[=<SIMULATE>]
+          Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses
+
+          Possible values:
+          - iridium: Call setup, latency and throughput as measured on Iridium
+          - instant: No delays: for quick experiments
+
+  -v, --verbose...
+          Log what the link is doing (-v), in more detail (-vv, -vvv)
+
+  -h, --help
+          Print help (see a summary with '-h')
+--- stderr

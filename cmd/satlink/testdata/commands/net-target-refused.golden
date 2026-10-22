@@ -1,0 +1,5 @@
+$ satlink --simulate=instant net get 'http://*.web.test/'
+exit status 1
+--- stdout
+--- stderr
+error: "*.web.test" is not a host name or IPv4 address

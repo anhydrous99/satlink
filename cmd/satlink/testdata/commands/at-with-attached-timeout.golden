@@ -1,0 +1,6 @@
+$ satlink --simulate=instant at -t3 AT+CGMI
+exit status 0
+--- stdout
+Iridium
+OK
+--- stderr

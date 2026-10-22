@@ -1,0 +1,5 @@
+$ satlink info
+exit status 1
+--- stdout
+--- stderr
+error: transport error: several handsets found, choose one: /dev/ttyACM0, /dev/ttyACM1

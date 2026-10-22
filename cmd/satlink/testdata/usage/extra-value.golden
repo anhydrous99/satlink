@@ -1,0 +1,9 @@
+$ satlink --simulate=instant dial 1 2
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '2' found
+
+Usage: satlink dial [OPTIONS] <NUMBER>
+
+For more information, try '--help'.

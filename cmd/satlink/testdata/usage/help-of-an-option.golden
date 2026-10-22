@@ -1,0 +1,9 @@
+$ satlink help -v
+exit status 2
+--- stdout
+--- stderr
+error: unrecognized subcommand '-v'
+
+Usage: satlink [OPTIONS] <COMMAND>
+
+For more information, try '--help'.

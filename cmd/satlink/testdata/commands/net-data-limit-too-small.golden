@@ -1,0 +1,5 @@
+$ satlink --simulate=instant net --max-kb 1 status
+exit status 1
+--- stdout
+--- stderr
+error: invalid configuration: the data limit must be at least 2048 bytes, as PPP alone takes up to 500

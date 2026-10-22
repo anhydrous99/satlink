@@ -1,0 +1,11 @@
+$ satlink --simulate=instant net --max-kb 5 --max status
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--max' found
+
+  tip: a similar argument exists: '--max-kb'
+
+Usage: satlink net --max-kb <MAX_KB> <COMMAND>
+
+For more information, try '--help'.

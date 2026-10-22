@@ -1,0 +1,9 @@
+$ satlink --help=foo
+exit status 2
+--- stdout
+--- stderr
+error: unexpected value 'foo' for '--help' found; no more were expected
+
+Usage: satlink --help <COMMAND>
+
+For more information, try '--help'.

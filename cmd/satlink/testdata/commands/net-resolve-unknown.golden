@@ -1,0 +1,11 @@
+$ satlink --simulate=instant net resolve nowhere.test
+exit status 1
+--- stdout
+--- stderr
+Dialling 008816000025 — call setup over Iridium takes about half a minute…
+Connected (19200).
+  address:     10.64.0.2
+  gateway:     10.64.0.1
+  DNS servers: 10.64.0.1
+Call lasted <n> s: <n> bytes sent, <n> received.
+error: no address found for nowhere.test

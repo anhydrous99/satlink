@@ -1,0 +1,17 @@
+$ satlink sms list -h
+exit status 0
+--- stdout
+List stored messages
+
+[1m[4mUsage:[0m [1msatlink sms list[0m [OPTIONS] [FILTER]
+
+[1m[4mArguments:[0m
+  [FILTER]  [default: all] [possible values: all, unread, read, unsent, sent]
+
+[1m[4mOptions:[0m
+  [1m-p[0m, [1m--port[0m <PORT>            Serial device (auto-detected by USB vendor ID when omitted) [env: SATLINK_PORT=]
+  [1m-b[0m, [1m--baud[0m <BAUD>            [default: 19200]
+      [1m--simulate[0m[=<SIMULATE>]  Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
+  [1m-v[0m, [1m--verbose[0m...             Log what the link is doing (-v), in more detail (-vv, -vvv)
+  [1m-h[0m, [1m--help[0m                   Print help (see more with '--help')
+--- stderr

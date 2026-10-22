@@ -1,0 +1,11 @@
+$ satlink --ver info
+exit status 2
+--- stdout
+--- stderr
+error: unexpected argument '--ver' found
+
+  tip: a similar argument exists: '--version'
+
+Usage: satlink --version <COMMAND>
+
+For more information, try '--help'.

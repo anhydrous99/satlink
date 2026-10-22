@@ -1,0 +1,5 @@
+$ satlink --simulate=instant answer
+exit status 1
+--- stdout
+--- stderr
+error: call failed: NO CARRIER
