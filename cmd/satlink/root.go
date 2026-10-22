@@ -46,7 +46,7 @@ func (c *cli) rootCommand() *command {
 		Short: "Talk to an Iridium satellite handset over USB",
 		// Before every command, once the command line has been read.
 		PersistentPreRun: func(*cobra.Command, []string) { c.installLogger() },
-		// run reports errors itself, as clap would.
+		// run reports errors itself.
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}, c.options.arguments()...)
@@ -61,7 +61,7 @@ func (c *cli) rootCommand() *command {
 	)
 }
 
-// versionText is what -V prints, as clap printed it: "satlink 0.1.0".
+// versionText is what -V prints: "satlink 0.1.0".
 func versionText() string {
 	return programName + " " + version + "\n"
 }

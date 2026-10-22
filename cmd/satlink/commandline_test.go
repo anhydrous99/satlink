@@ -113,7 +113,7 @@ func TestAnEnvironmentVariableStandsInForAnOptionNotGiven(t *testing.T) {
 		colour    givenText
 	}{
 		{"set", []string{"group", "leaf", "x"}, map[string]string{colourVariable: "blue"}, givenText{text: "blue", given: true}},
-		// As clap's: a variable set to "" is set.
+		// A variable set to "" is set.
 		{"set to nothing", []string{"group", "leaf", "x"}, map[string]string{colourVariable: ""}, givenText{given: true}},
 		{"overridden", []string{"group", "leaf", "-c", "red", "x"}, map[string]string{colourVariable: "blue"},
 			givenText{text: "red", given: true}},

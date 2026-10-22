@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// The command line as clap reads it: its help pages, its errors for command
+// The command line as users see it: its help pages, its errors for command
 // lines that do not parse, its environment variables, and its styles. The
 // golden files in testdata/help, testdata/usage and testdata/style hold that
 // output, byte for byte.
@@ -18,7 +18,7 @@ var helpCommands = [][]string{
 	{"net", "resolve"}, {"net", "get"}, {"net", "tcp"},
 }
 
-func TestTheCommandLineIsReadAsClapReadsIt(t *testing.T) {
+func TestHelpAndUsageErrorsMatchTheirGoldenFiles(t *testing.T) {
 	cases := append(helpCases(), usageCases()...)
 	cases = append(cases, environmentCases()...)
 	cases = append(cases, styleCases()...)
@@ -60,8 +60,8 @@ func helpCases() []goldenCase {
 	}...)
 }
 
-// usageCases are command lines that do not parse, one of each of clap's
-// errors and of the rules behind them.
+// usageCases are command lines that do not parse, one of each kind of error
+// and of the rules behind them.
 func usageCases() []goldenCase {
 	return slices.Concat(subcommandUsageCases(), optionUsageCases(), valueUsageCases(), pendingValueUsageCases(),
 		flagValueUsageCases())
@@ -169,7 +169,7 @@ func valueUsageCases() []goldenCase {
 }
 
 // pendingValueUsageCases are command lines with a value in a token of its
-// own, which clap checked only once the command line had moved on: help, or
+// own, which is checked only once the command line has moved on: help, or
 // a problem after it, comes first, and a token that is itself a problem is
 // reported instead of it.
 func pendingValueUsageCases() []goldenCase {
@@ -191,7 +191,7 @@ func pendingValueUsageCases() []goldenCase {
 
 // flagValueUsageCases are values given to flags, whose usage line names the
 // arguments a command declares as a group once one of them is given, and an
-// unknown option after a flag counted again, which clap moved last.
+// unknown option after a flag counted again, which moves the flag last.
 func flagValueUsageCases() []goldenCase {
 	return []goldenCase{
 		{name: "usage/value-for-help-after-a-global-option", args: []string{"-v", "--help=x"}},
@@ -202,7 +202,7 @@ func flagValueUsageCases() []goldenCase {
 }
 
 // notUTF8Case is a command line holding text that is not UTF-8, and what
-// clap wrote on standard error for it.
+// goes to standard error for it.
 type notUTF8Case struct {
 	name   string
 	world  world
@@ -211,7 +211,7 @@ type notUTF8Case struct {
 }
 
 // notUTF8Cases are text that is not UTF-8 given as each kind of argument,
-// as a token clap did not know, and in a variable.
+// as an unknown token, and in a variable.
 func notUTF8Cases() []notUTF8Case {
 	const notUTF8 = "\xff"
 	refused := func(usage string) string {
@@ -238,10 +238,11 @@ func notUTF8Cases() []notUTF8Case {
 	}
 }
 
-// clap's value parsers refused text that is not UTF-8 before anything ran,
-// but for possible values, and clap showed tokens and variables lossily. Golden
-// files would hold the bytes themselves, so the output is written out here.
-func TestTextThatIsNotUTF8IsRefusedOrShownLossilyAsClapDid(t *testing.T) {
+// Text that is not UTF-8 is refused before anything runs, with a message of
+// its own except for possible values, and tokens and variables are shown
+// lossily. Golden files would hold the bytes themselves, so the output is
+// written out here.
+func TestTextThatIsNotUTF8IsRefusedOrShownLossily(t *testing.T) {
 	for _, test := range notUTF8Cases() {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -264,14 +265,13 @@ func TestHelpShowsAVariableThatIsNotUTF8Lossily(t *testing.T) {
 	}
 }
 
-// clap's help and errors went to a stream that shows no styles
-// through anstream, which took out the sequences that ESC starts, and the
-// C0 control characters and DEL but for tab, line feed, form feed and
-// carriage return: clap's own styles, and those that tokens and variables
-// brought in. A stream that shows styles got them all. Golden files would
-// hold the control characters themselves, so the output is written out
-// here.
-func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing.T) {
+// A stream that shows no styles gets help and errors without the sequences
+// that ESC starts, and without the C0 control characters and DEL but for
+// tab, line feed, form feed and carriage return: the CLI's own styles, and
+// those that tokens and variables brought in. A stream that shows styles
+// gets them all. Golden files would hold the control characters themselves,
+// so the output is written out here.
+func TestControlCharactersAreTakenOutOfErrorsForAStreamWithoutStyles(t *testing.T) {
 	refused := func(problem, usage string) string {
 		return "error: " + problem + "\n\nUsage: " + usage + "\n\nFor more information, try '--help'.\n"
 	}
@@ -294,7 +294,7 @@ func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing
 		{"DEL", world{}, []string{instant, "sms", "list", "a\x7f"},
 			"error: invalid value 'a' for '[FILTER]'\n  [possible values: all, unread, read, unsent, sent]\n\n" +
 				"For more information, try '--help'.\n"},
-		// clap's style after the token ends the sequence.
+		// The CLI's style after the token ends the sequence.
 		{"an unfinished sequence", world{}, []string{"\x1b["}, unrecognized("")},
 		{"a line break inside a sequence", world{}, []string{"\x1b[\n1m"}, unrecognized("\n1m")},
 		// The message quotes the URL and escapes the control character in it.
@@ -324,8 +324,8 @@ func TestControlCharactersAreTakenOutOfErrorsAsClapsStreamTookThemOut(t *testing
 
 // Like the test above, this covers the variables whose values help shows. A
 // line break in one starts the next line where the argument's help starts,
-// as clap indented the lines of an argument's help.
-func TestHelpShowsVariablesHoldingControlCharactersAsClapDid(t *testing.T) {
+// as the lines of an argument's help are indented.
+func TestHelpShowsVariablesHoldingControlCharacters(t *testing.T) {
 	port := func(value string) world { return world{variables: map[string]string{portVariable: value}} }
 	tests := []struct {
 		name  string
@@ -377,7 +377,7 @@ func environmentCases() []goldenCase {
 	}
 }
 
-// styleCases are help pages and problems in clap's styles, which
+// styleCases are help pages and problems in the CLI's styles, which
 // CLICOLOR_FORCE asks for on a stream that is no terminal.
 func styleCases() []goldenCase {
 	styled := world{variables: map[string]string{forceColorVariable: "1"}}
@@ -409,7 +409,7 @@ func styleCases() []goldenCase {
 	return cases
 }
 
-// Help and errors take clap's styles on a terminal: each on the one it goes
+// Help and errors are styled on a terminal: each on the one it goes
 // to, help on standard output and errors on standard error.
 func TestHelpAndErrorsAreStyledOnTheTerminalTheyGoTo(t *testing.T) {
 	tests := []struct {

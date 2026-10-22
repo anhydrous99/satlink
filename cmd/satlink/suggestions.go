@@ -5,16 +5,15 @@ import (
 	"slices"
 )
 
-// Suggestions for a mistyped name — "tip: a similar subcommand exists:
-// 'info'" — found the way clap finds them.
+// Suggestions for a mistyped name, such as "tip: a similar subcommand
+// exists: 'info'", found by Jaro similarity.
 
 // similarityThreshold is how alike two names must be for one to suggest the
-// other: clap's 0.7, "so that bar -> baz is suggested".
+// other: 0.7, so that bar suggests baz.
 const similarityThreshold = 0.7
 
 // similarNames returns those of candidates that are like name, the most like
-// it last, as clap's did_you_mean did. Candidates alike to the same degree
-// keep their order.
+// it last. Candidates alike to the same degree keep their order.
 func similarNames(name string, candidates []string) []string {
 	type scored struct {
 		name       string
@@ -47,8 +46,8 @@ func mostSimilarName(name string, candidates []string) (string, bool) {
 }
 
 // jaro returns the Jaro similarity of a and b, from 0 for nothing in common
-// to 1 for the same text, over their characters as the strsim crate that
-// clap used computes it.
+// to 1 for the same text, counted over their characters rather than their
+// bytes.
 func jaro(a, b string) float64 {
 	first, second := []rune(a), []rune(b)
 	switch {
@@ -108,9 +107,9 @@ func countTranspositions(a, b []rune, aMatched, bMatched []bool) int {
 	return transpositions
 }
 
-// Tokens that the command does not take, and what clap suggested instead.
-// An option waiting for its value is not reported then: clap reported the
-// token it could not place.
+// Tokens that the command does not take, and what to suggest instead. An
+// option waiting for its value is not reported then: the token that cannot
+// be placed is.
 
 // unknownLong explains --name, an option the command does not take. It
 // suggests the command's option most like it, or one that a subcommand named

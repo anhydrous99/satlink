@@ -7,7 +7,7 @@ import "strconv"
 
 // argumentValue takes the text the command line gives an argument — once
 // for each time it is given — and keeps what it means, or refuses it with
-// the reason, as clap's value parsers did.
+// the reason.
 type argumentValue interface {
 	Set(text string) error
 }

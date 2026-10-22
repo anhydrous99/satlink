@@ -80,8 +80,8 @@ func limitArgument(long, help string, target *uint64, defaultValue string) *argu
 		defaultValue: defaultValue, value: unsignedValue{target: target, minimum: leastLimit}}
 }
 
-// valueNameOf is the name clap gave an option's value when it had none of
-// its own: the option's, in capitals, with underscores — IDLE_SECS.
+// valueNameOf is the name of an option's value when it has none of its own:
+// the option's, in capitals, with underscores: IDLE_SECS.
 func valueNameOf(long string) string {
 	name := []byte(long)
 	for i, letter := range name {

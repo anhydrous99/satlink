@@ -8,11 +8,10 @@ import (
 	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
-// Command lines that do not parse, explained as clap explains them: "error: …", tips on what may have been meant, the usage
-// line, and where to learn more — in clap's styles where it used them.
+// Command lines that do not parse, explained: "error: …", tips on what may
+// have been meant, the usage line, and where to learn more.
 
-// listIndent starts each tip, list of values and missing argument, as clap's
-// TAB.
+// listIndent starts each tip, list of values and missing argument.
 const listIndent = "  "
 
 // commandLineExit ends a run before any command runs: with a help page or the
@@ -33,13 +32,12 @@ func showing(text string) *commandLineExit {
 	return &commandLineExit{text: text, status: exitSuccess}
 }
 
-// explainer words the problems of a command line as clap did, styled by
-// its palette.
+// explainer words the problems of a command line, styled by its palette.
 type explainer struct {
 	palette palette
 }
 
-// usageProblem is a command line that does not parse, as clap explained it.
+// usageProblem is a command line that does not parse.
 type usageProblem struct {
 	// command is the command whose arguments do not parse.
 	command *command
@@ -56,7 +54,7 @@ func (e explainer) exit(u usageProblem) *commandLineExit {
 	return &commandLineExit{text: e.text(u), status: exitUsage}
 }
 
-// text is the problem u, formatted as clap formatted it.
+// text is the problem u, formatted for the user.
 func (e explainer) text(u usageProblem) string {
 	var text strings.Builder
 	text.WriteString(e.palette.failure("error:") + " " + u.problem)
@@ -156,8 +154,7 @@ func (e explainer) invalidValue(arg *argument, text string) string {
 }
 
 // invalidUTF8 is a value that is not UTF-8, given to an argument of cmd
-// that takes text or a number: clap's value parsers for those refused it
-// before reading it.
+// that takes text or a number, which is refused before its value reads it.
 func (e explainer) invalidUTF8(cmd *command) *commandLineExit {
 	return e.exit(usageProblem{command: cmd, problem: "invalid UTF-8 was detected in one or more arguments",
 		usage: usageLine(cmd, nil, e.palette)})
@@ -213,7 +210,7 @@ func possibleValueNames(arg *argument) []string {
 	return names
 }
 
-// quotedIfBlank is text as clap showed a value: quoted when it is empty or
+// quotedIfBlank is text as errors show a value: quoted when it is empty or
 // holds whitespace, so that its ends can be seen.
 func quotedIfBlank(text string) string {
 	if text == "" || strings.ContainsFunc(text, unicode.IsSpace) {

@@ -27,8 +27,7 @@ type globalOptions struct {
 	verbosity int
 }
 
-// arguments declares the options, which every command takes, as clap's
-// global arguments.
+// arguments declares the global options, which every command takes.
 func (o *globalOptions) arguments() []*argument {
 	return []*argument{
 		{long: "port", short: 'p', valueName: "PORT", global: true, env: portVariable,

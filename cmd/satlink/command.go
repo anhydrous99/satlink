@@ -6,15 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The tree of commands, as clap declares it. clap's interface is what users of
-// satlink rely on — where an option may
-// stand, which token is a value, the help pages, the errors — and cobra and
-// its flag library differ from it in all of these. So the command line is
-// read, documented and checked as clap did it (commandline.go, help.go,
-// usage.go), and cobra runs the command it names.
+// The tree of commands. Where an option may stand, which token is a value,
+// the help pages and the errors are what users of satlink rely on, and
+// cobra and its flag library would decide all of these differently. So the
+// CLI reads, documents and checks the command line itself (commandline.go,
+// help.go, usage.go), and cobra only runs the command it names.
 
-// helpSubcommandName is the name of the subcommand that clap adds to every
-// command with subcommands, which shows their help.
+// helpSubcommandName is the name of the subcommand that every command with
+// subcommands gets, which shows their help.
 const helpSubcommandName = "help"
 
 // command is one command of the command line: its name and what it does
@@ -97,8 +96,9 @@ func (c *command) withSubcommands(subcommands ...*command) *command {
 	return c
 }
 
-// arguments returns everything the command takes, in clap's order: its own
-// arguments, the global options of the commands above it, then -h and -V.
+// arguments returns everything the command takes, in the order help lists
+// them: its own arguments, the global options of the commands above it, then
+// -h and -V.
 func (c *command) arguments() []*argument {
 	all := slices.Clone(c.own)
 	if c.parent != nil && !c.showsHelp {
@@ -127,11 +127,10 @@ func (c *command) globals() []*argument {
 	return globals
 }
 
-// argumentGroup returns the arguments that clap's derive grouped as the
-// command's: those it declares, the fields of its struct or variant. Only
-// the usage line of a value given to a flag shows the group. (The help
-// subcommand, which clap added itself and grouped nothing of, is never read
-// as a command: it answers at once.)
+// argumentGroup returns the arguments grouped as the command's own: those it
+// declares. Only the usage line of a value given to a flag shows the group.
+// (The help subcommand, which groups nothing, is never read as a command: it
+// answers at once.)
 func (c *command) argumentGroup() []*argument {
 	return c.own
 }

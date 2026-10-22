@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// The usage line, "Usage: satlink dial [OPTIONS] <NUMBER>", in clap's two
-// forms: the full one of help pages, and the "smart" one of errors, which
-// names what the command line gave and what it still needs.
+// The usage line, "Usage: satlink dial [OPTIONS] <NUMBER>", in two forms:
+// the full one of help pages, and the one of errors, which names what the
+// command line gave and what it still needs.
 
 // subcommandPlaceholder stands for the subcommand in a usage line.
 const subcommandPlaceholder = "<COMMAND>"
@@ -22,9 +22,9 @@ func usageLine(cmd *command, used []*argument, p palette) string {
 }
 
 // groupedUsageLine is the usage line of a value given to flag, a flag of
-// cmd, after the command line gave given, styled by p. clap's derive put
-// the arguments a command declares in a group (argumentGroup), and once one
-// of them is given, this usage line names the group in place of them.
+// cmd, after the command line gave given, styled by p. The arguments a
+// command declares form a group (argumentGroup), and once one of them is
+// given, this usage line names the group in place of them.
 func groupedUsageLine(cmd *command, flag *argument, given []*argument, p palette) string {
 	used := append(slices.Clone(given), flag)
 	group := cmd.argumentGroup()
@@ -84,7 +84,7 @@ func smartUsage(cmd *command, used, group []*argument, p palette) string {
 	return joinUsage(cmd, parts)
 }
 
-// groupForm is how clap's usage line named a group of arguments: <a|b|…>,
+// groupForm is how a usage line names a group of arguments: <a|b|…>,
 // an option as errors write it, a positional argument by its value's name.
 func groupForm(group []*argument) string {
 	forms := make([]string, len(group))

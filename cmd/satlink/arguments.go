@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// The arguments a command takes — options such as --port and positional
-// arguments such as <NUMBER> — as clap declares them, and how clap writes them
-// in help, errors and usage lines.
+// The arguments a command takes, options such as --port and positional
+// arguments such as <NUMBER>, and how help, errors and usage lines write
+// them.
 
-// argumentAction is what giving an argument does, as clap's ArgAction.
+// argumentAction is what giving an argument does.
 type argumentAction int
 
 const (
@@ -25,11 +25,11 @@ const (
 	actionVersion
 )
 
-// builtInDisplayOrder places -h and -V after every declared option in help:
-// clap's order for the arguments it adds itself.
+// builtInDisplayOrder places -h and -V, the arguments every command gets,
+// after every declared option in help.
 const builtInDisplayOrder = 999
 
-// argument is an option or a positional argument, as clap described it. The
+// argument is an option or a positional argument. The
 // zero argument is not usable: one that the command line can give needs a
 // value at least.
 type argument struct {
@@ -58,8 +58,8 @@ type argument struct {
 	// possibleValues are the only values the argument takes, when there are
 	// any.
 	possibleValues []possibleValue
-	// global is set for an option that the command's subcommands take too,
-	// as clap's global arguments: the root's, which every command takes.
+	// global is set for an option that the command's subcommands take too:
+	// the root's, which every command takes.
 	global bool
 	// displayOrder places an option in help: where its command declared it
 	// among its options.
@@ -95,8 +95,8 @@ func (a *argument) takesValue() bool {
 	return a.action == actionSet || a.action == actionAppend
 }
 
-// isBuiltIn reports whether the argument is one that clap adds itself: -h
-// or -V.
+// isBuiltIn reports whether the argument is one that every command gets:
+// -h or -V.
 func (a *argument) isBuiltIn() bool {
 	return a.action == actionHelp || a.action == actionVersion
 }
@@ -109,7 +109,7 @@ func (a *argument) explainsPossibleValues() bool {
 	})
 }
 
-// String is how clap wrote the argument in errors: --port <PORT>,
+// String is how errors write the argument: --port <PORT>,
 // --simulate[=<SIMULATE>], --verbose..., <NUMBER> or [FILTER].
 func (a *argument) String() string {
 	if a.isPositional() && !a.required {

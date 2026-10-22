@@ -80,7 +80,7 @@ func handsetCases() []goldenCase {
 		{name: "commands/info-without-a-handset", args: []string{"info"}},
 		{name: "commands/info-with-several-handsets", args: []string{"info"}, world: twoPorts},
 		{name: "commands/info-when-discovery-fails", args: []string{"info"}, world: world{discoveryFails: true}},
-		// Options may follow the subcommand, as clap's global ones could.
+		// Global options may follow the subcommand.
 		{name: "commands/options-after-the-command", args: []string{"info", instant, "-b", "9600"}},
 	}
 }
@@ -91,7 +91,7 @@ func netCases() []goldenCase {
 		{name: "commands/net-status", args: []string{instant, "net", "status"}},
 		{name: "commands/net-data-number", args: []string{instant, "net", "status"},
 			world: world{variables: map[string]string{dataNumberVariable: "12345"}}},
-		// As clap's: a variable set to "" is set.
+		// A variable set to "" is set.
 		{name: "commands/net-empty-data-number", args: []string{instant, "net", "status"},
 			world: world{variables: map[string]string{dataNumberVariable: ""}}},
 		{name: "commands/net-resolve", args: []string{instant, "net", "resolve", "echo.test"}},
@@ -149,7 +149,7 @@ func TestTheVerboseFlagsChooseTheLogLevel(t *testing.T) {
 		{"info with -v", []string{"-v", instant, "hangup"}, slog.LevelInfo},
 		{"debug with -vv", []string{"-vv", instant, "hangup"}, slog.LevelDebug},
 		{"trace with three", []string{"-v", "--verbose", "-v", instant, "hangup"}, logtext.LevelTrace},
-		// As clap's global options: the deepest command given them wins.
+		// The deepest command given a global option wins.
 		{"the subcommand's count", []string{"-vvv", instant, "hangup", "-v"}, slog.LevelInfo},
 	}
 	for _, test := range tests {

@@ -249,7 +249,7 @@ func TestTheDataNumberComesFromTheEnvironmentUnlessGiven(t *testing.T) {
 	}{
 		{"from the environment", "12345", []string{"status"}, "12345"},
 		{"given", "12345", []string{"--number", "66666", "status"}, "66666"},
-		// As clap's: a variable set to "" is set, and the dial then fails.
+		// A variable set to "" is set, and the dial then fails.
 		{"empty in the environment", "", []string{"status"}, ""},
 	}
 	for _, test := range tests {

@@ -8,10 +8,9 @@ import (
 	"unicode/utf8"
 )
 
-// Help pages, laid out as clap lays them out: the summary
-// that -h shows, an argument a line with its help in a column, and the long
-// help of --help and of the help subcommand, an argument's help on the lines
-// below it.
+// Help pages: the summary that -h shows, an argument a line with its help in
+// a column, and the long help of --help and of the help subcommand, an
+// argument's help on the lines below it.
 
 // helpLength is which of a command's helps to show.
 type helpLength int
@@ -24,7 +23,7 @@ const (
 	longHelp
 )
 
-// The layout of help pages, as clap's.
+// The layout of help pages.
 const (
 	// helpIndent starts every entry.
 	helpIndent = "  "
@@ -36,7 +35,7 @@ const (
 	// which a long name without a short one is indented by.
 	shortNameWidth = 4
 	// shortestSubcommandWidth is the narrowest column of subcommand names:
-	// clap's "the shortest an arg can legally be is 2".
+	// the width of the shortest possible option, "-x".
 	shortestSubcommandWidth = 2
 )
 
@@ -175,7 +174,7 @@ func (p helpPage) argumentHelp(arg *argument) string {
 }
 
 // valueSources says where else arg's value may come from: "[env: X=value]"
-// with the variable's current value, which clap read lossily, "[default:
+// with the variable's current value, read lossily, "[default:
 // value]", and "[possible values: a, b]" unless long help lists them one per
 // line.
 func (p helpPage) valueSources(arg *argument) string {
@@ -224,8 +223,8 @@ func (p helpPage) possibleValuesList(arg *argument) string {
 	return strings.Join(lines, "\n"+longHelpIndent)
 }
 
-// compareForHelp orders options as clap's help did: by the order their
-// commands declared them, the built-in ones last, and then by name.
+// compareForHelp orders options for help: by the order their commands
+// declared them, the built-in ones last, and then by name.
 func compareForHelp(a, b *argument) int {
 	return cmp.Or(cmp.Compare(a.displayOrder, b.displayOrder), strings.Compare(helpSortKey(a), helpSortKey(b)))
 }
@@ -244,7 +243,7 @@ func helpSortKey(option *argument) string {
 }
 
 // indented indents every line of text after the first by indent, blank
-// lines included, as clap indented the lines of an argument's help.
+// lines included, as the lines of an argument's help are.
 func indented(text, indent string) string {
 	return strings.ReplaceAll(text, "\n", "\n"+indent)
 }
