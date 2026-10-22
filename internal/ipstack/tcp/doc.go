@@ -1,4 +1,4 @@
-// Package tcp is the stack's TCP socket, modelled on smoltcp's socket::tcp
+// Package tcp is the stack's TCP socket, modelled on smoltcp's TCP socket
 // (RFC 793 and RFC 9293, with window scaling from RFC 7323, selective
 // acknowledgements from RFC 2018, the retransmission timer of RFC 6298,
 // delayed ACKs, Nagle's algorithm, keep-alive, and zero window probes).

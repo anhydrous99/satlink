@@ -42,11 +42,10 @@
 // acknowledgement number or a window scale of 0, are Optional values.
 //
 // IPv4Repr and TCPRepr have HeaderLen (the header) and BufferLen (header and
-// payload); unlike smoltcp's Ipv4Repr::buffer_len, which is the header length
-// only.
-// UDPRepr has only HeaderLen, as its payload travels beside it. ICMPv4Repr,
-// DNSRepr and DNSQuestion have only BufferLen, the length of everything they
-// emit.
+// payload), so a segment's whole datagram is ip.HeaderLen() +
+// segment.BufferLen(). UDPRepr has only HeaderLen, as its payload travels
+// beside it. ICMPv4Repr, DNSRepr and DNSQuestion have only BufferLen, the
+// length of everything they emit.
 //
 // Parsing logs a TCP window scale above 14 and a SACK
 // option with more than three blocks, at debug level with the "pkg"
