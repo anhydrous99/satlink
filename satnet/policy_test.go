@@ -165,7 +165,7 @@ func TestRejectsMalformedRules(t *testing.T) {
 		{"-bad.com:80", ErrRuleInvalidHost, "-bad.com"},
 		{"10.0.0.0/33:80", ErrRuleInvalidNetwork, "10.0.0.0/33"},
 		{"300.1.1.1:80", ErrRuleInvalidNetwork, "300.1.1.1"},
-		// Go only: the cases around those of the Rust test.
+		// More rules that are malformed in other ways.
 		{"  example.com  ", ErrRuleMissingPort, "  example.com  "},
 		{"*.-bad.com:80", ErrRuleInvalidHost, "*.-bad.com"},
 		{":80", ErrRuleInvalidNetwork, ""},
@@ -209,7 +209,7 @@ func TestRulesAreTrimmedAndLowerCased(t *testing.T) {
 	}
 }
 
-func TestPortsMayCarryAPlusSignAsInRust(t *testing.T) {
+func TestPortsMayCarryAPlusSign(t *testing.T) {
 	rule, err := ParseAllowRule("example.com:+80-+81")
 
 	if err != nil || rule.String() != "example.com:80-81" {
@@ -317,7 +317,7 @@ func TestPortRangesParseAndPrint(t *testing.T) {
 	}
 }
 
-func TestRuleErrorsAreWordedAsInRust(t *testing.T) {
+func TestRuleErrorMessages(t *testing.T) {
 	for _, c := range []struct {
 		err  *ParseRuleError
 		text string
@@ -326,8 +326,8 @@ func TestRuleErrorsAreWordedAsInRust(t *testing.T) {
 		{&ParseRuleError{Kind: ErrRuleInvalidPort, Text: "0"}, `"0" is not a port or port range`},
 		{&ParseRuleError{Kind: ErrRuleInvalidHost, Text: "a b"}, `"a b" is not a valid host name`},
 		{&ParseRuleError{Kind: ErrRuleInvalidNetwork, Text: "1.2.3"}, `"1.2.3" is not a valid IPv4 address or network`},
-		// Rust's {:?} of a str, for every kind, where Go's %q would write
-		// "\x01", "\v" and "\u0085".
+		// Control characters are escaped as \u{..}, for every kind, where Go's
+		// %q would write "\x01", "\v" and "\u0085".
 		{&ParseRuleError{Kind: ErrRuleMissingPort, Text: "a\x01b"}, `"a\u{1}b" has no port; write host:port, host:first-last or host:*`},
 		{&ParseRuleError{Kind: ErrRuleInvalidPort, Text: "\v"}, `"\u{b}" is not a port or port range`},
 		{&ParseRuleError{Kind: ErrRuleInvalidHost, Text: "a\x01b"}, `"a\u{1}b" is not a valid host name`},

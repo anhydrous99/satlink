@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for packet filtering
-// (src/socket/tcp.rs, lines 9484-9549).
+// Tests of which segments a socket accepts.
 
 import (
 	"testing"
@@ -22,10 +21,9 @@ func TestDoesntAcceptWrongPort(t *testing.T) {
 	}{
 		{"to another local port", sendIPTemplate, toAnotherPort},
 		{"from another remote port", sendIPTemplate, fromAnotherPort},
-		// The cases above are smoltcp's. Its SEND_IP_TEMPL has the
-		// connection's addresses swapped, so they would be refused whatever
-		// their ports; in a datagram from the peer, the port is the only thing
-		// wrong.
+		// The cases above use sendIPTemplate, which has the connection's
+		// addresses swapped, so they would be refused whatever their ports; in a
+		// datagram from the peer, the port is the only thing wrong.
 		{"to another local port from the peer", ipHeader(remoteAddr, localAddr, toAnotherPort), toAnotherPort},
 		{"from another remote port of the peer", ipHeader(remoteAddr, localAddr, fromAnotherPort), fromAnotherPort},
 	}

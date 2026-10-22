@@ -81,8 +81,7 @@ func (c *cli) duringCall(link *satnet.Link, action netAction, interrupted contex
 }
 
 // outcomeOf returns what do returns, or errCommandPanicked should it panic,
-// once the panic is reported on stderr: the Rust version caught the panic,
-// after its panic hook had reported it.
+// once the panic is reported on stderr.
 func outcomeOf(stderr io.Writer, do func() error) (outcome error) {
 	defer func() {
 		if value := recover(); value != nil {

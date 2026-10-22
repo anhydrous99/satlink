@@ -42,9 +42,9 @@ func TestAnAddressTheStackCannotUseIsLeftOutWithAWarning(t *testing.T) {
 }
 
 // What `satlink --simulate -vv` shows of an answer the UDP echo or the DNS
-// server cannot send, in Rust's texts: here the answer to a datagram from
-// port 0, where no datagram can go.
-func TestTheUDPServicesLogTheAnswersTheyCannotSendAsTheRustVersionLoggedThem(t *testing.T) {
+// server cannot send: here the answer to a datagram from port 0, where no
+// datagram can go.
+func TestTheUDPServicesLogTheAnswersTheyCannotSend(t *testing.T) {
 	network := DefaultNetworkConfig()
 	unanswerable := netip.AddrPortFrom(network.ClientAddress, 0)
 	// The services answer on every address, the gateway's among them.

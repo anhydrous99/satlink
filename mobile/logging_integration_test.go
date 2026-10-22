@@ -16,8 +16,8 @@ import (
 
 // The log bridge as an app meets it: records reach the app's sink on their
 // own thread. SetLogSink can set a sink once per process and changes the
-// process's default logger, so the test runs in a process of its own, as
-// the Rust test binary did: other tests, and -count, cannot interfere.
+// process's default logger, so the test runs in a process of its own: other
+// tests, and -count, cannot interfere.
 
 // logSinkChild is the environment variable that tells TestLogSinkChild it
 // runs in the child process that

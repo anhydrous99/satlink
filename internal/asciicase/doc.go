@@ -1,7 +1,7 @@
-// Package asciicase maps and compares the case of ASCII letters alone, as
-// Rust's to_ascii_lowercase, to_ascii_uppercase and eq_ignore_ascii_case
-// do. The Rust version compared AT commands and their echoes, HTTP header
-// names and host names so, and matched the simulated handset's commands.
+// Package asciicase maps and compares the case of ASCII letters alone:
+// Lower, Upper and EqualFold leave every other byte as it is. AT commands
+// and their echoes, HTTP header names and host names are compared so, and
+// the simulated handset matches its commands so.
 //
 // Go's strings.ToLower, strings.ToUpper and strings.EqualFold follow
 // Unicode, which maps some letters beyond ASCII onto ASCII ones: 'ſ'

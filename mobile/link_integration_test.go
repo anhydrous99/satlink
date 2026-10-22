@@ -14,9 +14,8 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// The bindings' link API, driven from Go the way Kotlin or Swift would
-// drive it: through a ByteTransport (here, over the simulator). The first
-// tests are the Rust bindings' tests/link.rs; the others are Go's own.
+// The link API, driven from Go the way Kotlin or Swift would drive it:
+// through a ByteTransport (here, over the simulator).
 
 // hangUpTimeoutMillis bounds a hang-up the handset will not confirm: the
 // escape, its retry, the DTR drop and the raw ATH each wait in turn.
@@ -346,9 +345,8 @@ func awaitSetup(t *testing.T, outcome <-chan setup) error {
 	}
 }
 
-// TestALinkBeingSetUpCanBeCancelled is the Rust test in Go's shape: the
-// setup is cancelled once the dial is under way, rather than a second after
-// it starts. It runs alone, as it times the setup.
+// TestALinkBeingSetUpCanBeCancelled cancels the setup once the dial is under
+// way, rather than a second after it starts. It runs alone, as it times the setup.
 func TestALinkBeingSetUpCanBeCancelled(t *testing.T) {
 	config := sim.DefaultConfig()
 	config.Link.CallSetup = mobile.SlowCallSetup
@@ -372,10 +370,9 @@ func TestALinkBeingSetUpCanBeCancelled(t *testing.T) {
 	}
 }
 
-// TestALinkThatLostTheHandsetWhileHangingUpSaysTheCallMayStillBeUp is the
-// Rust test in Go's shape: a Go handset is never lost with its link
-// (docs/PORTING.md, section 3), so it comes back stranded, and Reinitialize
-// reaches it as it is.
+// TestALinkThatLostTheHandsetWhileHangingUpSaysTheCallMayStillBeUp checks
+// that a handset is never lost with its link: it comes back stranded, and
+// Reinitialize reaches it as it is.
 func TestALinkThatLostTheHandsetWhileHangingUpSaysTheCallMayStillBeUp(t *testing.T) {
 	t.Parallel()
 	transport, faulty, control := stubbornUSB(t, sim.DefaultConfig())
@@ -434,10 +431,9 @@ func callHeldInOnlineCommandMode(t *testing.T, usb *noDTRUSB) *mobile.IridiumHan
 	return handset
 }
 
-// TestReinitializeEndsACallHeldInOnlineCommandMode holds Rust's
-// reinitialize_ends_a_call_held_in_online_command_mode and
-// reinitialize_ends_a_held_call_even_without_cpas, which differ only in the
-// handset's firmware.
+// TestReinitializeEndsACallHeldInOnlineCommandMode checks that Reinitialize
+// ends a call held in online command mode, with and without +CPAS: the
+// cases differ only in the handset's firmware.
 func TestReinitializeEndsACallHeldInOnlineCommandMode(t *testing.T) {
 	t.Parallel()
 	firmwareWithoutCPAS := map[string]bool{
@@ -776,10 +772,10 @@ func TestReinitializeStrandsAReadyHandsetWhoseCallCannotBeEnded(t *testing.T) {
 	assertStranded(t, handset)
 }
 
-// The Rust tests a_dropped_link_gives_the_handset_back_once_its_call_ends
-// and a_dropped_link_that_cannot_hang_up_strands_the_handset drop the link;
-// their Go ports call Close, which is what dropping the Rust bindings'
-// SatelliteLink did. A link that the app's language merely lets go of is
+// The tests of a dropped link check that the handset is given back once its
+// call ends, or stranded when the call cannot be hung up. They call Close,
+// which is how a Go app drops a link. A link that the app's language merely
+// lets go of is
 // collected instead, and only its runtime cleanup ends the call: these
 // tests hold the bindings to keeping nothing that keeps the link reachable,
 // neither the listener's goroutine nor the IridiumHandset that lent its

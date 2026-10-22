@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the TIME-WAIT state
-// (src/socket/tcp.rs, lines 5736-5810).
+// Tests of the TIME-WAIT state.
 
 import (
 	"testing"

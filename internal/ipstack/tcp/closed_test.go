@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the CLOSED state
-// (src/socket/tcp.rs, lines 3313-3347).
+// Tests of the CLOSED state.
 
 import (
 	"testing"

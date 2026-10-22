@@ -54,7 +54,7 @@ func TestAnEscapeGuardBeyondAnyHandsetsIsRefused(t *testing.T) {
 	}
 }
 
-func TestDebugDurationWritesRustsDebugOfADuration(t *testing.T) {
+func TestDebugDurationFormat(t *testing.T) {
 	tests := map[time.Duration]string{
 		10 * time.Second:              "10s",
 		90 * time.Second:              "90s",

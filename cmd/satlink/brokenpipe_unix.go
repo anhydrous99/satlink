@@ -8,8 +8,8 @@ import (
 )
 
 // ignoreBrokenPipes makes a write to a pipe that nobody reads any more fail
-// with EPIPE, as it failed in the Rust version, whose runtime ignores
-// SIGPIPE before main. Go's runtime would end the process by SIGPIPE at
+// with EPIPE: SIGPIPE is ignored before main. Go's runtime would end the
+// process by SIGPIPE at
 // such a write to standard output or error — `satlink net get … | head`
 // once head has had enough — in the middle of a call, before it has hung
 // up. The failed write takes the paths the CLI has for it instead: the

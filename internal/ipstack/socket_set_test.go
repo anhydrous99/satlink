@@ -1,8 +1,7 @@
 package ipstack
 
-// smoltcp has no tests of its socket set (src/iface/socket_set.rs), so
-// every test here is the port's own. The set never calls its sockets, so
-// fresh ones do.
+// The tests here check the set's own behaviour. The set never calls its
+// sockets, so fresh ones do.
 
 import (
 	"net/netip"

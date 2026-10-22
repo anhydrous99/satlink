@@ -16,10 +16,10 @@ import (
 	"time"
 )
 
-// Go only: crypto/tls alone takes keys that rustls's ring backend refuses —
-// RSA keys of 1024 to 2040 bits among them, which are too weak to trust —
-// and it asks servers for keys that ring cannot verify, ML-DSA and ECDSA on
-// P-521, which must then be taken.
+// crypto/tls alone takes keys that the chain check refuses — RSA keys of 1024
+// to 2040 bits among them, which are too weak to trust — and it asks servers
+// for keys that the check cannot verify, ML-DSA and ECDSA on P-521, which must
+// then be taken.
 
 func TestTheKeysAServersChainMayHold(t *testing.T) {
 	p256, p384, p521 := generateKey(t), generateECDSAKey(t, elliptic.P384()), generateECDSAKey(t, elliptic.P521())
@@ -33,7 +33,7 @@ func TestTheKeysAServersChainMayHold(t *testing.T) {
 	}{
 		{"an RSA-2048 server key", p256, rsa2048, true},
 		{"an RSA-2048 CA", rsa2048, p256, true},
-		// A modulus of 2041 bits fills 256 bytes, as ring counts its minimum.
+		// A modulus of 2041 bits fills 256 bytes, which the minimum counts.
 		{"an RSA-2041 server key", p256, rsa2041, true},
 		{"a P-384 CA and an Ed25519 server key", p384, ed25519Key, true},
 		{"a P-521 server key", p256, p521, true},
@@ -61,7 +61,7 @@ func TestTheKeysAServersChainMayHold(t *testing.T) {
 }
 
 // keysOnlyCryptoTLSAsksFor returns, by name, keys of the kinds crypto/tls
-// asks servers for and rustls never does.
+// asks servers for and the chain check cannot verify.
 func keysOnlyCryptoTLSAsksFor(t *testing.T) map[string]crypto.Signer {
 	t.Helper()
 	return map[string]crypto.Signer{
@@ -83,8 +83,8 @@ func newTLSFixturePreferring(t *testing.T, preferredKey crypto.Signer) (*tlsFixt
 
 // TestAServerSendingTheCertificateCryptoTLSAskedForIsTrusted serves a server
 // that prefers an ML-DSA or a P-521 certificate to its P-256 one: crypto/tls
-// asks for both kinds, where rustls asks for neither and is sent the P-256
-// certificate.
+// asks for both kinds, so the server sends the preferred certificate, which
+// is trusted.
 func TestAServerSendingTheCertificateCryptoTLSAskedForIsTrusted(t *testing.T) {
 	for name, preferredKey := range keysOnlyCryptoTLSAsksFor(t) {
 		t.Run(name, func(t *testing.T) {
@@ -104,8 +104,9 @@ func TestAServerSendingTheCertificateCryptoTLSAskedForIsTrusted(t *testing.T) {
 }
 
 // TestTheCertificateCryptoTLSAskedForMustBePinnedToo serves the servers of
-// the test above. The Rust version is sent their P-256 certificate, so a pin
-// of its key alone is enough there, and matches nothing here.
+// the test above. A client that asks for neither kind is sent their P-256
+// certificate, so a pin of its key alone is enough there, and matches nothing
+// here.
 func TestTheCertificateCryptoTLSAskedForMustBePinnedToo(t *testing.T) {
 	for name, preferredKey := range keysOnlyCryptoTLSAsksFor(t) {
 		t.Run(name, func(t *testing.T) {
@@ -144,7 +145,8 @@ func TestTheRefusedKeys(t *testing.T) {
 		key     crypto.PublicKey
 		refused bool
 	}{
-		// ring rounds a modulus up to whole bytes for its minimum only.
+		// The minimum is checked against a modulus rounded up to whole bytes;
+		// the maximum is not.
 		"RSA of 2040 bits": {rsaPublicKeyOf(2040), true},
 		"RSA of 2041 bits": {rsaPublicKeyOf(2041), false},
 		"RSA of 2047 bits": {rsaPublicKeyOf(2047), false},

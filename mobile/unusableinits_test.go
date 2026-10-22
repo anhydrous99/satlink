@@ -17,8 +17,8 @@ import (
 // interface, and the init they inherit from NSObject
 // makes an object with no Go side, whose first use ends the app.
 // scripts/mark-unusable-inits.sh marks that init, and new, unavailable, so
-// that the compiler refuses them, as Rust's Swift bindings had no such
-// initializer. These tests run the script on gobind's header, as
+// that the compiler refuses them, as no Swift code should call an
+// initializer with no Go side. These tests run the script on gobind's header, as
 // build-bindings.sh runs it on the copies gomobile puts into the
 // framework, and compile Objective-C against it with the macOS SDK's
 // clang. Swift imports the mark as an unavailable init(), and so refuses

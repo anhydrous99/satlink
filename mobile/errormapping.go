@@ -8,9 +8,7 @@ import (
 	"github.com/anhydrous99/satlink/satnet"
 )
 
-// How the errors of the packages underneath reach the app: as the Rust
-// bindings' From impls word them, plus the Go-only cases that section 5 of
-// docs/PORTING.md lists.
+// How the errors of the packages underneath reach the app.
 
 // connectionClosed is the reason given for a connection used after Close,
 // which the satnet connections report as net.ErrClosed.
@@ -21,7 +19,7 @@ const connectionClosed = "the connection is closed"
 const strandedReason = "the last data call could not be hung up; reinitialize ends it"
 
 // handsetClosed is the reason an IridiumHandset the app has closed gives
-// for refusing to work, as UniFFI refused every call on a destroyed object.
+// for refusing to work: every call on it fails once it is closed.
 const handsetClosed = "the handset is closed"
 
 // fromError returns err as the error the app sees, a *SatlinkError; nil
@@ -40,12 +38,10 @@ func fromError(err error) error {
 // a closed connection. Any other error is none this package expects from
 // the libraries underneath, a fault inside the library.
 //
-// A handset error of kind satlink.ErrCallMayStillBeUp is a failed hang-up,
-// as the Rust bindings' From<core::Error> has it. The CallMayStillBeUp flag
-// on an error of another kind — Rust's CallFailure — is ignored here, as
-// those From impls never see it: establishError checks it, as the Rust
-// bindings' establish_error does, and SatelliteLink.HangUp reads the link's
-// status instead.
+// A handset error of kind satlink.ErrCallMayStillBeUp is a failed hang-up.
+// The CallMayStillBeUp flag on an error of another kind is ignored here, as
+// this conversion never sees it: establishError checks it, and
+// SatelliteLink.HangUp reads the link's status instead.
 func satlinkErrorOf(err error) *SatlinkError {
 	var (
 		own       *SatlinkError
@@ -69,8 +65,8 @@ func satlinkErrorOf(err error) *SatlinkError {
 	}
 }
 
-// establishError reports why a link could not be established, as the Rust
-// bindings' establish_error does: SatlinkErrorHangUpFailed, with the
+// establishError reports why a link could not be established:
+// SatlinkErrorHangUpFailed, with the
 // error's text as Reason, when its call may still be up.
 func establishError(err error) error {
 	if errors.Is(err, satlink.ErrCallMayStillBeUp) {
@@ -91,8 +87,7 @@ func unexpectedError(err error) *SatlinkError {
 	return &SatlinkError{Kind: SatlinkErrorInternal, Reason: err.Error()}
 }
 
-// fromCoreError converts a handset's error, as the Rust bindings'
-// From<core::Error> does, with ErrBusy as SatlinkErrorHandsetBusy and
+// fromCoreError converts a handset's error, with ErrBusy as SatlinkErrorHandsetBusy and
 // ErrCallMayStillBeUp as SatlinkErrorHangUpFailed.
 func fromCoreError(e *satlink.Error) *SatlinkError {
 	if e.Kind < 0 || int(e.Kind) >= len(coreErrorConversions) || coreErrorConversions[e.Kind] == nil {
@@ -138,8 +133,7 @@ var coreErrorConversions = [...]func(e *satlink.Error) *SatlinkError{
 	},
 }
 
-// fromNetError converts a link's error, as the Rust bindings'
-// From<NetError> does.
+// fromNetError converts a link's error.
 func fromNetError(e *satnet.Error) *SatlinkError {
 	if e.Kind < 0 || int(e.Kind) >= len(netErrorConversions) || netErrorConversions[e.Kind] == nil {
 		return unexpectedError(e)

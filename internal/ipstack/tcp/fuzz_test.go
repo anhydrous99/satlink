@@ -1,6 +1,6 @@
 package tcp
 
-// The fuzz target of the socket (PORTING-ipstack.md, section 6): a peer that
+// The fuzz target of the socket: a peer that
 // sends whatever segments it likes, an application that sends, receives,
 // closes and opens the socket again at any moment, and an interface that
 // polls the socket over a line that refuses segments at times, and whose
@@ -30,12 +30,12 @@ import (
 // it, and acknowledges no sequence number beyond the furthest the peer sent;
 // it sends only octets the application wrote, each at its sequence number,
 // in segments no longer than the effective MSS, and within the peer's window
-// but for a zero-window probe and a fast retransmission, which smoltcp sends
+// but for a zero-window probe and a fast retransmission, which are sent
 // whatever the window; it never answers a RST; and its assembler holds no
 // data beyond the receive buffer.
 //
 // The peer may also send data beyond its FIN, contradicting itself. The
-// socket, like smoltcp, queues such data, and the octets after the FIN are
+// socket queues such data, and the octets after the FIN are
 // not checked. If the socket already holds octets beyond the FIN when the
 // FIN's segment arrives, it may end the stream where they end, and
 // acknowledge them: then the FIN's position is not checked, nor, for the
@@ -89,7 +89,7 @@ const (
 	// configConnect has the socket connect at once, rather than listen.
 	configConnect fuzzConfig = 1 << 2
 	// configNagleOff turns Nagle's algorithm off; configACKDelay,
-	// configTimeout and configKeepAlive turn on smoltcp's default ACK delay,
+	// configTimeout and configKeepAlive turn on the default ACK delay,
 	// fuzzTimeout and fuzzKeepAlive.
 	configNagleOff  fuzzConfig = 1 << 3
 	configACKDelay  fuzzConfig = 1 << 4
@@ -321,7 +321,7 @@ type fuzzRun struct {
 	// ends in the socket's account.
 	takenFIN wire.TCPSeqNumber
 	// fastRetransmissionDue says whether a fast retransmission was pending,
-	// or its timer set, when the current Dispatch began: smoltcp sends it
+	// or its timer set, when the current Dispatch began: the socket sends it
 	// whatever the peer's window.
 	fastRetransmissionDue bool
 }
@@ -642,7 +642,7 @@ func (r *fuzzRun) checkReceived(first wire.TCPSeqNumber, data []byte) {
 // checks it: the segment must carry a FIN, and the socket must take it where
 // the peer sent it, right after the segment's data. A segment that ends
 // before heldEnd, though, may join octets held beyond it to the stream, and
-// the socket, like smoltcp, then ends the stream where they end, and
+// the socket then ends the stream where they end, and
 // acknowledges sequence numbers the peer never sent: the run stops checking
 // the FIN's position, and acknowledgements for the rest of the connection.
 func (r *fuzzRun) noteTakenFIN(segment wire.TCPRepr, heldEnd wire.TCPSeqNumber) {
@@ -723,7 +723,7 @@ func (r *fuzzRun) isFastRetransmission(segment wire.TCPRepr) bool {
 // acknowledges no sequence number beyond the furthest the peer sent
 // (peerSeqEnd), unless acknowledgementsUnchecked. A RST goes unchecked: one
 // that aborts a connection before the peer's SYN came acknowledges the
-// stream the socket never synchronized with at zero, as smoltcp's does.
+// stream the socket never synchronized with at zero.
 func (r *fuzzRun) checkAcknowledgement(segment wire.TCPRepr) {
 	r.t.Helper()
 	ack, acknowledges := segment.AckNumber.Get()
@@ -886,7 +886,7 @@ func remoteCloseScript() []byte {
 }
 
 // dataAfterThePeersFINScript has the peer close with data and then send more
-// beyond its FIN, which the socket, like smoltcp, queues in CLOSE-WAIT for
+// beyond its FIN, which the socket queues in CLOSE-WAIT for
 // the application to read after the data before the FIN.
 func dataAfterThePeersFINScript() []byte {
 	var b scriptBuilder
@@ -898,7 +898,7 @@ func dataAfterThePeersFINScript() []byte {
 }
 
 // finJoiningHeldDataScript has the peer send data beyond a gap, and then
-// close with a segment that fills the gap: the socket, like smoltcp, takes
+// close with a segment that fills the gap: the socket takes
 // the FIN where the data it held ends, beyond where the peer sent it.
 func finJoiningHeldDataScript() []byte {
 	var b scriptBuilder
@@ -931,7 +931,7 @@ func finAfterDataCutAtTheWindowsEndScript() []byte {
 // fills the receive window of fuzzBuffers[0], its FIN right at the window's
 // end, so that the window ends before it starts until the socket's next
 // segment; meanwhile the peer sends a RST and data maxSeqOffset past the
-// window's start, which smoltcp takes for inside the window, and panics on.
+// window's start: taken for inside the window, it makes the stack panic.
 func farSegmentsAfterAFINAtTheWindowsEndScript() []byte {
 	windowLen := fuzzBuffers[0].receive
 	var b scriptBuilder
@@ -1010,7 +1010,7 @@ func simultaneousCloseThenReuseScript() []byte {
 }
 
 // peerSYNBeforeTheSocketsOwnScript has a connecting socket get the peer's SYN
-// before its own has gone out, where smoltcp's poll_at panics.
+// before its own has gone out, where poll_at panics.
 func peerSYNBeforeTheSocketsOwnScript() []byte {
 	var b scriptBuilder
 	b.peer(seedSegment{control: peerSYN, window: 1024}).step(stepDispatch)
@@ -1020,7 +1020,7 @@ func peerSYNBeforeTheSocketsOwnScript() []byte {
 // closeBeforeThePeersSYNScript has a connecting socket drop a stray RST with
 // a sequence number below zero, and close before the peer's SYN comes: the
 // RST it sends then acknowledges sequence number zero, beyond the stray
-// one's, as smoltcp's does.
+// one's.
 func closeBeforeThePeersSYNScript() []byte {
 	var b scriptBuilder
 	b.step(stepDispatch).peer(seedSegment{control: peerRST, seqOffset: -74, window: 1024})
@@ -1030,7 +1030,7 @@ func closeBeforeThePeersSYNScript() []byte {
 
 // seedDataBeyondTheScaledBuffer is data that the peer of a socket with a
 // receive buffer of 128 KiB sends right after the handshake, 128 KiB past
-// the start of its stream: past the buffer's end, where smoltcp takes it.
+// the start of its stream: past the buffer's end, which the socket refuses.
 var seedDataBeyondTheScaledBuffer = seedSegment{control: peerNone, flags: peerFlagACK | peerFlagACKAll | peerFlagFarSeq,
 	seqOffset: 64, window: 1024, payloadUnits: 12}
 

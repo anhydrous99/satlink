@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// tcpPacketBytes is smoltcp's PACKET_BYTES: a segment with FIN, RST, ACK
-// and URG, a window scale option and a payload.
+// tcpPacketBytes is a segment with FIN, RST, ACK and URG, a window scale
+// option and a payload.
 func tcpPacketBytes() []byte {
 	return []byte{
 		0xbf, 0x00, 0x00, 0x50, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x60, 0x35, 0x01,
@@ -23,7 +23,7 @@ func tcpPayloadBytes() []byte {
 	return []byte{0xaa, 0x00, 0x00, 0xff}
 }
 
-// tcpSYNPacketBytes is smoltcp's SYN_PACKET_BYTES: the segment
+// tcpSYNPacketBytes is the segment
 // tcpPacketRepr describes.
 func tcpSYNPacketBytes() []byte {
 	return []byte{
@@ -73,7 +73,6 @@ func tcpLongPacketRepr() TCPRepr {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_deconstruct.
 func TestTCPPacketDeconstruct(t *testing.T) {
 	t.Parallel()
 	packet := TCPPacket(tcpPacketBytes())
@@ -103,7 +102,6 @@ func TestTCPPacketDeconstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_construct.
 func TestTCPPacketConstruct(t *testing.T) {
 	t.Parallel()
 	packet := TCPPacket(filled(len(tcpPacketBytes()), 0xa5))
@@ -132,7 +130,6 @@ func TestTCPPacketConstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_truncated.
 func TestTCPPacketTruncated(t *testing.T) {
 	t.Parallel()
 	packet := TCPPacket(tcpPacketBytes()[:23])
@@ -142,7 +139,6 @@ func TestTCPPacketTruncated(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_impossible_len.
 func TestTCPPacketImpossibleLen(t *testing.T) {
 	t.Parallel()
 	packet := TCPPacket(make([]byte, 20))
@@ -153,7 +149,6 @@ func TestTCPPacketImpossibleLen(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_parse.
 func TestTCPReprParse(t *testing.T) {
 	t.Parallel()
 	repr, err := ParseTCPRepr(TCPPacket(tcpSYNPacketBytes()), testSrcAddr, testDstAddr, ChecksumCapabilities{})
@@ -163,7 +158,6 @@ func TestTCPReprParse(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_emit.
 func TestTCPReprEmit(t *testing.T) {
 	t.Parallel()
 	repr := tcpPacketRepr()
@@ -176,7 +170,6 @@ func TestTCPReprEmit(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/tcp.rs test_header_len_multiple_of_4.
 func TestTCPReprHeaderLenMultipleOf4(t *testing.T) {
 	t.Parallel()
 	repr := tcpPacketRepr()

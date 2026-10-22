@@ -362,7 +362,6 @@ func TestAnsweringADataCallByMistakeEndsIt(t *testing.T) {
 }
 
 func TestADataCallAnsweredByMistakeThatCannotBeEndedMayStillBeUp(t *testing.T) {
-	// Go only: Rust's text.
 	transport := newScripted(step{"ATA\r", "\r\nCONNECT 9600\r\n"}).unpluggedOncePlayedOut()
 	handset := newTestHandset(transport)
 
@@ -380,7 +379,6 @@ func TestADataCallAnsweredByMistakeThatCannotBeEndedMayStillBeUp(t *testing.T) {
 }
 
 func TestAnsweringWithoutACallFails(t *testing.T) {
-	// Go only.
 	handset := newTestHandset(newScripted(step{"ATA\r", "\r\nNO CARRIER\r\n"}))
 
 	err := handset.Answer()
@@ -389,7 +387,7 @@ func TestAnsweringWithoutACallFails(t *testing.T) {
 }
 
 func TestAnAnswerThatCannotReadTheHandsetSendsNothing(t *testing.T) {
-	// Go only: the late answers are dropped first, and that read fails.
+	// The late answers are dropped first, and that read fails.
 	transport := newScripted().unpluggedOncePlayedOut()
 
 	err := newTestHandset(transport).Answer()
@@ -436,8 +434,7 @@ func TestTimeoutAndValidation(t *testing.T) {
 	}
 }
 
-// The tests below are Go only: they cover the methods the Rust tests leave
-// out.
+// The tests below cover further Handset methods.
 
 func TestInitializeEndsACallLeftUpWhoseFarEndNeverPauses(t *testing.T) {
 	// Slow — the first drain's two seconds, three two-second ATs and an
@@ -611,7 +608,7 @@ func TestAnATAnsweredASecondLateStillSynchronises(t *testing.T) {
 }
 
 func TestAZeroTimeoutFailsACommandWithoutWaitingForItsAnswer(t *testing.T) {
-	// As SetTimeout says, and as in Rust: the command is sent, and nothing
+	// As SetTimeout says: the command is sent, and nothing
 	// is read for it, not even an answer that has arrived.
 	handset := newTestHandset(newScripted(step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"}))
 	handset.SetTimeout(0)
@@ -621,8 +618,8 @@ func TestAZeroTimeoutFailsACommandWithoutWaitingForItsAnswer(t *testing.T) {
 	assertError(t, err, &satlink.Error{Kind: satlink.ErrTimeout, Command: "AT+CSQ"})
 }
 
-// longestPromisedRead is the longest one read of a handset waits, as the
-// Rust version's LONGEST_READ, a second: then it looks at its deadline
+// longestPromisedRead is the longest a read of a handset waits for data at a
+// time, a second: then it looks at its deadline
 // again, so that a transport is never handed an absurd timeout.
 const longestPromisedRead = time.Second
 
@@ -655,8 +652,8 @@ func TestTheEchoIsNoInformationLine(t *testing.T) {
 }
 
 func TestALineOnlyUnicodeFoldsToTheCommandIsNoEcho(t *testing.T) {
-	// The echo is the command but for the case of ASCII letters, as Rust
-	// compares them: Unicode would fold ſ into s.
+	// The echo is the command but for the case of ASCII letters, which are the
+	// only letters compared without regard to case: Unicode would fold ſ into s.
 	handset := newTestHandset(newScripted(step{"AT+CSQ\r", "\r\nAT+C\u017fQ\r\n\r\n+CSQ:4\r\n\r\nOK\r\n"}))
 
 	response, err := handset.Command("AT+CSQ")

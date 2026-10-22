@@ -1,14 +1,14 @@
-package rustdebug_test
+package debugtext_test
 
 import (
 	"net/netip"
 	"testing"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
-func TestIPv4SettingsAreWrittenAsRustsDebugWroteThem(t *testing.T) {
+func TestIPv4SettingsAreWrittenAsDebugStructs(t *testing.T) {
 	local, peer := netip.MustParseAddr("10.64.0.2"), netip.MustParseAddr("10.64.0.1")
 	primary, secondary := netip.MustParseAddr("10.64.0.1"), netip.MustParseAddr("10.64.0.3")
 	tests := []struct {
@@ -35,7 +35,7 @@ func TestIPv4SettingsAreWrittenAsRustsDebugWroteThem(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := rustdebug.IPv4Settings(test.settings.LocalAddress, test.settings.PeerAddress, test.settings.DNSServers); got != test.want {
+			if got := debugtext.IPv4Settings(test.settings.LocalAddress, test.settings.PeerAddress, test.settings.DNSServers); got != test.want {
 				t.Errorf("IPv4Settings = %q, want %q", got, test.want)
 			}
 		})

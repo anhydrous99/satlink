@@ -126,8 +126,8 @@ var (
 	}
 )
 
-// DescribeState returns state as the Rust tests' LinkState values print,
-// such as "Closed(Requested)", and "nil" for none.
+// DescribeState returns state's text, such as "Closed(Requested)", and
+// "nil" for none.
 func DescribeState(state *LinkState) string {
 	if state == nil {
 		return "nil"

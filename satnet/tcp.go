@@ -77,7 +77,7 @@ func closeTCPGracefully(conn *connection) {
 // down. After [TCPConn.CloseWrite], what the peer sent stays readable for
 // ten seconds once it has finished too (TCP's TIME-WAIT); the connection
 // then ends, discarding what was not read, and Read fails with
-// ErrConnectionReset, as in the Rust version.
+// ErrConnectionReset.
 func (c *TCPConn) Read(p []byte) (int, error) {
 	read := 0
 	err := c.conn.wait(operationTCPRead, c.conn.readUntil, func(e *engine) (bool, error) {
@@ -136,7 +136,7 @@ func (c *TCPConn) Write(p []byte) (int, error) {
 // for room in the send buffer, and returns how many bytes were queued: as
 // many as fit once there was room, perhaps not all of p. That part is still
 // sent, so exactly the rest can be written again. Unlike Write, it returns
-// as soon as anything is queued, as the Rust version's send_until does; an
+// as soon as anything is queued; an
 // error means that nothing was, and an empty p queues nothing without
 // waiting for room.
 //

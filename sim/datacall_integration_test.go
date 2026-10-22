@@ -134,8 +134,8 @@ func TestACallDroppedByTheNetworkIsNoticed(t *testing.T) {
 	assertAnswersAT(t, handset)
 }
 
-// Rust takes the transport back from the earlier handset; in Go, the next
-// session's handset is made over the earlier one's Transport.
+// The next session's handset is made over the earlier one's Transport, which
+// takes it back from the earlier handset.
 func TestACallEscapedFromButNeverHungUpIsEndedByTheNextSession(t *testing.T) {
 	t.Parallel()
 	earlier, control := readyHandset(t, fastConfig())
@@ -164,8 +164,8 @@ func TestACallEscapedFromButNeverHungUpIsEndedByTheNextSession(t *testing.T) {
 	}
 }
 
-// The Rust test drops the call, and with it the port; in Go, closing the
-// handset closes the port.
+// Dropping the call drops the port with it; here closing the handset closes
+// the port.
 func TestClosingThePortEndsTheCallWhenTheAppAskedForIt(t *testing.T) {
 	t.Parallel()
 	for _, endCallWhenDTRDrops := range []bool{true, false} {
@@ -321,9 +321,8 @@ func TestANetworkTheGatewayCannotServeFailsTheCall(t *testing.T) {
 	assertLines(t, handset, "AT+CEER", "+CEER: Service or option not available")
 }
 
-// Go only, from here to the end of the file: the network's DNS servers and
-// silent addresses, and PPP restarted by the network, which the Rust tests
-// exercise through iridium-net's.
+// From here to the end of the file: the network's DNS servers and silent
+// addresses, and PPP restarted by the network.
 
 func TestIPCPOffersTheConfiguredDNSServersInOrder(t *testing.T) {
 	t.Parallel()

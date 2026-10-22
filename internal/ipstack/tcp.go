@@ -7,7 +7,7 @@ import (
 
 // processTCP hands a TCP segment to the first socket in slot order that
 // accepts it and returns that socket's immediate reply, if any; a segment no
-// socket accepts is answered with a RST. This is smoltcp's process_tcp.
+// socket accepts is answered with a RST.
 func (i *Interface) processTCP(sockets *SocketSet, header wire.IPv4Repr, payload []byte) (ipPacket, bool) {
 	// Per RFC 1122 § 3.2.1.3, the unspecified address must never appear as
 	// a source or destination in any IP datagram. Drop such TCP segments

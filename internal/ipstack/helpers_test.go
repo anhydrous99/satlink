@@ -31,8 +31,7 @@ var (
 	anyChecksums = wire.ChecksumCapabilities{}
 )
 
-// at returns the time elapsed after the tests' epoch, the zero time.Time
-// (smoltcp's Instant::ZERO).
+// at returns the time elapsed after the tests' epoch, the zero time.Time.
 func at(elapsed time.Duration) time.Time {
 	return time.Time{}.Add(elapsed)
 }
@@ -225,8 +224,7 @@ func newUDPSocket(t *testing.T, local wire.ListenEndpoint) *udp.Socket {
 	return s
 }
 
-// newTCPSocket returns a closed TCP socket with 64-octet buffers, as
-// smoltcp's interface tests use.
+// newTCPSocket returns a closed TCP socket with 64-octet buffers.
 func newTCPSocket() *tcp.Socket {
 	const bufferLen = 64
 	return tcp.NewSocket(tcp.NewSocketBuffer(bufferLen), tcp.NewSocketBuffer(bufferLen))

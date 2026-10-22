@@ -270,7 +270,7 @@ func lastRecord(t *testing.T, records []logRecord) logRecord {
 	return records[len(records)-1]
 }
 
-func TestAHangUpIsLoggedAsTheRustVersionLoggedIt(t *testing.T) {
+func TestAHangUpIsLogged(t *testing.T) {
 	records := recordLogs(t, slog.LevelInfo)
 	handset, _ := simtest.NewHandset(t, simtest.SimulatorConfig())
 	link, err := Establish(handset, testLinkConfig())

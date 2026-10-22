@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for timeouts (src/socket/tcp.rs,
-// lines 8561-8744).
+// Tests of timeouts.
 
 import (
 	"testing"

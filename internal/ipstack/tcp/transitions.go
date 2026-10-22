@@ -122,8 +122,8 @@ func (s *Socket) adoptPeerOptions(syn wire.TCPRepr) {
 	if !s.remoteWindowScale.IsSome() {
 		s.remoteWindowShift = 0
 	}
-	// smoltcp also stops sending timestamps to a peer that does not send
-	// them; this port never sends any.
+	// A peer that does not send timestamps gets none back: this socket never
+	// sends any.
 }
 
 func (s *Socket) transitionFromSynReceived(a *arrival) outcome {

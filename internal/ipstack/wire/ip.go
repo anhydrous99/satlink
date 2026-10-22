@@ -20,7 +20,7 @@ const (
 	IPProtocolUDP IPProtocol = 0x11
 )
 
-// The protocols smoltcp names although the stack does not handle them
+// The protocols the stack names although it does not handle them
 // (IANA's protocol numbers). They matter only for how a datagram that
 // carries one is shown.
 const (
@@ -35,8 +35,7 @@ const (
 	ipProtocolIPv6Opts  IPProtocol = 0x3c // IPv6 destination options (RFC 8200)
 )
 
-// ipProtocolNames are the names smoltcp's Display gives the protocols it
-// knows.
+// ipProtocolNames are the names of the protocols the stack knows.
 var ipProtocolNames = map[IPProtocol]string{
 	ipProtocolHopByHop:  "Hop-by-Hop",
 	IPProtocolICMP:      "ICMP",
@@ -52,9 +51,8 @@ var ipProtocolNames = map[IPProtocol]string{
 	ipProtocolIPv6Opts:  "IPv6-Opts",
 }
 
-// String returns the protocol's name as smoltcp displays it ("TCP",
-// "IPsec-ESP"), or its number in hexadecimal ("0x2f") when smoltcp has no
-// name for it.
+// String returns the protocol's name ("TCP", "IPsec-ESP"), or its number in
+// hexadecimal ("0x2f") when it has no name.
 func (p IPProtocol) String() string {
 	if name, ok := ipProtocolNames[p]; ok {
 		return name
@@ -77,8 +75,8 @@ func (e ListenEndpoint) IsSpecified() bool {
 	return e.Addr.IsValid() && e.Port != 0
 }
 
-// String formats the endpoint as smoltcp does: "address:port", or "*:port"
-// when the address is open.
+// String formats the endpoint as "address:port", or "*:port" when the address
+// is open.
 func (e ListenEndpoint) String() string {
 	if !e.Addr.IsValid() {
 		return fmt.Sprintf("*:%d", e.Port)
@@ -91,9 +89,8 @@ const ipv4AddrLen = 4
 
 // ipv4Octets returns the four octets of addr, for a function that writes the
 // address into a packet or includes it in a checksum. It panics unless addr
-// is an IPv4 address (Is4): smoltcp's address type cannot hold anything else,
-// and the sockets refuse other addresses where they enter the stack, so one
-// that reaches the wire is a programming error.
+// is an IPv4 address (Is4): the sockets refuse other addresses where they
+// enter the stack, so one that reaches the wire is a programming error.
 func ipv4Octets(addr netip.Addr) [ipv4AddrLen]byte {
 	requireIPv4(addr)
 	return addr.As4()

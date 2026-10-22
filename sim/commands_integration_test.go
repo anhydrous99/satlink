@@ -25,9 +25,8 @@ func assertHandsetError(t *testing.T, err error, want satlink.Error) {
 	}
 }
 
-// The Rust test checks at compile time that the handset and its control
-// may go to other threads; the Go one uses them from several goroutines
-// at once, for the race detector to see.
+// The handset and its control are used from several goroutines at once, for
+// the race detector to see.
 func TestTheHandsetAndItsControlCanBeUsedFromSeveralGoroutines(t *testing.T) {
 	t.Parallel()
 	handset, control := readyHandset(t, fastConfig())
@@ -195,9 +194,7 @@ func assertMessage(t *testing.T, got, want satlink.SMSMessage) {
 	}
 }
 
-// The Rust test sends the message 50 ms after the app starts to wait for
-// it; this one sends it once the app waits (docs/PORTING.md, section 2,
-// Tests). In a synctest bubble, synctest.Wait returns once every other
+// The message is sent once the app waits for it. In a synctest bubble, synctest.Wait returns once every other
 // goroutine waits: here once PollURCs sleeps between two reads of the
 // simulated handset.
 func TestAnSMSFromAnotherGoroutineReachesAWaitingApp(t *testing.T) {

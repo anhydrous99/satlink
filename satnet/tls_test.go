@@ -127,8 +127,9 @@ func distrustedAfter(date time.Time) func([]*x509.Certificate) error {
 	}
 }
 
-// TestAPublicRootAnchorsNoChainIssuedAfterItsDistrustDate is Go only:
-// webpki-roots, the Rust version's roots, cannot carry such a date.
+// TestAPublicRootAnchorsNoChainIssuedAfterItsDistrustDate checks the
+// constraint that the bundled roots place on a root NSS distrusts after a
+// date.
 func TestAPublicRootAnchorsNoChainIssuedAfterItsDistrustDate(t *testing.T) {
 	fixture := newTLSFixture(t)
 	server, err := x509.ParseCertificate(fixture.server.Certificates[0].Certificate[0])
@@ -194,7 +195,7 @@ func TestACertificateForAnotherNameIsRefusedPinnedOrNot(t *testing.T) {
 	}
 }
 
-func TestTLS12IsOfferedWithRustlssSuitesOnly(t *testing.T) {
+func TestTLS12IsOfferedWithECDHESuitesOnly(t *testing.T) {
 	connector, err := NewTLSConnector(TLSOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -208,7 +209,7 @@ func TestTLS12IsOfferedWithRustlssSuitesOnly(t *testing.T) {
 		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
 	}
 	if !slices.Equal(config.CipherSuites, want) {
-		t.Errorf("TLS 1.2 suites %v, want rustls's %v", config.CipherSuites, want)
+		t.Errorf("TLS 1.2 suites %v, want %v", config.CipherSuites, want)
 	}
 }
 
@@ -268,7 +269,7 @@ func TestTheConnectorKeepsItsOwnCopyOfTheOptions(t *testing.T) {
 	}
 }
 
-func TestServerNamesFollowRustlsRules(t *testing.T) {
+func TestServerNameValidity(t *testing.T) {
 	for name, valid := range map[string]bool{
 		"secure.test":           true,
 		"Secure.Test.":          true,

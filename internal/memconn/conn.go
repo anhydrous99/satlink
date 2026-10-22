@@ -219,7 +219,7 @@ func (c *Conn) Pending() int {
 // — and reports whether that happened within timeout. It returns at once
 // when it already has. The owner calls it between injecting and
 // extracting, so that the answer to what it injected is there to extract
-// in the same step, as with the Rust version's sans-I/O sessions. A session
+// in the same step. A session
 // that stops reading without closing, such as a client that has read the
 // peer's close_notify, makes it wait for all of timeout: call it only while
 // the session reads.

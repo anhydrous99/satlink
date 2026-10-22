@@ -1,8 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the LISTEN state
-// (src/socket/tcp.rs, lines 3348-3560). Its socket_listen builder is
-// socketListen, in harness_test.go.
+// Tests of the LISTEN state.
 
 import (
 	"errors"

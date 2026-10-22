@@ -216,9 +216,9 @@ func TestLengthPrefixedFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestReadableReplacesInvalidUTF8AsRustDoes(t *testing.T) {
-	// The expected texts are what Rust's readable, built on
-	// String::from_utf8_lossy, returned for the same bytes.
+func TestReadableReplacesInvalidUTF8(t *testing.T) {
+	// The expected texts follow the Unicode rule for invalid UTF-8: each
+	// maximal invalid subpart becomes one U+FFFD.
 	tests := []struct {
 		text []byte
 		want string

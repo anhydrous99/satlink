@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // Which destinations the app may reach over the satellite link; the rules
@@ -319,9 +319,8 @@ func parsePort(text string) (uint16, bool) {
 	return uint16(port), err == nil && port != 0
 }
 
-// parseUnsigned parses a decimal number of at most bits bits as Rust's
-// FromStr for unsigned integers does: a leading '+' is allowed, any other
-// sign is not.
+// parseUnsigned parses a decimal number of at most bits bits. A leading
+// '+' is allowed, any other sign is not.
 func parseUnsigned(text string, bits int) (uint64, error) {
 	return strconv.ParseUint(strings.TrimPrefix(text, "+"), 10, bits)
 }
@@ -392,13 +391,13 @@ type ParseRuleError struct {
 func (e *ParseRuleError) Error() string {
 	switch e.Kind {
 	case ErrRuleMissingPort:
-		return rustdebug.Quote(e.Text) + " has no port; write host:port, host:first-last or host:*"
+		return debugtext.Quote(e.Text) + " has no port; write host:port, host:first-last or host:*"
 	case ErrRuleInvalidPort:
-		return rustdebug.Quote(e.Text) + " is not a port or port range"
+		return debugtext.Quote(e.Text) + " is not a port or port range"
 	case ErrRuleInvalidHost:
-		return rustdebug.Quote(e.Text) + " is not a valid host name"
+		return debugtext.Quote(e.Text) + " is not a valid host name"
 	case ErrRuleInvalidNetwork:
-		return rustdebug.Quote(e.Text) + " is not a valid IPv4 address or network"
+		return debugtext.Quote(e.Text) + " is not a valid IPv4 address or network"
 	default:
 		return e.Kind.Error()
 	}
@@ -415,9 +414,8 @@ func (e *ParseRuleError) Is(target error) bool {
 // trailing dot — and false if it is not a valid DNS name: at most 253
 // bytes of labels of 1 to 63 letters, digits, '-' (not at either end) and
 // '_'. Only ASCII letters change case, as only they can be valid: Unicode
-// case mapping, as Rust's to_ascii_lowercase avoids, would turn some
-// letters beyond ASCII, such as the Kelvin sign, into ASCII ones, and so
-// make an invalid name valid.
+// case mapping would turn some letters beyond ASCII, such as the Kelvin
+// sign, into ASCII ones, and so make an invalid name valid.
 func normalizeHost(host string) (string, bool) {
 	name := asciicase.Lower(strings.TrimSuffix(host, "."))
 	if len(name) > maxHostLen {
@@ -453,8 +451,8 @@ func isLabelByte(b byte) bool {
 	return 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '-' || b == '_'
 }
 
-// parseIPv4 parses an IPv4 address in dotted decimal, as Rust's Ipv4Addr
-// parser does: four decimal octets, without leading zeros.
+// parseIPv4 parses an IPv4 address in dotted decimal: four decimal octets,
+// without leading zeros.
 func parseIPv4(text string) (netip.Addr, bool) {
 	address, err := netip.ParseAddr(text)
 	if err != nil || !address.Is4() {

@@ -14,7 +14,7 @@ import (
 // shortestTransportWaitMillis is the shortest wait a ByteTransport's Read
 // is asked for: UsbDeviceConnection.bulkTransfer takes a timeout of zero as
 // "wait forever", so even a read of only what has arrived waits a
-// millisecond, as in the Rust bindings.
+// millisecond.
 const shortestTransportWaitMillis = 1
 
 // longestTransportWaitMillis is the longest wait a ByteTransport's Read is
@@ -64,7 +64,7 @@ func transportWaitMillis(timeout time.Duration) int64 {
 }
 
 // wholeSeconds returns duration in whole seconds, as the app's settings
-// and link status count time, dropping any fraction as Rust's as_secs did.
+// and link status count time, dropping any fraction.
 func wholeSeconds(duration time.Duration) int64 {
 	return int64(duration / time.Second)
 }

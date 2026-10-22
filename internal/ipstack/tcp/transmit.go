@@ -70,7 +70,7 @@ func localMSS(cx *socket.Context) int {
 
 // effectiveMSS returns the largest segment payload, taking into account the
 // local and remote limits: the local MSS and the peer's. No TCP options
-// shorten it, as this port never sends timestamps.
+// shorten it, as this socket never sends timestamps.
 func effectiveMSS(cx *socket.Context, remoteMSS int) int {
 	return min(localMSS(cx), remoteMSS)
 }

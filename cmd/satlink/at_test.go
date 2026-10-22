@@ -15,7 +15,7 @@ func TestAResponseEndsWithItsFinalResult(t *testing.T) {
 	}{
 		{"OK", satlink.Response{Lines: []string{"+CSQ:4"}}, "+CSQ:4\nOK\n"},
 		{"CONNECT and its rate", satlink.Response{Connected: true, ConnectMessage: "19200"}, "CONNECT 19200\n"},
-		// As the Rust version's, which printed CONNECT and an empty rate.
+		// The CONNECT line with no rate after it.
 		{"a bare CONNECT", satlink.Response{Connected: true}, "CONNECT \n"},
 	}
 	for _, test := range tests {

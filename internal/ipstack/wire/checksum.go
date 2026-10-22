@@ -49,7 +49,7 @@ type ChecksumCapabilities struct {
 
 // The Internet checksum (RFC 1071) is the one's complement of the one's
 // complement sum of the 16-bit words of the data it covers. The functions
-// below compute the sum (smoltcp's checksum module); a packet's FillChecksum
+// below compute the sum; a packet's FillChecksum
 // writes its complement.
 
 // correctChecksumSum is what the sum over data that includes its own correct
@@ -61,7 +61,7 @@ const checksumWordLen = 2
 
 // dataChecksum returns the one's complement sum of data, read as big-endian
 // 16-bit words with an odd last octet padded with a zero octet, without the
-// final complement (smoltcp's checksum::data). The sum does not depend on
+// final complement. The sum does not depend on
 // the order in which words are added (RFC 1071 § 2), so sums over parts of
 // the data combine with combineChecksums.
 func dataChecksum(data []byte) uint16 {
@@ -78,8 +78,7 @@ func dataChecksum(data []byte) uint16 {
 }
 
 // combineChecksums returns the one's complement sum of checksums, sums that
-// dataChecksum or pseudoHeaderChecksum computed (smoltcp's
-// checksum::combine).
+// dataChecksum or pseudoHeaderChecksum computed.
 func combineChecksums(checksums ...uint16) uint16 {
 	var sum uint64
 	for _, checksum := range checksums {
@@ -103,8 +102,8 @@ func foldCarries(sum uint64) uint16 {
 // pseudoHeaderChecksum returns the sum over the IPv4 pseudo-header that the
 // TCP and UDP checksums cover (RFC 9293 § 3.1, RFC 768): the source and
 // destination addresses, a zero octet, the protocol, and the length of the
-// segment, of which only the low 16 bits fit (smoltcp's
-// checksum::pseudo_header). It panics unless both addresses are IPv4.
+// segment, of which only the low 16 bits fit. It panics unless both addresses
+// are IPv4.
 func pseudoHeaderChecksum(src, dst netip.Addr, protocol IPProtocol, length int) uint16 {
 	srcOctets, dstOctets := ipv4Octets(src), ipv4Octets(dst)
 	zeroAndProtocol := []byte{0, byte(protocol)}

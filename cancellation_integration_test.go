@@ -106,7 +106,7 @@ func TestACancellationJustAfterTheDialCommandWaitsToAbort(t *testing.T) {
 	assertWaitedBetween(t, transport, "ATD"+testNumber+"\r", "\r", abortIgnoredWindow)
 }
 
-// The tests below are Go only: an answer cancelled, a context driving the
+// The tests below cover an answer cancelled, a context driving the
 // cancellation, and settings without one.
 
 func TestACancelledAnswerIsAborted(t *testing.T) {

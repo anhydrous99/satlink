@@ -1,125 +1,14 @@
 package tcp
 
 // This file is the test harness that every test of package tcp shares: the
-// port of the "Constants" and "Helper functions" sections of smoltcp's
-// socket tests (src/socket/tcp.rs:2926-3312), plus socket_listen from its
-// LISTEN section (:3351), which later sections use too, and the helpers that
-// several sections share. Tests stay white-box, as smoltcp's are: they read
-// and set the socket's unexported fields directly.
+// constants, the helper functions, and socket_listen, which later tests use
+// too. Tests stay white-box: they read and set the socket's unexported fields
+// directly.
 //
-// The ported tests follow smoltcp's sections, one file each, in smoltcp's
-// order: closed, listen, syn_received, syn_sent, established, fin_wait,
-// closing, time_wait, close_wait, last_ack, transitions, retransmission,
-// window, flow_control, zero_window_probe, timeout, keep_alive, reassembly,
-// receive_close, delayed_ack, nagle, filtering, timer, rtt_estimator,
-// timestamp and source_address (each name + _test.go). The Go-specific
-// tests sit beside the code they test: socket_test.go, stream_test.go,
-// connection_test.go, process_test.go, dispatch_test.go and
-// pull_model_test.go; fuzz_test.go holds the fuzz target. smoltcp's section on
-// time-to-live configuration, test_set_hop_limit and test_set_hop_limit_zero,
-// is not ported, because the stack always sends wire.DefaultHopLimit
-// (PORTING-ipstack.md, sections 3 and 6); the other tests left out are named
-// in the files of their sections.
-//
-// How smoltcp's test code ports:
-//
-//	smoltcp                                        Go
-//	TcpRepr { …, ..SEND_TEMPL }                    fromRemote(with…(…), …)
-//	TcpRepr { …, ..RECV_TEMPL }                    fromLocal(with…(…), …)
-//	  control: TcpControl::Syn                       withControl(wire.TCPControlSYN)
-//	  seq_number: REMOTE_SEQ + 1                     withSeq(remoteSeq.Add(1))
-//	  ack_number: Some(LOCAL_SEQ + 1) / None         withAck(localSeq.Add(1)) / withoutAck()
-//	  window_len: 58                                 withWindow(58)
-//	  window_scale: Some(0)                          withWindowScale(0)
-//	  max_seg_size: Some(BASE_MSS)                   withMSS(baseMSS)
-//	  sack_permitted: true                           withSACKPermitted()
-//	  sack_ranges: [Some((l, r)), None, None]        withSACKRanges(sackRangeOf(l, r)), l and r sequence numbers
-//	  timestamp: Some(TcpTimestampRepr::new(v, e))   withTimestamp(v, e)
-//	  payload: &b"abc"[..]                           withPayload([]byte("abc"))
-//	  src_port: …, dst_port: …                       withSrcPort(…), withDstPort(…)
-//	  (fields equal to the template's, such as window_scale: None, need no option)
-//	the socket's SYN in SYN-SENT                   initialSYN(…)
-//	the socket's SYN|ACK in SYN-RECEIVED           synACK(…)
-//	the remote's SYN (seq REMOTE_SEQ, no ACK)      remoteSYN(…)
-//	once both SYNs are acknowledged:
-//	  the socket's data at LOCAL_SEQ + 1 + n         dataFromLocal(n, "abc", …)
-//	  the remote's data at REMOTE_SEQ + 1 + n        dataFromRemote(n, "abc", …)
-//	  the remote's ACK of LOCAL_SEQ + 1 + n          ackFromRemote(n, …)
-//	  the socket's ACK of REMOTE_SEQ + 1 + n         ackFromLocal(n, window, …)
-//	an IpRepr carrying repr from src to dst        ipHeader(src, dst, repr)
-//	send!(s, repr)                                 send(t, s, repr)
-//	send!(s, repr, Some(reply))                    sendExpectingReply(t, s, repr, reply)
-//	send(&mut s, Instant::from_millis(0), &repr)   deliver(t, s, repr), which returns (reply, ok)
-//	recv!(s, [a, b])                               receiveOnly(t, s, a, b)
-//	recv!(s, Ok(a))                                receive(t, s, a)
-//	recv!(s, time T, Ok(a), exact)                 receiveExact(t, s.at(T*time.Millisecond), a)
-//	recv!(s, []) / recv_nothing!(s)                receiveNothing(t, s)
-//	any of them with `time T`                      the same helper with s.at(T*time.Millisecond) for s,
-//	                                               as in send(t, s.at(2000*time.Millisecond), repr)
-//	sanity!(s1, s2)                                sanity(t, s1, s2)
-//	socket(), socket_with_buffer_sizes(tx, rx)     socketClosed(t), socketClosedWithBufferSizes(t, tx, rx)
-//	socket_listen()                                socketListen(t)
-//	socket_syn_received(), …_with_buffer_sizes     socketSynReceived(t), socketSynReceivedWithBufferSizes(t, tx, rx)
-//	socket_syn_sent(), …_with_buffer_sizes         socketSynSent(t), socketSynSentWithBufferSizes(t, tx, rx)
-//	socket_established(), …_with_buffer_sizes      socketEstablished(t), socketEstablishedWithBufferSizes(t, tx, rx)
-//	socket_fin_wait_1(), socket_fin_wait_2()       socketFinWait1(t), socketFinWait2(t)
-//	socket_closing()                               socketClosing(t)
-//	socket_time_wait(false) / (true)               socketTimeWaitFromFinWait2(t) / socketTimeWaitFromClosing(t)
-//	socket_close_wait(), socket_last_ack()         socketCloseWait(t), socketLastAck(t)
-//	socket_recved()                                socketWithReceivedData(t)
-//	Instant::from_millis(T)                        instant(T*time.Millisecond)
-//	assert_eq!(s.state, State::X)                  assertState(t, s, StateX)
-//	assert_eq!(s.tuple, Some(TUPLE)) / None        assertTuple(t, s, testTuple) / assertNoTuple(t, s)
-//	assert_eq!(s.timer, Timer::Close { … })        assertTimer(t, s.timer, timer{kind: timerClose, expiresAt: …})
-//	assert_eq!(s.socket.poll_at(&mut s.cx), p)     assertPollAt(t, s, socket.PollAtTime(instant(…)))
-//	assert_eq!(s.tx_buffer.len(), n)               assertTransmitBufferLen(t, s, n)
-//	s.socket.accepts(&mut s.cx, &ip, &repr)        s.Accepts(ip, repr)
-//	s.socket.connect(&mut s.cx, REMOTE_END, p)     s.Connect(s.cx, remoteEnd, wire.ListenEndpoint{Port: p})
-//	s.socket.connect(&mut s.cx, REMOTE_END, LOCAL_END)  s.Connect(s.cx, remoteEnd, localListenEnd)
-//	s.cx.set_ip_addrs(…)                           s.cx.SetIPAddrs(…) (returns an error)
-//	s.send_slice(b"abc").unwrap()                  mustSendSlice(t, s, []byte("abc"))
-//	s.recv(|data| { assert_eq!(data, b"abc"); (3, ()) }).unwrap()
-//	                                               receiveExactly(t, s, "abc")
-//	s.recv(|data| { assert_eq!(&data[..2], b"ab"); (2, ()) }).unwrap()
-//	                                               receivePrefix(t, s, "ab")
-//	s.recv(|data| (data.len(), ())).unwrap()       mustReceive(t, s, consumeAll)
-//	s.recv(|data| { …; (n, ()) }).unwrap()         mustReceive(t, s, func(data []byte) int { …; return n })
-//	s.recv_slice(&mut buffer).unwrap()             mustReceiveSlice(t, s, buffer)
-//	s.recv(…) == Err(RecvError::Finished)          _, err := s.Receive(…); errors.Is(err, ErrFinished)
-//	s.rx_buffer = SocketBuffer::new(vec![0; n]); s.assembler = Assembler::new()
-//	                                               replaceReceiveBuffer(s, n)
-//	s.tx_buffer = SocketBuffer::new(vec![0; n])    s.transmitBuffer = NewSocketBuffer(n)
-//	Timer::new(), RttEstimator::default()          timer{}, newRTTEstimator()
-//	ACK_DELAY_DEFAULT, CLOSE_DELAY, DEFAULT_MSS, MIN_REMOTE_MSS   defaultACKDelay, closeDelay, defaultMSS, minRemoteMSS
-//
-// The socket's fields, as tests read and set them:
-//
-//	state, timer, rtte → rttEstimator, assembler, rx_buffer → receiveBuffer,
-//	rx_fin_received → finReceived, tx_buffer → transmitBuffer, timeout,
-//	keep_alive → keepAlive, listen_endpoint → listenEndpoint, tuple
-//	(wire.Optional[fourTuple]), local_seq_no → localSeqNumber,
-//	remote_seq_no → remoteSeqNumber, remote_last_seq → remoteLastSeq,
-//	remote_last_ack → remoteLastAck, remote_last_win → remoteLastWindow,
-//	remote_win_shift → remoteWindowShift, remote_win_len → remoteWindowLen,
-//	remote_win_scale → remoteWindowScale, remote_has_sack → remoteHasSACK,
-//	remote_mss → remoteMSS, remote_last_ts → remoteLastTimestamp,
-//	local_rx_last_seq → localReceiveLastSeq, local_rx_last_ack →
-//	localReceiveLastAck, local_rx_dup_acks → localReceiveDuplicateACKs,
-//	pending_fast_retransmit → pendingFastRetransmit, ack_delay → ackDelay,
-//	ack_delay_timer → ackDelayTimer, challenge_ack_timer →
-//	challengeACKTimer, nagle → nagleEnabled. An Option is a wire.Optional
-//	(wire.Some(x) for Some(x), the zero value for None); an Option<Duration>
-//	setting is a time.Duration, 0 for None.
-//
-// Times are durations after the epoch of the tests' clock, the zero
-// time.Time (smoltcp's Instant::ZERO), so that every time compares with ==.
-// Like smoltcp's macros, every helper acts at the epoch unless given
-// s.at(T), which sets the time for that one call only.
-//
-// smoltcp's tests sometimes set local_seq_no before connect; Connect resets
-// it and takes localSeq from the test sockets' fixed ISN, so such an
-// assignment needs no port. smoltcp's assert_eq!(…) becomes an if with
-// t.Errorf or t.Fatalf, or one of the assert… helpers below.
+// The tests are grouped in one file per state or feature. The tests of
+// behaviour beyond the states sit beside the code they test: socket_test.go, stream_test.go,
+// connection_test.go, process_test.go, dispatch_test.go and pull_model_test.go.
+// fuzz_test.go holds the fuzz target.
 
 import (
 	"bytes"
@@ -140,25 +29,22 @@ import (
 
 const (
 	// localPort and remotePort are the ports of the test connection's two
-	// ends (smoltcp's LOCAL_PORT and REMOTE_PORT).
+	// ends.
 	localPort  uint16 = 80
 	remotePort uint16 = 49500
-	// localSeq is the initial sequence number of every test socket: smoltcp
-	// fixes it at 10000 in its test build.
+	// localSeq is the initial sequence number of every test socket.
 	localSeq = wire.TCPSeqNumber(10000)
 	// remoteSeq is the initial sequence number of the tests' peer.
 	remoteSeq = wire.TCPSeqNumber(-10001)
-	// testIPMTU is the MTU of smoltcp's TestingDevice for Medium::Ip, which
-	// the test context takes as its IP MTU.
+	// testIPMTU is the IP MTU of the test context.
 	testIPMTU = 1500
-	// testRandomSeed is the random seed of the test context: that of
-	// smoltcp's tests::setup, its Config's default.
+	// testRandomSeed is the random seed of the test context.
 	testRandomSeed = 0
 	// baseMSS is the MSS a test socket announces: the test IP MTU less the
 	// IPv4 and TCP headers.
 	baseMSS uint16 = testIPMTU - wire.IPv4HeaderLen - wire.TCPHeaderLen
-	// peerMSS is the MSS the tests' peer announces in its SYN (smoltcp's
-	// BASE_MSS - 80): smaller than the socket's.
+	// peerMSS is the MSS the tests' peer announces in its SYN: smaller than
+	// the socket's.
 	peerMSS = baseMSS - 80
 	// tinyMSS is an MSS below minRemoteMSS, which the socket raises.
 	tinyMSS uint16 = 10
@@ -166,37 +52,34 @@ const (
 	// chooses others.
 	defaultBufferLen = 64
 	// remoteTemplateWindow is the window the tests' peer announces unless a
-	// test chooses another (SEND_TEMPL's).
+	// test chooses another.
 	remoteTemplateWindow uint16 = 256
 	// localTemplateWindow is the window a test socket announces with an
-	// empty receive buffer of defaultBufferLen octets (RECV_TEMPL's).
+	// empty receive buffer of defaultBufferLen octets.
 	localTemplateWindow uint16 = defaultBufferLen
 )
 
 var (
 	// localAddr and remoteAddr are the addresses of the test connection's
-	// two ends (smoltcp's LOCAL_ADDR and REMOTE_ADDR); localAddr is the test
-	// context's own.
+	// two ends; localAddr is the test context's own.
 	localAddr  = netip.AddrFrom4([4]byte{192, 168, 1, 1})
 	remoteAddr = netip.AddrFrom4([4]byte{192, 168, 1, 2})
 	// otherAddr is an address of the test network that is neither end of the
 	// connection.
 	otherAddr = netip.AddrFrom4([4]byte{192, 168, 1, 3})
 
-	// localEnd and remoteEnd are the test connection's endpoints (smoltcp's
-	// LOCAL_END and REMOTE_END).
+	// localEnd and remoteEnd are the test connection's endpoints.
 	localEnd  = netip.AddrPortFrom(localAddr, localPort)
 	remoteEnd = netip.AddrPortFrom(remoteAddr, remotePort)
-	// listenEnd is smoltcp's LISTEN_END: the local port on every address.
+	// listenEnd is the local port on every address.
 	listenEnd = wire.ListenEndpoint{Port: localPort}
-	// localListenEnd is smoltcp's LOCAL_END where a listen endpoint is
-	// expected: the local port on the local address.
+	// localListenEnd is the local port on the local address, where a listen
+	// endpoint is expected.
 	localListenEnd = wire.ListenEndpoint{Addr: localAddr, Port: localPort}
-	// testTuple is smoltcp's TUPLE: the connection of the test sockets.
+	// testTuple is the connection of the test sockets.
 	testTuple = fourTuple{local: localEnd, remote: remoteEnd}
 
-	// sendIPTemplate is smoltcp's SEND_IP_TEMPL, the IP header the tests
-	// hand to Accepts: from the local to the remote address, which only a
+	// sendIPTemplate is the IP header the tests hand to Accepts: from the local to the remote address, which only a
 	// listening socket without a listen address accepts.
 	sendIPTemplate = wire.IPv4Repr{
 		SrcAddr:    localAddr,
@@ -207,7 +90,7 @@ var (
 	}
 )
 
-// smallBufferLen is the receive buffer that many of smoltcp's tests swap in:
+// smallBufferLen is the receive buffer that many tests swap in:
 // six octets, which "abcdef" fills.
 const smallBufferLen = 6
 
@@ -220,7 +103,7 @@ const maxSeqOffset = math.MaxInt32
 const largeBufferLen = 1 << 20
 
 // receiveBufferWindowShifts are receive buffer sizes and the window scale a
-// socket offers for each: what smoltcp's *_win_scale_buffers tests try.
+// socket offers for each.
 var receiveBufferWindowShifts = []struct {
 	bufferLen int
 	shift     uint8
@@ -250,12 +133,11 @@ func unscaledWindow(bufferLen int) uint16 {
 // Segments
 // =========================================================================
 
-// segmentOption sets a field of a test segment, as a field of a smoltcp
-// TcpRepr literal does.
+// segmentOption sets a field of a test segment.
 type segmentOption func(segment *wire.TCPRepr)
 
-// fromRemote returns a segment the peer sends to the socket: smoltcp's
-// SEND_TEMPL (from remotePort to localPort, no flags, sequence number 0,
+// fromRemote returns a segment the peer sends to the socket: from remotePort
+// to localPort, no flags, sequence number 0,
 // acknowledgement number 0, a window of remoteTemplateWindow, no options and
 // no payload) with options applied in order.
 func fromRemote(options ...segmentOption) wire.TCPRepr {
@@ -267,8 +149,8 @@ func fromRemote(options ...segmentOption) wire.TCPRepr {
 	}, options)
 }
 
-// fromLocal returns a segment the socket sends to the peer: smoltcp's
-// RECV_TEMPL (from localPort to remotePort, no flags, sequence number 0,
+// fromLocal returns a segment the socket sends to the peer: from localPort
+// to remotePort, no flags, sequence number 0,
 // acknowledgement number 0, a window of localTemplateWindow, no options and
 // no payload) with options applied in order.
 func fromLocal(options ...segmentOption) wire.TCPRepr {
@@ -410,7 +292,7 @@ func withSACKPermitted() segmentOption {
 }
 
 // sackRangeOf returns the SACK block from left to right, its edges as the
-// wire carries them: smoltcp's (left.0 as u32, right.0 as u32).
+// wire carries them: the low 32 bits of each sequence number.
 func sackRangeOf(left, right wire.TCPSeqNumber) wire.SACKRange {
 	return wire.SACKRange{Left: uint32(left), Right: uint32(right)}
 }
@@ -462,8 +344,8 @@ func ipHeader(src, dst netip.Addr, segment wire.TCPRepr) wire.IPv4Repr {
 // Helper functions
 // =========================================================================
 
-// testSocket is a socket together with the interface context it runs in:
-// smoltcp's TestSocket. The embedded *Socket gives tests every method and
+// testSocket is a socket together with the interface context it runs in.
+// The embedded *Socket gives tests every method and
 // field of the socket.
 type testSocket struct {
 	*Socket
@@ -473,28 +355,25 @@ type testSocket struct {
 	elapsed time.Duration
 }
 
-// at returns s for a helper to act at elapsed after the epoch, as smoltcp's
-// `time T` argument has its macros do; s itself still acts at the epoch.
+// at returns s for a helper to act at elapsed after the epoch; s itself still
+// acts at the epoch.
 func (s *testSocket) at(elapsed time.Duration) *testSocket {
 	timed := *s
 	timed.elapsed = elapsed
 	return &timed
 }
 
-// instant returns the time elapsed after the epoch of the tests' clock: what
-// smoltcp's Instant::from_millis(ms) is for elapsed = ms*time.Millisecond.
+// instant returns the time elapsed after the epoch of the tests' clock.
 func instant(elapsed time.Duration) time.Time {
 	return time.Time{}.Add(elapsed)
 }
 
-// fixedISN is the initial sequence number source of every test socket, as
-// smoltcp's test build has it.
+// fixedISN is the initial sequence number source of every test socket.
 func fixedISN(*socket.Context) wire.TCPSeqNumber {
 	return localSeq
 }
 
-// newTestContext returns the context of smoltcp's tests::setup(Medium::Ip):
-// at the epoch, random seed testRandomSeed, an IP MTU of testIPMTU, and the
+// newTestContext returns the test context: at the epoch, random seed testRandomSeed, an IP MTU of testIPMTU, and the
 // addresses 192.168.1.1/24 and 127.0.0.1/8.
 func newTestContext(t *testing.T) *socket.Context {
 	t.Helper()
@@ -517,7 +396,7 @@ func newTestContextWith(t *testing.T, randomSeed uint64, ipMTU int) *socket.Cont
 }
 
 // deliver hands segment to the socket, as the interface would, and returns
-// its reply: smoltcp's send function. It fails the test unless the socket
+// its reply. It fails the test unless the socket
 // accepts the segment, and checks the reply's IP header as
 // checkOutgoingIPHeader does.
 func deliver(t *testing.T, s *testSocket, segment wire.TCPRepr) (wire.TCPRepr, bool) {
@@ -534,8 +413,7 @@ func deliver(t *testing.T, s *testSocket, segment wire.TCPRepr) (wire.TCPRepr, b
 	return reply, replied
 }
 
-// send hands segment to the socket and expects no reply: smoltcp's
-// send!(s, repr).
+// send hands segment to the socket and expects no reply.
 func send(t *testing.T, s *testSocket, segment wire.TCPRepr) {
 	t.Helper()
 	if reply, replied := deliver(t, s, segment); replied {
@@ -543,8 +421,7 @@ func send(t *testing.T, s *testSocket, segment wire.TCPRepr) {
 	}
 }
 
-// sendExpectingReply hands segment to the socket and expects want in reply:
-// smoltcp's send!(s, repr, Some(want)).
+// sendExpectingReply hands segment to the socket and expects want in reply.
 func sendExpectingReply(t *testing.T, s *testSocket, segment, want wire.TCPRepr) {
 	t.Helper()
 	reply, replied := deliver(t, s, segment)
@@ -555,8 +432,7 @@ func sendExpectingReply(t *testing.T, s *testSocket, segment, want wire.TCPRepr)
 }
 
 // dispatchOne runs Dispatch with an emit that takes every segment, and
-// returns the one segment the socket sent, its payload copied: smoltcp's
-// recv function. It fails the test unless exactly one segment was sent, with
+// returns the one segment the socket sent, its payload copied. It fails the test unless exactly one segment was sent, with
 // the IP header checkOutgoingIPHeader expects.
 func dispatchOne(t *testing.T, s *testSocket) wire.TCPRepr {
 	t.Helper()
@@ -598,7 +474,7 @@ func checkOutgoingIPHeader(t *testing.T, ip wire.IPv4Repr, segment wire.TCPRepr)
 }
 
 // receive expects the socket to send want, ignoring the PSH flag, which most
-// tests don't care about: smoltcp's recv!(s, Ok(want)).
+// tests don't care about.
 func receive(t *testing.T, s *testSocket, want wire.TCPRepr) {
 	t.Helper()
 	got := dispatchOne(t, s)
@@ -606,15 +482,14 @@ func receive(t *testing.T, s *testSocket, want wire.TCPRepr) {
 	assertSegment(t, got, want)
 }
 
-// receiveExact expects the socket to send want, PSH flag included: smoltcp's
-// recv!(s, time T, Ok(want), exact).
+// receiveExact expects the socket to send want, PSH flag included.
 func receiveExact(t *testing.T, s *testSocket, want wire.TCPRepr) {
 	t.Helper()
 	assertSegment(t, dispatchOne(t, s), want)
 }
 
 // receiveOnly expects the socket to send wants, one per Dispatch, and then
-// nothing: smoltcp's recv!(s, [wants…]).
+// nothing.
 func receiveOnly(t *testing.T, s *testSocket, wants ...wire.TCPRepr) {
 	t.Helper()
 	for _, want := range wants {
@@ -623,8 +498,7 @@ func receiveOnly(t *testing.T, s *testSocket, wants ...wire.TCPRepr) {
 	receiveNothing(t, s)
 }
 
-// receiveNothing expects the socket to send nothing: smoltcp's
-// recv_nothing!(s).
+// receiveNothing expects the socket to send nothing.
 func receiveNothing(t *testing.T, s *testSocket) {
 	t.Helper()
 	if sent := dispatchCollecting(t, s); len(sent) > 0 {
@@ -632,8 +506,7 @@ func receiveNothing(t *testing.T, s *testSocket) {
 	}
 }
 
-// sanity compares the state of two sockets, field by field: smoltcp's
-// sanity! macro.
+// sanity compares the state of two sockets, field by field.
 func sanity(t *testing.T, got, want *testSocket) {
 	t.Helper()
 	compareField(t, "state", got.state, want.state)
@@ -740,7 +613,7 @@ func assertPollAt(t *testing.T, s *testSocket, want socket.PollAt) {
 }
 
 // assertTransmitBufferLen fails the test unless the transmit buffer holds
-// want octets: smoltcp's assert_eq!(s.tx_buffer.len(), want).
+// want octets.
 func assertTransmitBufferLen(t *testing.T, s *testSocket, want int) {
 	t.Helper()
 	if got := s.transmitBuffer.Len(); got != want {
@@ -777,8 +650,7 @@ func mustReceiveSlice(t *testing.T, s *testSocket, data []byte) int {
 	return received
 }
 
-// receiveExactly reads from the socket as smoltcp's tests do with
-// s.recv(|data| { assert_eq!(data, want); (data.len(), ()) }).unwrap(): it
+// receiveExactly reads from the socket and takes all of it: it
 // fails the test unless Receive succeeds and offers exactly want, which it
 // consumes.
 func receiveExactly(t *testing.T, s *testSocket, want string) {
@@ -793,9 +665,8 @@ func receiveExactly(t *testing.T, s *testSocket, want string) {
 	}
 }
 
-// receivePrefix reads from the socket as smoltcp's tests do with
-// s.recv(|data| { assert_eq!(&data[..n], want); (n, ()) }).unwrap(), where n
-// is len(want): it fails the test unless Receive succeeds and offers octets
+// receivePrefix reads from the socket and takes the first len(want) octets,
+// which must be want: it fails the test unless Receive succeeds and offers octets
 // starting with want, of which it consumes len(want).
 func receivePrefix(t *testing.T, s *testSocket, want string) {
 	t.Helper()
@@ -816,9 +687,7 @@ func consumeAll(data []byte) int {
 }
 
 // replaceReceiveBuffer swaps the socket's receive buffer for an empty one of
-// capacity octets, with an empty assembler to match: smoltcp's
-// s.rx_buffer = SocketBuffer::new(vec![0; capacity]); s.assembler =
-// Assembler::new(). The window the socket last announced stays the one of
+// capacity octets, with an empty assembler to match. The window the socket last announced stays the one of
 // its old buffer.
 func replaceReceiveBuffer(s *testSocket, capacity int) {
 	s.receiveBuffer = NewSocketBuffer(capacity)
@@ -826,19 +695,19 @@ func replaceReceiveBuffer(s *testSocket, capacity int) {
 }
 
 // =========================================================================
-// Socket builders: sockets in each state, as smoltcp's tests build them,
-// by setting the fields a connection in that state has.
+// Socket builders: sockets in each state, built by setting the fields a
+// connection in that state has.
 // =========================================================================
 
 // socketClosed returns a closed socket with buffers of defaultBufferLen
-// octets: smoltcp's socket().
+// octets.
 func socketClosed(t *testing.T) *testSocket {
 	t.Helper()
 	return socketClosedWithBufferSizes(t, defaultBufferLen, defaultBufferLen)
 }
 
 // socketClosedWithBufferSizes returns a closed socket with the given buffer
-// sizes, transmit buffer first as in smoltcp's socket_with_buffer_sizes. Its
+// sizes, transmit buffer first. Its
 // delayed ACKs are off, and its initial sequence number is localSeq.
 func socketClosedWithBufferSizes(t *testing.T, transmitLen, receiveLen int) *testSocket {
 	t.Helper()
@@ -848,8 +717,7 @@ func socketClosedWithBufferSizes(t *testing.T, transmitLen, receiveLen int) *tes
 	return &testSocket{Socket: s, cx: newTestContext(t)}
 }
 
-// socketListen returns a socket listening on listenEnd: smoltcp's
-// socket_listen().
+// socketListen returns a socket listening on listenEnd.
 func socketListen(t *testing.T) *testSocket {
 	t.Helper()
 	s := socketClosed(t)
@@ -942,7 +810,7 @@ func socketClosing(t *testing.T) *testSocket {
 }
 
 // socketTimeWaitFromFinWait2 returns a socket that received the peer's FIN
-// in FIN-WAIT-2 at 1 s: smoltcp's socket_time_wait(false).
+// in FIN-WAIT-2 at 1 s.
 func socketTimeWaitFromFinWait2(t *testing.T) *testSocket {
 	t.Helper()
 	s := socketFinWait2(t)
@@ -953,8 +821,7 @@ func socketTimeWaitFromFinWait2(t *testing.T) *testSocket {
 }
 
 // socketTimeWaitFromClosing returns a socket that came to TIME-WAIT from
-// CLOSING at 1 s, having already acknowledged the peer's FIN: smoltcp's
-// socket_time_wait(true).
+// CLOSING at 1 s, having already acknowledged the peer's FIN.
 func socketTimeWaitFromClosing(t *testing.T) *testSocket {
 	t.Helper()
 	s := socketTimeWaitFromFinWait2(t)
@@ -983,8 +850,7 @@ func socketLastAck(t *testing.T) *testSocket {
 }
 
 // socketWithReceivedData returns an established socket that received
-// "abcdef" and acknowledged it, the data still unread: smoltcp's
-// socket_recved().
+// "abcdef" and acknowledged it, the data still unread.
 func socketWithReceivedData(t *testing.T) *testSocket {
 	t.Helper()
 	s := socketEstablished(t)
@@ -994,7 +860,7 @@ func socketWithReceivedData(t *testing.T) *testSocket {
 }
 
 // =========================================================================
-// Tests of the helpers themselves: the porting table above relies on them.
+// Tests of the helpers themselves.
 // =========================================================================
 
 func TestSegmentOptionsSetOneFieldEach(t *testing.T) {
@@ -1034,7 +900,7 @@ func TestSegmentOptionsSetOneFieldEach(t *testing.T) {
 	}
 }
 
-func TestTemplatesAreSmoltcpsSendAndReceiveTemplates(t *testing.T) {
+func TestTemplatesSetTheirFields(t *testing.T) {
 	t.Parallel()
 	wantFromRemote := wire.TCPRepr{SrcPort: 49500, DstPort: 80, AckNumber: wire.Some[wire.TCPSeqNumber](0), WindowLen: 256}
 	wantFromLocal := wire.TCPRepr{SrcPort: 80, DstPort: 49500, AckNumber: wire.Some[wire.TCPSeqNumber](0), WindowLen: 64}
@@ -1064,7 +930,7 @@ func TestSACKRangeOfTakesTheWireFormOfSequenceNumbers(t *testing.T) {
 	}
 }
 
-func TestTestContextIsSmoltcpsTestSetup(t *testing.T) {
+func TestTestContextSetup(t *testing.T) {
 	t.Parallel()
 	cx := newTestContext(t)
 
@@ -1075,6 +941,6 @@ func TestTestContextIsSmoltcpsTestSetup(t *testing.T) {
 		t.Errorf("SourceAddress(%v) = %v, %v; want %v", remoteAddr, source, ok, localAddr)
 	}
 	if baseMSS != 1460 {
-		t.Errorf("baseMSS = %d, want smoltcp's BASE_MSS of 1460", baseMSS)
+		t.Errorf("baseMSS = %d, want 1460", baseMSS)
 	}
 }

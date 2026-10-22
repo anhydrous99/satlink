@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// ipv4PacketBytes is smoltcp's PACKET_BYTES: a fragment of an ICMP datagram,
-// with flags and fields that are all non-zero.
+// ipv4PacketBytes is a fragment of an ICMP datagram, with flags and fields
+// that are all non-zero.
 func ipv4PacketBytes() []byte {
 	return []byte{
 		0x45, 0x00, 0x00, 0x1e, 0x01, 0x02, 0x62, 0x03, 0x1a, 0x01, 0xd5, 0x6e, 0x11, 0x12, 0x13,
@@ -16,13 +16,12 @@ func ipv4PacketBytes() []byte {
 	}
 }
 
-// ipv4PayloadBytes is smoltcp's PAYLOAD_BYTES, the payload of
-// ipv4PacketBytes.
+// ipv4PayloadBytes is the payload of ipv4PacketBytes.
 func ipv4PayloadBytes() []byte {
 	return []byte{0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff}
 }
 
-// ipv4ReprPacketBytes is smoltcp's REPR_PACKET_BYTES: the datagram
+// ipv4ReprPacketBytes is the datagram
 // ipv4PacketRepr describes, with ipv4ReprPayloadBytes as its payload.
 func ipv4ReprPacketBytes() []byte {
 	return []byte{
@@ -58,7 +57,6 @@ func ipv4RouterAlertPacketBytes() []byte {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_deconstruct.
 func TestIPv4PacketDeconstruct(t *testing.T) {
 	t.Parallel()
 	packet := IPv4Packet(ipv4PacketBytes())
@@ -85,7 +83,6 @@ func TestIPv4PacketDeconstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_construct.
 func TestIPv4PacketConstruct(t *testing.T) {
 	t.Parallel()
 	packet := IPv4Packet(filled(30, 0xa5))
@@ -112,7 +109,6 @@ func TestIPv4PacketConstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_overlong.
 func TestIPv4PacketOverlong(t *testing.T) {
 	t.Parallel()
 	overlong := append(ipv4PacketBytes(), 0)
@@ -122,7 +118,6 @@ func TestIPv4PacketOverlong(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_total_len_overflow.
 func TestIPv4PacketTotalLenOverflow(t *testing.T) {
 	t.Parallel()
 	buffer := ipv4PacketBytes()
@@ -133,7 +128,6 @@ func TestIPv4PacketTotalLenOverflow(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_parse.
 func TestIPv4ReprParse(t *testing.T) {
 	t.Parallel()
 	repr, err := ParseIPv4Repr(IPv4Packet(ipv4ReprPacketBytes()), ChecksumCapabilities{})
@@ -143,7 +137,6 @@ func TestIPv4ReprParse(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_parse_bad_version.
 func TestIPv4ReprParseBadVersion(t *testing.T) {
 	t.Parallel()
 	packet := IPv4Packet(ipv4ReprPacketBytes())
@@ -155,7 +148,6 @@ func TestIPv4ReprParseBadVersion(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_parse_total_len_less_than_header_len.
 func TestIPv4PacketParseTotalLenLessThanHeaderLen(t *testing.T) {
 	t.Parallel()
 	buffer := make([]byte, 40)
@@ -166,7 +158,6 @@ func TestIPv4PacketParseTotalLenLessThanHeaderLen(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_parse_small_ihl.
 func TestIPv4PacketParseSmallIHL(t *testing.T) {
 	t.Parallel()
 	buffer := ipv4ReprPacketBytes()
@@ -177,7 +168,6 @@ func TestIPv4PacketParseSmallIHL(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_emit.
 func TestIPv4ReprEmit(t *testing.T) {
 	t.Parallel()
 	repr := ipv4PacketRepr()
@@ -375,8 +365,7 @@ func TestIPv4ReprEmitPanicsOnAddressesThatAreNotIPv4(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/ipv4.rs test_cidr_broadcast, with a /30 case
-// added: the smallest network that has a broadcast address.
+// It also checks a /30 case, the smallest network that has a broadcast address.
 func TestIPv4CIDRBroadcast(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{

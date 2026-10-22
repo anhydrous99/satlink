@@ -6,8 +6,8 @@ import (
 )
 
 // The arguments a command takes — options such as --port and positional
-// arguments such as <NUMBER> — as the Rust version declared them with clap,
-// and how clap wrote them in help, errors and usage lines.
+// arguments such as <NUMBER> — as clap declares them, and how clap writes them
+// in help, errors and usage lines.
 
 // argumentAction is what giving an argument does, as clap's ArgAction.
 type argumentAction int

@@ -2,8 +2,7 @@ package dns
 
 // This file holds what the DNS socket's tests share: a test context, a
 // recording EmitFunc, and a builder for the responses a server sends.
-// smoltcp has no tests of its DNS socket, so every test here is the port's
-// own.
+// The tests here check the socket's own behaviour.
 
 import (
 	"bytes"
@@ -19,11 +18,11 @@ import (
 )
 
 const (
-	// testIPMTU is the IP MTU of the test context, smoltcp's TestingDevice's.
+	// testIPMTU is the IP MTU of the test context.
 	testIPMTU = 1500
 	// firstQueryID and firstQueryPort are the transaction id and source
 	// port of the first query on a context seeded with 0: the first Uint16
-	// and the first SourcePort after it of smoltcp's sPCG32.
+	// and the first SourcePort after it.
 	firstQueryID   uint16 = 0x3
 	firstQueryPort uint16 = 1358
 	// dnsOpcodeShift is where the opcode sits in a DNS header's flags field
@@ -75,8 +74,7 @@ func testContext(t *testing.T) *socket.Context {
 	return cx
 }
 
-// at returns the time elapsed after the tests' epoch, the zero time.Time
-// (smoltcp's Instant::ZERO).
+// at returns the time elapsed after the tests' epoch, the zero time.Time.
 func at(elapsed time.Duration) time.Time {
 	return time.Time{}.Add(elapsed)
 }

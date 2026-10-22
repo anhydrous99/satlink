@@ -133,7 +133,7 @@ func TestDataLeavesForPPPOnlyWhenThePacedLineCanTakeIt(t *testing.T) {
 	}
 }
 
-func TestIPv4UpIsLoggedAsTheRustVersionLoggedIt(t *testing.T) {
+func TestIPv4UpIsLogged(t *testing.T) {
 	records := recordLogs(t, slog.LevelInfo)
 	d := &driver{ppp: clientEndpoint(t), tuning: DefaultTuning()}
 	now := time.Now()
@@ -280,7 +280,7 @@ func TestOnlyALinkThatIsUpIdlesAndTrafficRestartsTheClock(t *testing.T) {
 	}
 }
 
-func TestLimitsAreCheckedInTheRustVersionsOrder(t *testing.T) {
+func TestLimitsAreCheckedInOrder(t *testing.T) {
 	connected := time.Now()
 	endpoint := clientEndpoint(t)
 	// The data limit counts every byte the line carries, frames or not.

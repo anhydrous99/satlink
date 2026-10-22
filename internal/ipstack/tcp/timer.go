@@ -8,9 +8,8 @@ import (
 )
 
 // closeDelay is how long a socket stays in TIME-WAIT, so that the peer can
-// still have a lost final ACK repeated, before it closes (smoltcp's
-// CLOSE_DELAY). RFC 9293 asks for twice the maximum segment lifetime; smoltcp
-// waits 10 s.
+// still have a lost final ACK repeated, before it closes. RFC 9293 asks for
+// twice the maximum segment lifetime; this waits 10 s.
 const closeDelay = 10 * time.Second
 
 // timerKind is what the socket's one timer is timing.
@@ -33,7 +32,7 @@ const (
 )
 
 // timer is the socket's retransmission timer, which also times keep-alives,
-// zero-window probes and TIME-WAIT: smoltcp's Timer. The zero timer is idle,
+// zero-window probes and TIME-WAIT. The zero timer is idle,
 // without keep-alive.
 //
 // Every change leaves the fields its kind does not use zero, so that timers

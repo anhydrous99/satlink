@@ -20,8 +20,7 @@ type TLSSettings struct {
 	TrustPublicRoots bool
 
 	// mu guards the lists the Add methods fill: the app may add to them
-	// from one thread while another makes a connector, which the Rust
-	// bindings' record, copied as it crossed into the library, allowed.
+	// from one thread while another makes a connector, which takes a copy.
 	mu               sync.Mutex
 	extraRootsPEM    []string
 	pinnedPublicKeys [][]byte
@@ -47,9 +46,9 @@ func (s *TLSSettings) AddRootCertificatesPEM(pem string) {
 // SubjectPublicKeyInfo, 32 bytes. It is checked when the connector is made.
 //
 // Pin the key of every certificate the server holds: one that holds
-// several may send satlink another one than it sends the Rust version, as
-// crypto/tls asks for ML-DSA, then RSA-PSS, signatures before ECDSA ones,
-// where rustls asks for ECDSA first (see satnet.TLSOptions.PinnedPublicKeys).
+// several may send satlink another one than it sends a client with other
+// signature preferences, since the client's offered algorithms decide which
+// certificate it sends (see satnet.TLSOptions.PinnedPublicKeys).
 func (s *TLSSettings) AddPinnedPublicKeySHA256(sha256 []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -65,8 +64,8 @@ func (s *TLSSettings) AddALPNProtocol(protocol string) {
 }
 
 // copied returns a copy of the settings, whose lists no other thread
-// changes, so that the checks NewTLSConnector makes, in the Rust version's
-// order, all see the same settings.
+// changes, so that the checks NewTLSConnector makes, in their order, all see
+// the same settings.
 func (s *TLSSettings) copied() *TLSSettings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -129,7 +128,7 @@ type TLSConnector struct {
 // fails with SatlinkErrorTLS for certificates that do not parse, with
 // SatlinkErrorInvalidArgument for a pin that is not 32 bytes ("a SHA-256 pin
 // is 32 bytes"), and with SatlinkErrorTLS for settings that trust nothing,
-// checked in that order, as in the Rust version.
+// checked in that order.
 func NewTLSConnector(settings *TLSSettings) (connector *TLSConnector, err error) {
 	defer recoverPanic(&err)
 	if settings == nil {
@@ -137,7 +136,7 @@ func NewTLSConnector(settings *TLSSettings) (connector *TLSConnector, err error)
 	}
 	trust := settings.copied()
 	// satnet checks the PEM bundles and whether anything is trusted in one
-	// go; the Rust bindings checked the pins in between.
+	// go, after the pins are read.
 	pins, pinErr := trust.pins()
 	built, err := satnet.NewTLSConnector(trust.options(pins))
 	switch {

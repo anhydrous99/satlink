@@ -305,8 +305,7 @@ func newInterface(mtu int, now time.Time) *ipstack.Interface {
 	return ipstack.NewInterface(config, ipstack.DeviceCapabilities{MTU: mtu}, now)
 }
 
-// randomSeed returns a random number, as Rust draws one from a randomly
-// keyed hasher.
+// randomSeed returns a random number, read from crypto/rand.
 func randomSeed() uint64 {
 	var seed [8]byte
 	// crypto/rand.Read never returns an error: it crashes the program

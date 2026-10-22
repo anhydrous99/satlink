@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // The parts of an http:// or https:// URL that a GET request needs.
@@ -80,7 +80,7 @@ func breaksTheRequestLine(character rune) bool {
 
 // notAnHTTPURL refuses rawURL.
 func notAnHTTPURL(rawURL string) error {
-	return errors.New(rustdebug.Quote(rawURL) + " is not a valid http:// or https:// URL")
+	return errors.New(debugtext.Quote(rawURL) + " is not a valid http:// or https:// URL")
 }
 
 // isSecureScheme reports whether scheme is https rather than http, and
@@ -103,7 +103,7 @@ func splitAuthority(authority string, fallback uint16) (string, uint16, error) {
 	if colon < 0 {
 		return authority, fallback, nil
 	}
-	// As Rust's u16 parses it: digits after an optional '+'.
+	// Decimal digits after an optional '+', as parseUnsigned reads them.
 	port, err := parseUnsigned(authority[colon+1:])
 	if err == nil && port > math.MaxUint16 {
 		err = errNumberTooLarge

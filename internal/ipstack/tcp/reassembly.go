@@ -30,8 +30,8 @@ func (s *Socket) receivePayload(a *arrival) (reply, bool) {
 		return reply{}, false
 	}
 	// Note that we change the transmitter state here. This is fine because
-	// smoltcp assumes that it can always transmit zero or one packets for
-	// every packet it receives.
+	// the interface can always transmit zero or one packets for every packet it
+	// receives.
 	netlog.Trace("ACKing incoming segment")
 	return s.ackReply(a.ip, a.segment), true
 }

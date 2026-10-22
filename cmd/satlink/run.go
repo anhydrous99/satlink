@@ -7,9 +7,9 @@ import (
 	"runtime/debug"
 )
 
-// The exit statuses, as the Rust version's: clap's for a command line that
-// does not parse, and the Rust runtime's for a panic. Go's runtime would end
-// a panicking program with clap's status instead.
+// The exit statuses: clap's for a command line that does not parse, and 101
+// for a panic. Go's runtime would end a panicking program with clap's status
+// instead.
 const (
 	exitSuccess  = 0
 	exitFailure  = 1
@@ -29,8 +29,7 @@ func run(ctx context.Context, env environment) (status int) {
 	c := newCLI(env, stderr)
 	defer c.log.close()
 	defer func() {
-		// The handset is closed by now, as the Rust version's was dropped
-		// while its panic unwound.
+		// The handset is closed by now, as it was dropped while the panic unwound.
 		if value := recover(); value != nil {
 			status = c.panicked(value)
 		}
@@ -70,17 +69,15 @@ func (c *cli) finish(err error) int {
 	}
 }
 
-// panicked ends a run that panicked with value, as the Rust version ended
-// one: the panic is reported, and the status is exitPanicked, whatever an
-// interruption asked for.
+// panicked ends a run that panicked with value: the panic is reported, and the
+// status is exitPanicked, whatever an interruption asked for.
 func (c *cli) panicked(value any) int {
 	reportPanic(c.streams.stderr, value)
 	c.interruptions.stop()
 	return exitPanicked
 }
 
-// reportPanic writes a recovered panic and where it happened to stderr, as
-// Rust's panic hook did.
+// reportPanic writes a recovered panic and where it happened to stderr.
 func reportPanic(stderr io.Writer, value any) {
 	// Best effort: what follows — the hang-up, or the end of the run —
 	// matters more.

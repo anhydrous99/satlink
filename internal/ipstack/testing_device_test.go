@@ -6,24 +6,23 @@ import (
 	"time"
 )
 
-// testingDeviceMTU is the MTU of smoltcp's TestingDevice on Medium::Ip.
+// testingDeviceMTU is the MTU of the testing device.
 const testingDeviceMTU = 1500
 
 // unlimitedSlots is the transmit slot budget of a device that never refuses
 // one.
 const unlimitedSlots = -1
 
-// testingDevice is smoltcp's TestingDevice (src/tests.rs): received
-// datagrams come from one queue, and every datagram the interface sends,
+// testingDevice is a device for the tests, modelled on smoltcp's
+// TestingDevice: received datagrams come from one queue, and every datagram the interface sends,
 // through a reply slot or a transmit slot, goes to another, in order. For
 // the pull-model tests it also refuses transmit slots on demand, counts the
 // calls to Transmit, and records which datagrams were replies.
 type testingDevice struct {
 	// received holds the datagrams the interface has yet to receive,
-	// oldest first (smoltcp's rx_queue).
+	// oldest first.
 	received [][]byte
-	// sent holds what the interface sent, oldest first (smoltcp's
-	// tx_queue).
+	// sent holds what the interface sent, oldest first.
 	sent []sentDatagram
 	// transmitSlots is how many more transmit slots the device grants, or
 	// unlimitedSlots.
@@ -93,8 +92,8 @@ func (d *testingDevice) takeSent() []sentDatagram {
 	return sent
 }
 
-// setup returns smoltcp's test interface (tests::setup(Medium::Ip)): made at
-// the epoch with seed 0 for a testing device, with the addresses
+// setup returns the test interface, made at the epoch with seed 0 for a
+// testing device, with the addresses
 // 192.168.1.1/24 and 127.0.0.1/8, with an empty socket set and the device.
 func setup(t *testing.T) (*Interface, *SocketSet, *testingDevice) {
 	t.Helper()

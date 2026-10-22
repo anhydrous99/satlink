@@ -117,8 +117,8 @@ func wakeWaitingReads(conn *Conn) {
 //
 // The tests of what wakes AwaitReader run it in a synctest bubble: there
 // synctest.Wait returns once every other goroutine waits, so the test knows
-// that AwaitReader waits before it acts (docs/PORTING.md, section 2,
-// Tests), and time passes only while every goroutine waits, so an
+// that AwaitReader waits before it acts, and time passes only while every
+// goroutine waits, so an
 // AwaitReader that was woken returns with no time passed, while one that
 // gave up after patience returns patience later — with the same result, as
 // it looks once more before it gives up.

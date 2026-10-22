@@ -1,15 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for window management
-// (src/socket/tcp.rs, lines 7520-7790). test_segmentation_offload is not
-// ported: segmentation offload is not compiled in the workspace
-// (PORTING-ipstack.md, sections 3 and 6).
-//
-// test_close_wait_no_window_update and test_time_wait_no_window_update pass
-// whatever the state, in smoltcp too: the window they open grows from 60 to
-// 64 octets, which has not doubled, so no state would announce it.
-// TestWindowGrowthIsNotAnnouncedAfterThePeersFIN, in dispatch_test.go, checks
-// the state rule itself.
+// Tests of window management.
 
 import (
 	"testing"

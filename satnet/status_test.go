@@ -6,7 +6,7 @@ import (
 	"github.com/anhydrous99/satlink/ppp"
 )
 
-func TestCloseReasonsAreWordedAsInRust(t *testing.T) {
+func TestCloseReasonMessages(t *testing.T) {
 	for _, c := range []struct {
 		reason CloseReason
 		text   string
@@ -28,7 +28,7 @@ func TestCloseReasonsAreWordedAsInRust(t *testing.T) {
 	}
 }
 
-func TestCloseReasonKindsAreNamedAsTheRustVariants(t *testing.T) {
+func TestCloseReasonKindNames(t *testing.T) {
 	names := map[CloseReasonKind]string{
 		CloseReasonRequested:           "Requested",
 		CloseReasonCarrierLost:         "CarrierLost",

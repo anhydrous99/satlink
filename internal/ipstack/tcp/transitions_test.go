@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for transitioning through multiple
-// states (src/socket/tcp.rs, lines 6006-6394).
+// Tests of transitions through multiple states.
 
 import (
 	"testing"

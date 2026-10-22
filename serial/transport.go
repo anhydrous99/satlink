@@ -24,8 +24,8 @@ const DefaultBaud = 19_200
 // dataBits is the character size of the handset's 8N1 serial interface.
 const dataBits = 8
 
-// shortestReadTimeout is the least a read waits, as in the Rust version: a
-// zero or negative timeout still takes what has already arrived, and the
+// shortestReadTimeout is the least a read waits: a zero or negative timeout
+// still takes what has already arrived, and the
 // library would wait forever for its NoTimeout (-1) and refuse other
 // negative timeouts.
 const shortestReadTimeout = time.Millisecond
@@ -33,8 +33,7 @@ const shortestReadTimeout = time.Millisecond
 // longestLibraryWait is the longest one library read is asked to wait; a
 // longer timeout is waited out in turns. macOS's select(2) refuses a wait
 // above 10^8 seconds, and the library's Windows port one above 0xFFFFFFFE
-// ms, where the Rust version's serial library cut such a wait down to what
-// it could wait. That port also cuts a wait above 0x7FFFFFFE ms, some 24.8
+// ms, where the library cut such a wait down to what it could wait. That port also cuts a wait above 0x7FFFFFFE ms, some 24.8
 // days, down to that, and would report silence before the wait was over. A
 // day is well below them all.
 const longestLibraryWait = 24 * time.Hour
@@ -64,9 +63,8 @@ type portOpener func(path string, mode *serialport.Mode) (serialport.Port, error
 // one goroutine reading while another writes; Close may be called from any
 // goroutine and ends a read in progress.
 //
-// A Transport collected without Close closes its port all the same, as the
-// Rust version's dropped transport did, which gives the port back and drops
-// DTR — but only once the collector notices: call Close to have it closed
+// A Transport collected without Close closes its port all the same, which
+// gives the port back and drops DTR — but only once the collector notices: call Close to have it closed
 // at once.
 //
 // The zero Transport is not usable; create one with [Open].
@@ -96,8 +94,8 @@ var (
 
 // Open opens the handset's serial device at path exclusively, 8N1 at baud,
 // with DTR raised, and with RTS asserted, as some CDC firmwares only
-// transmit once it is. Raising the lines is best effort, as in the Rust
-// version: a device that refuses control requests still opens.
+// transmit once it is. Raising the lines is best effort: a device that
+// refuses control requests still opens.
 //
 // The operating system drops DTR again when the port closes, even if the
 // program crashes; with AT&D2 (which data calls set) the handset should
@@ -129,11 +127,10 @@ func open(path string, baud int, openPort portOpener) (*Transport, error) {
 	if err != nil {
 		return nil, transportError(err)
 	}
-	// Best effort, as the Rust version's dtr_on_open, which ignores the
-	// result: the line is up already wherever the port opened normally.
+	// Best effort: the line is up already wherever the port opened normally.
 	_ = port.SetDTR(true)
-	// Some CDC firmwares only transmit once RTS is asserted too; the Rust
-	// version drops this result as well.
+	// Some CDC firmwares only transmit once RTS is asserted too; this
+	// result is ignored as well.
 	_ = port.SetRTS(true)
 	transport := &Transport{port: port}
 	// The cleanup holds the library's port, not the Transport, which it
@@ -143,8 +140,8 @@ func open(path string, baud int, openPort portOpener) (*Transport, error) {
 }
 
 // closeAbandonedPort closes port, whose Transport was collected without
-// Close: as the Rust version's dropped transport did, which gives the port
-// back and drops DTR, so that with AT&D2 a call left up ends.
+// Close: it gives the port back and drops DTR, so that with AT&D2 a call
+// left up ends.
 func closeAbandonedPort(port serialport.Port) {
 	// Nobody is left to tell of a failure.
 	_ = port.Close()
@@ -234,8 +231,8 @@ func (t *Transport) readOnce(p []byte, wait time.Duration) (received int, endedE
 // cannot watch becomes an error. go.bug.st/serial's Unix Read waits with
 // select(2), whose descriptor sets hold the numbers below selectSetSize,
 // and panics for a port above them, which a Go program reaches easily, as
-// the runtime raises its limit of open files at start-up; the Rust
-// version's serial library waited with poll(2), which has no such limit.
+// the runtime raises its limit of open files at start-up; poll(2), which has
+// no such limit, does not share the problem.
 func (t *Transport) libraryRead(p []byte) (received int, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -351,9 +348,8 @@ func transportError(err error) error {
 
 // systemError is an error number from the operating system, written as
 // strerror(3) writes it, with a capital letter: "No such file or
-// directory", where Go writes "no such file or directory". The Rust
-// version's serial library reported the C library's texts, which the CLI
-// prints after "transport error: ".
+// directory", where Go writes "no such file or directory". The CLI prints
+// the text after "transport error: ".
 type systemError struct {
 	errno syscall.Errno
 }

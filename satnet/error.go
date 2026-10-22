@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/anhydrous99/satlink"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // ErrorKind classifies an [Error].
@@ -136,8 +136,8 @@ type Error struct {
 	CallMayStillBeUp bool
 }
 
-// Error returns the message, worded as the Rust version words it, for
-// example "echo.test:80 is not allowed by the link policy".
+// Error returns the message, for example "echo.test:80 is not allowed by
+// the link policy".
 func (e *Error) Error() string {
 	if e.Kind < 0 || int(e.Kind) >= len(errorMessages) || errorMessages[e.Kind] == nil {
 		return e.Kind.Error()
@@ -145,13 +145,13 @@ func (e *Error) Error() string {
 	return errorMessages[e.Kind](e)
 }
 
-// errorMessages words the message of each kind that has details, as the
-// Rust version words it; the message of any other kind is its label.
+// errorMessages words the message of each kind that has details; the
+// message of any other kind is its label.
 var errorMessages = [...]func(e *Error) string{
 	ErrHandset:          func(e *Error) string { return "handset: " + e.messageOrCause() },
 	ErrInvalidConfig:    func(e *Error) string { return "invalid configuration: " + e.messageOrCause() },
 	ErrPolicyDenied:     func(e *Error) string { return e.Destination + " is not allowed by the link policy" },
-	ErrInvalidHost:      func(e *Error) string { return rustdebug.Quote(e.Host) + " is not a valid host name" },
+	ErrInvalidHost:      func(e *Error) string { return debugtext.Quote(e.Host) + " is not a valid host name" },
 	ErrNameNotFound:     func(e *Error) string { return "no address found for " + e.Host },
 	ErrTimedOut:         func(e *Error) string { return e.Operation + " timed out" },
 	ErrConnectionFailed: func(e *Error) string { return "could not connect to " + e.Addr.String() },
@@ -208,8 +208,7 @@ func (e *Error) messageOrCause() string {
 }
 
 // isStandardEquivalent reports whether target is the standard library's
-// error for kind, the counterpart of the io::ErrorKind the Rust version
-// converted it to. A link that is down is not net.ErrClosed, which means
+// error for kind. A link that is down is not net.ErrClosed, which means
 // that this side closed the connection, and a deadline is not
 // context.DeadlineExceeded, which the net package keeps for contexts.
 func isStandardEquivalent(kind ErrorKind, target error) bool {
@@ -233,7 +232,7 @@ func isStandardEquivalent(kind ErrorKind, target error) bool {
 	}
 }
 
-// The operations an ErrTimedOut names, as the Rust version names them.
+// The operations an ErrTimedOut names.
 const (
 	operationLinkUp     = "bringing the link up"
 	operationDNSLookup  = "DNS lookup"

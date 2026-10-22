@@ -1,8 +1,7 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the graceful (FIN) and the
-// ungraceful (RST) end of the received stream: its "graceful vs ungraceful
-// rx close" section (src/socket/tcp.rs, lines 8966-9159).
+// Tests of the graceful (FIN) and the ungraceful (RST) end of the
+// received stream.
 
 import (
 	"errors"
@@ -11,8 +10,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// assertReceiveFails fails the test unless Receive fails with want:
-// smoltcp's assert_eq!(s.recv(|_| (0, ())), Err(want)).
+// assertReceiveFails fails the test unless Receive fails with want.
 func assertReceiveFails(t *testing.T, s *testSocket, want error) {
 	t.Helper()
 	if _, err := s.Receive(func([]byte) int { return 0 }); !errors.Is(err, want) {

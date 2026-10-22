@@ -6,8 +6,8 @@ import (
 )
 
 // The goroutines this package starts — the link listener, the log
-// delivery, a serial link's port closer — carry a name, as the Rust
-// bindings' threads did, and recover their own panics, as a panic that
+// delivery, a serial link's port closer — carry a name, and recover their
+// own panics, as a panic that
 // ended one would end the app.
 
 // goroutineLabel is the pprof label that names the goroutines this package

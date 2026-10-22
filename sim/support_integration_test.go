@@ -23,8 +23,8 @@ import (
 //
 // internal/simtest offers a short guard and ready handsets too, but it is
 // built on this package for the tests of the packages above it. The
-// simulator's own tests keep their set-up here, as the Rust crate's tests
-// did, so that nothing simtest needs can change what they test.
+// simulator's own tests keep their set-up here, so that nothing simtest
+// needs can change what they test.
 
 const (
 	// simulatorGuard is the simulator's escape guard in these tests:

@@ -41,7 +41,7 @@ func linkStateOf(state satnet.LinkState) *LinkState {
 }
 
 // closeReasonOf returns the app's copy of reason. Detail is what failed —
-// for PPP, why PPP went down, as the Rust bindings word it — and "" for
+// for PPP, why PPP went down — and "" for
 // the reasons that need none.
 func closeReasonOf(reason satnet.CloseReason) *LinkCloseReason {
 	copied := &LinkCloseReason{Kind: closeReasonKinds[reason.Kind]}

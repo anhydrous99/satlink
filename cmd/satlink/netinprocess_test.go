@@ -16,12 +16,11 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// The Rust version's tests/net.rs, those that need no process boundary,
-// run in-process: net tcp and net get end to end against the simulator —
-// how a run ends when the remote end closes first, a page fetched for a
-// slow reader — and, Go only, what interruptions and a panic do to a run.
-// net_integration_test.go runs the binary for the tests that need a
-// process of their own.
+// The tests that need no process boundary run in-process: net tcp and net get
+// end to end against the simulator — how a run ends when the remote end closes
+// first, a page fetched for a slow reader — and what interruptions and a panic
+// do to a run. net_integration_test.go runs the binary for the tests that need
+// a process of their own.
 
 // runLimit is the longest a run may take: dialling, PPP, the exchange and
 // hanging up, all without the simulator's delays.
@@ -71,7 +70,7 @@ func checkNotAllSent(t *testing.T, got outcome) {
 	}
 }
 
-// Rust: a_request_the_remote_end_answered_and_closed_is_no_error.
+// A request the remote end answered and closed is no error.
 func TestARequestTheRemoteEndAnsweredAndClosedIsNoError(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +82,7 @@ func TestARequestTheRemoteEndAnsweredAndClosedIsNoError(t *testing.T) {
 	}
 }
 
-// Rust: an_upload_the_remote_end_cut_short_is_an_error.
+// An upload the remote end cut short is an error.
 func TestAnUploadTheRemoteEndCutShortIsAnError(t *testing.T) {
 	t.Parallel()
 	// The web server answers the request head and closes, long before the
@@ -95,7 +94,7 @@ func TestAnUploadTheRemoteEndCutShortIsAnError(t *testing.T) {
 	checkNotAllSent(t, got)
 }
 
-// Rust: an_upload_whose_end_the_remote_end_reset_is_an_error.
+// An upload whose end the remote end reset is an error.
 func TestAnUploadWhoseEndTheRemoteEndResetIsAnError(t *testing.T) {
 	t.Parallel()
 	// Small enough to be queued at once, but the web server has closed, and
@@ -164,8 +163,7 @@ func (h *recordingHandset) Close() error {
 	return h.Handset.Close()
 }
 
-// Go only: Rust's tests make no net subcommand panic. As in the Rust
-// version, a panic in the subcommand's work — a standard output whose writes
+// A panic in the subcommand's work — a standard output whose writes
 // panic stands in for a bug — is reported, and fails the command once it has
 // hung up. Closing the handset would end the call too, by dropping DTR, but
 // that is the last resort: that handsets honour DTR over USB is not yet
@@ -257,9 +255,9 @@ func (w *controlledWorld) awaitStats(t *testing.T, what string, shown func(sim.S
 	})
 }
 
-// Rust: a_fetched_page_is_hung_up_on_before_a_slow_reader_takes_it. A
-// standard output that blocks stands in for the Rust test's full pipe, and
-// the test waits for the hang-up instead of sleeping ten seconds.
+// A fetched page is hung up on before a slow reader takes it. A standard
+// output that blocks stands in for a full pipe, and the test waits for the
+// hang-up instead of sleeping ten seconds.
 func TestAFetchedPageIsHungUpOnBeforeASlowReaderTakesIt(t *testing.T) {
 	t.Parallel()
 	w := newControlledWorld()
@@ -318,7 +316,7 @@ func TestAnInterruptedRelayHangsUpAndEndsAsInterrupted(t *testing.T) {
 	}
 }
 
-// Go only. Nothing between an interruption and the hang-up waits for
+// Nothing between an interruption and the hang-up waits for
 // standard error, which may be a pipe nobody reads: neither the message
 // that the interruption writes, nor anything else.
 func TestAnInterruptionHangsUpWhileStandardErrorIsBlocked(t *testing.T) {

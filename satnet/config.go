@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -183,9 +183,7 @@ type Tuning struct {
 
 	// TCPTimeout is how long a connection may go without hearing from its
 	// peer; zero sets none, so that a connection to a peer that has gone
-	// waits for as long as the link lives. (The Rust version took zero for
-	// a timeout at once, which failed every connection before its SYN
-	// left.)
+	// waits for as long as the link lives.
 	TCPTimeout time.Duration
 
 	// TCPKeepalive is the interval of keepalive probes on idle connections,
@@ -236,9 +234,9 @@ func DefaultTuning() Tuning {
 // costs airtime; an app can check sooner, before saying a call is on its
 // way.
 //
-// It checks in the Rust version's order — the MTU, the link rate, the TCP
-// buffers, the hosts, the durations, the escape guard — and then the
-// limits, which depend on how long hanging up takes.
+// It checks the MTU, the link rate, the TCP buffers, the hosts, the
+// durations and the escape guard, in that order, and then the limits, which
+// depend on how long hanging up takes.
 func (c Config) Validate() error {
 	if err := c.Tuning.validateSizes(); err != nil {
 		return err
@@ -299,12 +297,12 @@ func validateHosts(hosts map[string]netip.Addr) error {
 	names := slices.Sorted(maps.Keys(hosts))
 	for _, name := range names {
 		if _, ok := normalizeHost(name); !ok {
-			return invalidConfig(rustdebug.Quote(name) + " in hosts is not a valid host name")
+			return invalidConfig(debugtext.Quote(name) + " in hosts is not a valid host name")
 		}
 	}
 	for _, name := range names {
 		if !hosts[name].Is4() {
-			return invalidConfig(rustdebug.Quote(name) + " in hosts needs an IPv4 address")
+			return invalidConfig(debugtext.Quote(name) + " in hosts needs an IPv4 address")
 		}
 	}
 	return nil

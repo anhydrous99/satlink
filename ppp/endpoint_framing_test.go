@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Go-only tests of how an endpoint frames what it sends: within the peer's
+// Tests of how an endpoint frames what it sends: within the peer's
 // MRU, with the control characters each end asked for escaped, headers
 // compressed once LCP agreed, LCP itself always conservatively.
 

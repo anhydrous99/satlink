@@ -72,7 +72,7 @@ func handsetCases() []goldenCase {
 		{name: "commands/at-with-attached-timeout", args: []string{instant, "at", "-t3", "AT+CGMI"}},
 		{name: "commands/at-refused", args: []string{instant, "at", "AT+BOGUS"}},
 		{name: "commands/list", args: []string{"list"}, world: twoPorts},
-		// As in the Rust version, list looks on USB whatever --simulate says.
+		// list looks on USB whatever --simulate says.
 		{name: "commands/list-ignores-simulate", args: []string{instant, "list"}, world: twoPorts},
 		{name: "commands/list-none", args: []string{"list"}},
 		{name: "commands/list-failed", args: []string{"list"}, world: world{discoveryFails: true}},
@@ -232,7 +232,7 @@ func TestAPortThatCannotBeOpenedFailsTheCommand(t *testing.T) {
 	}{
 		{"given with --port", []string{"--port", missing, "info"}, world{}, missing},
 		{"named by SATLINK_PORT", []string{"info"}, world{variables: map[string]string{portVariable: missing}}, missing},
-		// As in the Rust version: an empty port is a port, which no handset is
+		// An empty port is a port, which no handset is
 		// found by.
 		{"empty", []string{"--port=", "info"}, world{}, ""},
 		{"the only handset discovered", []string{"info"}, world{ports: []serial.Port{{Path: missing}}}, missing},
@@ -241,7 +241,7 @@ func TestAPortThatCannotBeOpenedFailsTheCommand(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// The serial library's error, not discovery's: the port was
 			// opened, not looked for. On macOS and Linux it reads
-			// "transport error: No such file or directory", as in Rust.
+			// "transport error: No such file or directory".
 			_, openErr := serial.Open(test.opened, serial.DefaultBaud)
 			want := fmt.Sprintf("error: %v\n", openErr)
 
@@ -281,10 +281,8 @@ func TestAHelpPageThatCannotBeWrittenStillExitsAsAsked(t *testing.T) {
 	}
 }
 
-// Go only. A handset command whose output cannot be written — a pipe to a
-// head that has had enough — fails and says why, as the net commands do.
-// The Rust version printed with println!, which panicked instead, with exit
-// status 101.
+// A handset command whose output cannot be written — a pipe to a head that has
+// had enough — fails and says why, as the net commands do.
 func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -322,9 +320,8 @@ func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 	}
 }
 
-// Go only. The "(event)" lines are not best effort either: an event that
-// standard error cannot take fails the command, where the Rust version's
-// eprintln! panicked.
+// The "(event)" lines are not best effort either: an event that standard error
+// cannot take fails the command.
 func TestAnEventThatCannotBeReportedFailsTheCommand(t *testing.T) {
 	env, stdout, _ := world{handset: smsArrivingOn("AT+CSQ")}.environment(t, []string{instant, "status"})
 	env.stderr = brokenWriter{}

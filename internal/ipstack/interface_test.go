@@ -1,10 +1,9 @@
 package ipstack
 
-// The tests up to TestTCPListenDropsUnspecifiedSrc port smoltcp's interface
-// tests (src/iface/interface/tests/mod.rs) that the workspace compiles:
-// test_handle_udp_broadcast (Medium::Ip), tcp_listen_drops_unspecified_src,
-// and tcp_not_accepted, which needs IPv6 and is ported to IPv4.
-// test_new_panic needs Ethernet. The Go-specific tests follow.
+// The tests up to TestTCPListenDropsUnspecifiedSrc follow the scenarios of
+// smoltcp's interface tests that apply to bare IPv4 datagrams: UDP broadcasts,
+// unspecified source addresses and TCP connections that are not accepted. The
+// tests after them cover the rest of the interface.
 
 import (
 	"bytes"
@@ -179,7 +178,7 @@ var exampleResponse = []byte("\x05\x4e\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00" 
 
 // firstQueryPort is the source port of the first DNS query of a seed-0
 // interface. Its transaction id and port are the second and third Uint16
-// the seed gives, as with smoltcp: the interface drew the first.
+// the seed gives, the interface having drawn the first.
 const firstQueryPort = 57331
 
 func TestUDPSocketsComeBeforeDNSSockets(t *testing.T) {
@@ -419,13 +418,12 @@ func TestNewInterfaceMakesItsContext(t *testing.T) {
 	}
 }
 
-func TestASeedGivesTheSocketsSmoltcpsRandomValues(t *testing.T) {
+func TestSeedDeterminesTheSocketsRandomValues(t *testing.T) {
 	t.Parallel()
 	// The first Uint32 a socket draws, as a TCP socket does for its initial
-	// sequence number, is the first ISN of smoltcp 0.14.0 with the
-	// workspace's features for the same seed. The interface has drawn the
-	// fragment identifier first: the seed's first Uint16, unless that is 0,
-	// as it is for 0x2e80, which draws again.
+	// sequence number, is the first ISN of smoltcp 0.14.0 for the same seed.
+	// The interface has drawn the fragment identifier first: the seed's first
+	// Uint16, unless that is 0, as it is for 0x2e80, which draws again.
 	tests := []struct {
 		seed        uint64
 		firstSocket uint32
@@ -438,7 +436,7 @@ func TestASeedGivesTheSocketsSmoltcpsRandomValues(t *testing.T) {
 		cx := NewInterface(Config{RandomSeed: test.seed}, DeviceCapabilities{MTU: 576}, time.Time{}).Context()
 
 		if got := cx.Rand().Uint32(); got != test.firstSocket {
-			t.Errorf("seed %#x: the sockets' first Uint32 is %#x, want smoltcp's %#x", test.seed, got, test.firstSocket)
+			t.Errorf("seed %#x: the sockets' first Uint32 is %#x, want %#x", test.seed, got, test.firstSocket)
 		}
 	}
 }

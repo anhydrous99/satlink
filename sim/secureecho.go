@@ -22,9 +22,9 @@ import (
 // a test CA; the CA, the certificate and its key are fixtures in testdata/
 // that protect nothing.
 //
-// crypto/tls has no sans-I/O interface, as rustls had, so each session runs
-// in a goroutine of its own over an in-memory connection, which the service
-// pumps from and to the session's TCP socket.
+// crypto/tls has no sans-I/O interface, so each session runs in a goroutine
+// of its own over an in-memory connection, which the service pumps from and
+// to the session's TCP socket.
 
 //go:embed testdata/test-ca.pem
 var secureTestCAPEM string
@@ -87,25 +87,24 @@ var serverCertificate = sync.OnceValue(func() tls.Certificate {
 func newSecureEchoConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{serverCertificate()},
-		// TLS 1.2 and 1.3, as rustls's safe defaults.
+		// TLS 1.2 and 1.3, the usual safe defaults.
 		MinVersion: tls.VersionTLS12,
-		// The TLS 1.2 suites the Rust echo served: crypto/tls's defaults
+		// The TLS 1.2 suites are the ring provider's. crypto/tls's defaults
 		// would also serve a client that offers only the ECDHE suites with
-		// CBC and HMAC-SHA1, which the Rust echo refused. crypto/tls ignores
-		// the list's order: of the suites a client offers, it picks by its
-		// own order, where rustls's server followed the client's. Its TLS
-		// 1.3 suites, which a server can neither choose nor order, are
-		// rustls's three. TLS 1.2 keeps crypto/tls's order too, one rule for
-		// both versions: following the client's there, through a
-		// GetConfigForClient, would matter only to a client of another TLS
-		// library that speaks TLS 1.2 at most, as crypto/tls's clients,
-		// satnet's among them, agree the same suite at TLS 1.2 with either
-		// echo on the same machine (docs/PORTING.md, section 3).
+		// CBC and HMAC-SHA1, which this echo refuses. crypto/tls ignores the
+		// list's order: of the suites a client offers, it picks by its own
+		// order. Its TLS 1.3 suites, which a server can neither choose nor
+		// order, are the three crypto/tls implements. TLS 1.2 keeps
+		// crypto/tls's order too, one rule for both versions: following the
+		// client's there, through a GetConfigForClient, would matter only to a
+		// client of another TLS library that speaks TLS 1.2 at most, as
+		// crypto/tls's clients, satnet's among them, agree the same suite at
+		// TLS 1.2 with either echo on the same machine.
 		CipherSuites: ringprovider.TLS12CipherSuites(),
-		// The key exchange groups of rustls's ring provider, without a
-		// post-quantum one, which the Rust server could not offer.
+		// The key exchange groups of the ring provider, which include no
+		// post-quantum one.
 		CurvePreferences: ringprovider.KeyExchangeGroups(),
-		// Records as large as rustls makes them, up to 16 KiB of plaintext.
+		// Records as large as TLS allows, up to 16 KiB of plaintext.
 		DynamicRecordSizingDisabled: true,
 	}
 }
@@ -191,7 +190,7 @@ func (e *secureEcho) close() {
 }
 
 // awaitSession waits until the session has dealt with what it was given,
-// so that its answer leaves in the same step, as rustls's would. A session
+// so that its answer leaves in the same step. A session
 // that takes longer answers in a later step.
 func (e *secureEcho) awaitSession() {
 	e.conn.AwaitReader(sessionStepTimeout)
@@ -209,8 +208,8 @@ func runSecureEcho(server *tls.Conn, conn *memconn.Conn) {
 	case conn.EOFDelivered() || errors.Is(err, io.EOF):
 		// The client said goodbye: with FIN, which the connection reports,
 		// or with close_notify. crypto/tls reports a FIN in the middle of a
-		// record as io.ErrUnexpectedEOF, not io.EOF; Rust's hang_up says
-		// goodbye whatever the record state, and so does this.
+		// record as io.ErrUnexpectedEOF, not io.EOF; the session says goodbye
+		// whatever the record state.
 		sayGoodbye(server)
 	case errors.Is(err, net.ErrClosed):
 		// The session was closed from outside: its internet went away.

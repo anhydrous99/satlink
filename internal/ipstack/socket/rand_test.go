@@ -16,8 +16,8 @@ func draw[T any](seed uint64, next func(*Rand) T) []T {
 	return values
 }
 
-// The golden values were computed with rustc from smoltcp's src/rand.rs.
-func TestRandMatchesSmoltcp(t *testing.T) {
+// The golden values are smoltcp's outputs for these seeds.
+func TestRandGoldenValues(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		seed            uint64
@@ -52,8 +52,7 @@ func TestRandMatchesSmoltcp(t *testing.T) {
 }
 
 // SourcePort skips the reserved ports up to 1024 and takes 1025: the first
-// Uint16 of these seeds is 3, 1024 and 1025. The golden values were computed
-// with rustc from smoltcp's src/rand.rs.
+// Uint16 of these seeds is 3, 1024 and 1025.
 func TestRandSourcePortIsTheFirstDrawAbove1024(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

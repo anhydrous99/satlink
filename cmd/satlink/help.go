@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// Help pages, laid out as the Rust version's clap laid them out: the summary
+// Help pages, laid out as clap lays them out: the summary
 // that -h shows, an argument a line with its help in a column, and the long
 // help of --help and of the help subcommand, an argument's help on the lines
 // below it.

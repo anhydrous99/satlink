@@ -130,8 +130,8 @@ func TestLocalHostsNeedNoDNS(t *testing.T) {
 	}
 }
 
-// TestAnAnswerIsReusedRatherThanAskedForAgain is Go only: each lookup costs
-// a satellite round trip of airtime.
+// TestAnAnswerIsReusedRatherThanAskedForAgain checks that an answer is
+// reused. Each lookup costs a satellite round trip of airtime.
 func TestAnAnswerIsReusedRatherThanAskedForAgain(t *testing.T) {
 	t.Parallel()
 	link, control := newLink(t, "echo.test:7")
@@ -163,7 +163,7 @@ func TestTCPRoundTripThroughTheEchoService(t *testing.T) {
 	}
 }
 
-// TestTheUsageIsCurrentWhileTheLinkIsUp is Go only: an app showing what the
+// TestTheUsageIsCurrentWhileTheLinkIsUp checks that an app showing what the
 // call costs reads it while the link is up, not only once it has closed.
 func TestTheUsageIsCurrentWhileTheLinkIsUp(t *testing.T) {
 	t.Parallel()
@@ -310,7 +310,7 @@ func TestADroppedCallEndsTheLink(t *testing.T) {
 	expectKind(t, err, satnet.ErrLinkDown)
 }
 
-// TestDataHoldingTheHandsetsNoCarrierDoesNotEndTheLink is Go only. The link
+// TestDataHoldingTheHandsetsNoCarrierDoesNotEndTheLink checks that the link
 // asks the gateway to escape CR, so that the handset's own result code
 // never appears inside a frame: otherwise any server could end the call by
 // sending it — or fake the handset's OK while it hangs up.
@@ -342,7 +342,7 @@ func TestAnIdleLinkHangsUpByItself(t *testing.T) {
 	if control.Stats().InDataCall {
 		t.Error("the call is still up")
 	}
-	// Go only: the limit did not act before its time.
+	// The limit did not act before its time.
 	if connected := link.Status().Usage.ConnectedFor; connected < config.Limits.IdleTimeout {
 		t.Errorf("the call lasted %v, less than the idle limit %v", connected, config.Limits.IdleTimeout)
 	}
@@ -418,9 +418,8 @@ func expectCancelled(t *testing.T, err error) {
 	}
 }
 
-// TestALinkCancelledWhileItDialsNeverConnects is the Rust test in Go's
-// shape: the setup is cancelled once the dial is under way, rather than a
-// second after it starts.
+// TestALinkCancelledWhileItDialsNeverConnects cancels the setup once the dial
+// is under way, rather than a second after it starts.
 func TestALinkCancelledWhileItDialsNeverConnects(t *testing.T) {
 	t.Parallel()
 	handset, control := simtest.NewHandset(t, simulatorWith(sim.LinkProfile{CallSetup: 5 * time.Second}))
@@ -443,9 +442,8 @@ func TestALinkCancelledWhileItDialsNeverConnects(t *testing.T) {
 	}
 }
 
-// TestALinkCancelledWhilePPPComesUpIsHungUp is the Rust test in Go's shape:
-// the setup is cancelled once the call is up, rather than a second after it
-// starts.
+// TestALinkCancelledWhilePPPComesUpIsHungUp cancels the setup once the call is
+// up, rather than a second after it starts.
 func TestALinkCancelledWhilePPPComesUpIsHungUp(t *testing.T) {
 	t.Parallel()
 	// Each of PPP's round trips takes two seconds.
@@ -505,7 +503,7 @@ func TestTheDataLimitHangsUp(t *testing.T) {
 	}
 
 	expectClosed(t, link.Watcher(), satnet.CloseReasonDataLimit)
-	// Go only: the limit did not act before its time.
+	// The limit did not act before its time.
 	if usage := link.Status().Usage; usage.BytesSent+usage.BytesReceived < config.Limits.MaxBytes {
 		t.Errorf("%d bytes moved, short of the data limit %d", usage.BytesSent+usage.BytesReceived, config.Limits.MaxBytes)
 	}
@@ -561,7 +559,7 @@ const (
 	datagramLen             = 200
 )
 
-// TestClosingDeliversTheDatagramsAlreadyWritten is Go only, the UDP side of
+// TestClosingDeliversTheDatagramsAlreadyWritten is the UDP side of
 // TestClosingDeliversWhatWasWrittenButTakesNothingNew: the stack hands every
 // datagram to the device at once, where they wait for the line.
 func TestClosingDeliversTheDatagramsAlreadyWritten(t *testing.T) {
@@ -604,8 +602,8 @@ func TestARequestedCloseLetsWaitsAlreadyUnderWayFinish(t *testing.T) {
 		}
 		reply <- received
 	}()
-	// Rust sleeps 50 ms here so that the read is under way before the
-	// close; AwaitWaitingCall waits for exactly that.
+	// A fixed 50 ms sleep would have the read under way before the close;
+	// AwaitWaitingCall waits for exactly that.
 	satnet.AwaitWaitingCall(t, link, timeout)
 
 	link.RequestClose()
@@ -663,9 +661,9 @@ func TestABulkUploadDoesNotHoldUpALaterConnection(t *testing.T) {
 	<-uploaded
 }
 
-// TestALookupDoesNotWaitBehindBusyConnections is the Rust test in Go's
-// shape: the lookup starts once the uploads have kept the line busy for
-// three seconds, rather than three seconds after they start.
+// TestALookupDoesNotWaitBehindBusyConnections starts the lookup once the
+// uploads have kept the line busy for three seconds, rather than three seconds
+// after they start.
 func TestALookupDoesNotWaitBehindBusyConnections(t *testing.T) {
 	if testing.Short() {
 		t.Skip("times a lookup over a line busy with five uploads")
@@ -803,7 +801,7 @@ func TestAReplyToAClosedUDPSocketCostsNoAirtime(t *testing.T) {
 	simtest.Eventually(t, timeout, "the echo came back", func() bool {
 		return control.Stats().DataBytesToApp >= start.DataBytesToApp+400
 	})
-	// Rust's wait for an ICMP error to go out, were there one: a wait for
+	// The wait for an ICMP error to go out, were there one: a wait for
 	// something not to happen, the one sleep the tests allow. Paced at
 	// Iridium's rate, an error the stack let out would wait for the line
 	// longer than this; TestTheStacksICMPErrorsNeverGo, an internal test,
@@ -904,10 +902,10 @@ func TestALinkThatFailsAndCannotHangUpSaysTheCallMayStillBeUp(t *testing.T) {
 	expectNotBusy(t, handset)
 }
 
-// TestAPanicWhileHangingUpStillReportsTheLinkClosed is the Rust test in Go's
-// shape: the handset is never moved into the link, so it cannot go down
-// with the panic; instead it is released, its methods no longer failing
-// with satlink.ErrBusy.
+// TestAPanicWhileHangingUpStillReportsTheLinkClosed checks that a panic while
+// hanging up still reports the link closed. The handset is never moved into
+// the link, so it cannot go down with the panic; instead it is released, its
+// methods no longer failing with satlink.ErrBusy.
 func TestAPanicWhileHangingUpStillReportsTheLinkClosed(t *testing.T) {
 	t.Parallel()
 	link, handset, control, faulty := faultyLink(t)
@@ -926,9 +924,8 @@ func TestAPanicWhileHangingUpStillReportsTheLinkClosed(t *testing.T) {
 		t.Error("the status does not say the call may still be up")
 	}
 	expectNotBusy(t, handset)
-	// Go only: the core's hang-up pulses DTR as the panic unwinds, which
-	// ends the call after AT&D2, as the Rust version's unwinding did by
-	// dropping the handset and so its transport.
+	// The core's hang-up pulses DTR as the panic unwinds, which ends the call
+	// after AT&D2. The test counts those drops below.
 	if faulty.DTRDrops() < 1 {
 		t.Error("DTR was never dropped")
 	}
@@ -1201,7 +1198,7 @@ func TestAnInvalidNameIsNeverLookedUp(t *testing.T) {
 	expectNothingSentSince(t, link, control, before)
 }
 
-// TestARefusedDestinationGetsNothingOnTheLine is Go only: the policy is
+// TestARefusedDestinationGetsNothingOnTheLine checks that the policy is
 // checked before anything is sent, so that a refused name is never looked
 // up — a name can carry data — and a refused address never gets a SYN. Each
 // case has a link of its own: a lookup that leaked would leave its answer

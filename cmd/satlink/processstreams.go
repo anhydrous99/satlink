@@ -10,19 +10,19 @@ import (
 	"github.com/anhydrous99/satlink/internal/errnotext"
 )
 
-// The process's standard streams, whose failures read as the Rust
-// version's did: "error: Broken pipe (os error 32)" once standard output is
+// The process's standard streams, whose failures read as
+// "error: Broken pipe (os error 32)" once standard output is
 // a pipe that nobody reads any more, where Go would write "write
 // /dev/stdout: broken pipe".
 
 // processStream is one of the process's standard streams. A read or write
 // that the operating system fails with an error number returns it as an
-// osError; the end of the stream stays io.EOF. As in Rust's standard
-// library, a failure with badDescriptor — on Unix, a descriptor not open
+// osError; the end of the stream stays io.EOF. A failure with badDescriptor —
+// on Unix, a descriptor not open
 // for the direction, such as a standard output opened read-only; on
 // Windows, a NULL handle — reads as the end of the stream and takes every
-// write: the Rust version then ended standard input there and dropped its
-// output without an error.
+// write: standard input then ends there, and output is dropped without an
+// error.
 type processStream struct {
 	file *os.File
 }
@@ -45,8 +45,8 @@ func (s processStream) Write(p []byte) (int, error) {
 	return count, withOSErrorText(err)
 }
 
-// isBadDescriptor reports whether err is badDescriptor, which Rust's
-// standard streams take for an empty input and a sink (std's handle_ebadf).
+// isBadDescriptor reports whether err is badDescriptor, which makes a standard
+// stream an empty input and a sink.
 func isBadDescriptor(err error) bool {
 	return errors.Is(err, badDescriptor)
 }
@@ -63,8 +63,8 @@ func withOSErrorText(err error) error {
 	return err
 }
 
-// osError is an error number from the operating system, written as Rust's
-// io::Error writes it: the C library's text, which is Go's with a capital
+// osError is an error number from the operating system, written as its
+// message: the C library's text, which is Go's with a capital
 // letter, and the number — "Broken pipe (os error 32)".
 type osError struct {
 	errno syscall.Errno

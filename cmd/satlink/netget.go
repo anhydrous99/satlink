@@ -67,7 +67,7 @@ func printHTTPResponse(response []byte, ending responseEnding, s streams) error 
 	if !ok {
 		return unfinishedHead(len(response), ending)
 	}
-	// Read as the Rust version did, with String::from_utf8_lossy.
+	// Read as lossy UTF-8: what is not UTF-8 becomes U+FFFD.
 	headText := utf8lossy.String(head)
 	if err := writef(s.stderr, "%s\n", strings.TrimRightFunc(headText, unicode.IsSpace)); err != nil {
 		return err
@@ -105,7 +105,7 @@ func fetch(link dialer, url httpURL) ([]byte, responseEnding, error) {
 		// The response is in, or abandoned, so a failure to close changes
 		// nothing; the link's own close follows. Closing a TLS connection
 		// sends a close_notify before TCP's end, within the deadline, where
-		// the Rust version dropped its stream, which sent the end alone.
+		// a plain TCP close would send only the end.
 		_ = conn.Close()
 	}()
 	return exchange(conn, url)
@@ -154,9 +154,8 @@ func connect(link dialer, url httpURL) (net.Conn, error) {
 	return conn, nil
 }
 
-// newHTTPSConnector returns the connector that secures an https:// fetch,
-// as the Rust version's TlsConnector::new(): it trusts the public web PKI
-// and pins no key.
+// newHTTPSConnector returns the connector that secures an https:// fetch: it
+// trusts the public web PKI and pins no key.
 func newHTTPSConnector() (*satnet.TLSConnector, error) {
 	return satnet.NewTLSConnector(satnet.TLSOptions{})
 }

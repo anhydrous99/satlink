@@ -36,7 +36,7 @@ var echoAddress = netip.AddrFrom4([4]byte{192, 0, 2, 7})
 // briefCloseGrace is the close grace of links whose tests end with data
 // still queued that need not arrive. The tests' cleanup waits for the
 // hang-up, which would otherwise wait for that data for the default 30 s;
-// the Rust tests dropped the link instead, which hangs up in the
+// the tests dropped the link instead, which hangs up in the
 // background.
 const briefCloseGrace = time.Second
 

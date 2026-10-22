@@ -6,13 +6,12 @@ import (
 	"testing"
 )
 
-// udpPacketBytes is smoltcp's PACKET_BYTES: a DNS datagram with a checksum.
+// udpPacketBytes is a DNS datagram with a checksum.
 func udpPacketBytes() []byte {
 	return []byte{0xbf, 0x00, 0x00, 0x35, 0x00, 0x0c, 0x12, 0x4d, 0xaa, 0x00, 0x00, 0xff}
 }
 
-// udpNoChecksumPacketBytes is smoltcp's NO_CHECKSUM_PACKET: the same datagram
-// without a checksum.
+// udpNoChecksumPacketBytes is the same datagram without a checksum.
 func udpNoChecksumPacketBytes() []byte {
 	return []byte{0xbf, 0x00, 0x00, 0x35, 0x00, 0x0c, 0x00, 0x00, 0xaa, 0x00, 0x00, 0xff}
 }
@@ -38,7 +37,6 @@ func udpLongPacketBytes() []byte {
 	return append(header, make([]byte, 300)...)
 }
 
-// Ported from smoltcp's wire/udp.rs test_deconstruct.
 func TestUDPPacketDeconstruct(t *testing.T) {
 	t.Parallel()
 	packet := UDPPacket(udpPacketBytes())
@@ -55,7 +53,6 @@ func TestUDPPacketDeconstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_construct.
 func TestUDPPacketConstruct(t *testing.T) {
 	t.Parallel()
 	packet := UDPPacket(filled(12, 0xa5))
@@ -72,7 +69,6 @@ func TestUDPPacketConstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_impossible_len.
 func TestUDPPacketImpossibleLen(t *testing.T) {
 	t.Parallel()
 	packet := UDPPacket(make([]byte, 12))
@@ -83,7 +79,6 @@ func TestUDPPacketImpossibleLen(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_zero_checksum.
 func TestUDPPacketZeroChecksum(t *testing.T) {
 	t.Parallel()
 	packet := UDPPacket(make([]byte, 8))
@@ -98,7 +93,6 @@ func TestUDPPacketZeroChecksum(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_no_checksum.
 func TestUDPPacketNoChecksum(t *testing.T) {
 	t.Parallel()
 	packet := UDPPacket(make([]byte, 8))
@@ -112,7 +106,6 @@ func TestUDPPacketNoChecksum(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_parse.
 func TestUDPReprParse(t *testing.T) {
 	t.Parallel()
 	repr, err := ParseUDPRepr(UDPPacket(udpPacketBytes()), testSrcAddr, testDstAddr, ChecksumCapabilities{})
@@ -122,7 +115,6 @@ func TestUDPReprParse(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_emit.
 func TestUDPReprEmit(t *testing.T) {
 	t.Parallel()
 	repr := udpPacketRepr()
@@ -135,7 +127,6 @@ func TestUDPReprEmit(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/udp.rs test_checksum_omitted.
 func TestUDPReprChecksumOmitted(t *testing.T) {
 	t.Parallel()
 	repr, err := ParseUDPRepr(UDPPacket(udpNoChecksumPacketBytes()), testSrcAddr, testDstAddr, ChecksumCapabilities{})

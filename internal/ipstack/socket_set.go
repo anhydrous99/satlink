@@ -19,7 +19,7 @@ type SocketHandle struct {
 	slot int
 }
 
-// String formats the handle as smoltcp does: "#" and the socket's index in
+// String formats the handle as "#" and the socket's index in
 // its set ("#0" for the first); "#invalid" for the zero handle.
 func (h SocketHandle) String() string {
 	if h.slot == 0 {
@@ -45,7 +45,7 @@ func handleAt(index int) SocketHandle {
 // concurrent use, and must not change while one of its iterators runs.
 type SocketSet struct {
 	// slots holds the sockets by index, a free slot being nil. It grows as
-	// needed, as smoltcp's set does with growable storage.
+	// needed.
 	slots []anySocket
 }
 
@@ -119,14 +119,14 @@ func (s *SocketSet) add(socket anySocket) SocketHandle {
 	return handle
 }
 
-// item returns the socket handle identifies. It panics, as smoltcp does, if
-// handle identifies no socket of the set.
+// item returns the socket handle identifies. It panics if handle identifies no
+// socket of the set.
 func (s *SocketSet) item(handle SocketHandle) anySocket {
 	return s.slots[s.index(handle)]
 }
 
 // index returns the index of the slot of the socket handle identifies. It
-// panics, as smoltcp does, if handle identifies no socket of the set.
+// panics if handle identifies no socket of the set.
 func (s *SocketSet) index(handle SocketHandle) int {
 	index := handle.slot - 1
 	if index < 0 || index >= len(s.slots) || s.slots[index] == nil {
@@ -147,8 +147,8 @@ func (s *SocketSet) items() iter.Seq2[SocketHandle, anySocket] {
 }
 
 // socketOfKind returns the socket handle identifies, which must be of kind
-// K. It panics, as smoltcp does, if handle identifies no socket of the set or
-// one of another kind.
+// K. It panics if handle identifies no socket of the set or one of another
+// kind.
 func socketOfKind[K anySocket](s *SocketSet, handle SocketHandle) K {
 	socket, ok := s.item(handle).(K)
 	if !ok {

@@ -60,7 +60,7 @@ const (
 	tcpOptionUnknown
 )
 
-// tcpOption is one TCP option, smoltcp's TcpOption. kind says which, and the
+// tcpOption is one TCP option. kind says which, and the
 // fields below say which kinds use them.
 type tcpOption struct {
 	kind tcpOptionKind
@@ -87,7 +87,7 @@ var fixedTCPOptionLens = map[uint8]int{
 }
 
 // parseTCPOption parses the option at the start of buffer and returns it
-// with the octets that follow it (smoltcp's TcpOption::parse). It fails with
+// with the octets that follow it. It fails with
 // ErrMalformed for an empty buffer, an option that does not fit into it, an
 // option of a fixed length with another length, and a SACK option that is
 // not a whole number of blocks.
@@ -148,8 +148,8 @@ func decodeTCPOption(raw []byte) (tcpOption, error) {
 			EchoReply: binary.BigEndian.Uint32(data[timestampEchoReplyOffset:]),
 		}}, nil
 	}
-	// smoltcp keeps an option it does not know, and a timestamps option of
-	// another length, as an unknown option.
+	// An option it does not know, and a timestamps option of another length,
+	// are kept as unknown options.
 	return tcpOption{kind: tcpOptionUnknown, unknownKind: kind, data: data}, nil
 }
 

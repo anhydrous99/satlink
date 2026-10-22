@@ -144,8 +144,8 @@ func TestACollectedSerialLinkStillHangsUpAndClosesItsPort(t *testing.T) {
 }
 
 // A serial port this package opened itself is closed on every way out that
-// does not hand it on, a fault recovered at the boundary included, as the
-// Rust bindings' unwinding dropped it: the port is free for the next
+// does not hand it on, a fault recovered at the boundary included: the port
+// is free for the next
 // OpenSerialHandset, and closing it drops DTR, which ends a call the fault
 // left up.
 

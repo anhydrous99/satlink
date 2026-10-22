@@ -81,12 +81,9 @@ func (l *linkRecorder) DialTLS(_ string, _ uint16, connector *satnet.TLSConnecto
 
 func (*linkRecorder) RequestClose() {}
 
-// Go only: Rust's tests leave the time allowed unchecked, and only the
-// golden file of an untrusted HTTPS fetch over the simulator, whose
-// handshake takes a second, would notice it fall below that. Over Iridium a
-// full TLS handshake takes about 8 s, and a lookup that waits out a silent
-// first DNS server about 10 s: a shorter time would fail them after the
-// call was billed.
+// The time allowed is checked here. Over Iridium a full TLS handshake takes
+// about 8 s, and a lookup that waits out a silent first DNS server about 10 s:
+// a shorter time would fail them after the call was billed.
 func TestALookupAConnectionOrAHandshakeIsAllowedTwoMinutes(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -103,7 +100,7 @@ func TestALookupAConnectionOrAHandshakeIsAllowedTwoMinutes(t *testing.T) {
 
 			err := test.action.execute(link, streams{stdout: io.Discard, stderr: io.Discard})
 
-			// The Rust version's CONNECT_TIMEOUT.
+			// The connect timeout.
 			const allowed = 2 * time.Minute
 			if !errors.Is(err, errNotDialled) || !slices.Equal(link.timeouts, []time.Duration{allowed}) {
 				t.Errorf("the command failed with %v, having been given the times %v; want one of %v",
@@ -113,7 +110,7 @@ func TestALookupAConnectionOrAHandshakeIsAllowedTwoMinutes(t *testing.T) {
 	}
 }
 
-// Rust: targets_that_are_rules_rather_than_hosts_are_refused_before_dialling.
+// Targets that are rules rather than hosts are refused before dialling.
 func TestTargetsThatAreRulesRatherThanHostsAreRefusedBeforeDialling(t *testing.T) {
 	for _, commandLine := range [][]string{
 		{"get", "http://*.web.test/"},
@@ -140,7 +137,7 @@ func TestTargetsThatAreRulesRatherThanHostsAreRefusedBeforeDialling(t *testing.T
 	}
 }
 
-// Rust: limits_too_small_to_be_of_use_are_refused_before_dialling.
+// Limits too small to be of use are refused before dialling.
 func TestLimitsTooSmallToBeOfUseAreRefusedBeforeDialling(t *testing.T) {
 	for _, commandLine := range [][]string{
 		{"--max-kb", "1", "status"},
@@ -167,13 +164,13 @@ func TestARefusedTargetIsNamed(t *testing.T) {
 	if want := `"*" is not a host name or IPv4 address`; err == nil || err.Error() != want {
 		t.Errorf("error = %v, want %s", err, want)
 	}
-	// Rust's {:?} of a str, where Go's %q would write "\a".
+	// The message escapes the bell character as \u{7}.
 	if err, want := (netTarget{host: "*\a", port: 7}).check(satnet.DenyAll()), `"*\u{7}" is not a host name or IPv4 address`; err == nil || err.Error() != want {
 		t.Errorf("check fails with %v, want %s", err, want)
 	}
 }
 
-// Rust: an_address_is_resolved_without_a_call.
+// An address is resolved without a call.
 func TestAnAddressIsResolvedWithoutACall(t *testing.T) {
 	address, ok := mustParseNet(t, "resolve", "192.0.2.7").action.literalAddress()
 	if !ok || address != netip.MustParseAddr("192.0.2.7") {

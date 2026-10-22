@@ -11,16 +11,15 @@ import (
 	"github.com/anhydrous99/satlink"
 )
 
-// Go only: the handset as a transport, its Close, and I/O after Close.
+// The handset as a transport, its Close, and I/O after Close.
 
 // handsetPatience bounds the waits for what the simulated handset does at
 // once; a test that reaches it has failed.
 const handsetPatience = 5 * time.Second
 
 // promisedPollInterval is how often a waiting ReadTimeout advances the
-// simulation, as its doc promises and as the Rust version's POLL_INTERVAL:
-// every 2 ms, which keeps simulated latency and pacing accurate to a few
-// milliseconds.
+// simulation, as its doc promises: every 2 ms, which keeps simulated latency
+// and pacing accurate to a few milliseconds.
 const promisedPollInterval = 2 * time.Millisecond
 
 // readUntilQuiet reads from handset until it has nothing more to say.
@@ -146,8 +145,7 @@ func TestCloseIsIdempotent(t *testing.T) {
 }
 
 // The read must be waiting when Close comes, or it would fail at its first
-// check and the wake-up would go untested (docs/PORTING.md, section 2,
-// Tests). In a synctest bubble, synctest.Wait returns once the read sleeps
+// check and the wake-up would go untested. In a synctest bubble, synctest.Wait returns once the read sleeps
 // between two polls, and time passes only while every goroutine waits, so
 // the read ends exactly one poll interval after Close.
 func TestCloseEndsAReadInProgress(t *testing.T) {
@@ -298,8 +296,8 @@ func TestRaisingDTRChangesNothing(t *testing.T) {
 	}
 }
 
-// The Rust handset dropped DTR when it was dropped. In Go, a Handset that
-// nobody refers to any more does, once the garbage collector has noticed.
+// A Handset that nobody refers to any more drops DTR, once the garbage
+// collector has noticed.
 func TestAHandsetCollectedWithoutCloseDropsDTR(t *testing.T) {
 	t.Parallel()
 

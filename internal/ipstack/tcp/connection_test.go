@@ -1,8 +1,7 @@
 package tcp
 
-// Go-specific tests (PORTING-ipstack.md, section 6) of Listen and Connect,
-// of connections whose initial sequence number lies anywhere in sequence
-// space, and of what starts a connection afresh (connection.go).
+// Tests of Listen and Connect, of connections whose initial sequence number
+// lies anywhere in sequence space, and of what starts a connection afresh.
 
 import (
 	"errors"
@@ -71,8 +70,8 @@ func TestConnectNeedsAnAddressToSendFrom(t *testing.T) {
 	}
 }
 
-// smoltcp's test_connect_validation tries the unspecified remote address
-// only together with port 0, which alone makes Connect fail.
+// The unspecified remote address is tried only together with port 0, which
+// alone makes Connect fail.
 func TestConnectRefusesTheUnspecifiedRemoteAddress(t *testing.T) {
 	t.Parallel()
 	s := socketClosed(t)
@@ -121,8 +120,8 @@ func socketDrawingISNsFrom(t *testing.T, randomSeed uint64) *testSocket {
 	}
 }
 
-// smoltcp's test_connect_validation tries port 0 only together with an
-// unspecified address, which alone makes Connect fail.
+// Port 0 is tried only together with an unspecified address, which alone
+// makes Connect fail.
 func TestConnectRefusesPortZeroOnEitherSide(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -145,7 +144,7 @@ func TestConnectRefusesPortZeroOnEitherSide(t *testing.T) {
 	}
 }
 
-// smoltcp's test_listen_twice listens again only on the same endpoint; on
+// Listening again is allowed only on the same endpoint; on
 // any other, Listen fails and the socket goes on listening where it did.
 func TestListenOnAnotherEndpointWhileListeningIsRefused(t *testing.T) {
 	t.Parallel()
@@ -169,7 +168,7 @@ func TestListenOnAnotherEndpointWhileListeningIsRefused(t *testing.T) {
 // =========================================================================
 
 // isnsAcrossSequenceSpace are initial sequence numbers in both halves of
-// sequence space, around its middle and its wrap. smoltcp's tests fix the
+// sequence space, around its middle and its wrap. The tests fix the
 // ISN at 10000 (localSeq), but a socket draws it at random (randomISN). An
 // absent wire.Optional holds sequence number 0, which comes before an ISN in
 // the lower half and after one in the upper half, so code that reads it
@@ -231,10 +230,9 @@ func TestTheSYNIsTimedWhateverTheISN(t *testing.T) {
 // What starts a connection afresh
 // =========================================================================
 
-// PORTING-ipstack.md, section 8: satnet relies on the reset that the loss of
-// the socket's local address causes to empty the send buffer, as if the peer
-// had acknowledged everything. smoltcp's
-// test_established_close_on_src_ip_change checks only the state.
+// satnet relies on the reset that the loss of the socket's local address
+// causes to empty the send buffer, as if the peer had acknowledged everything.
+// Checking the state alone would not show that.
 func TestLosingTheLocalAddressEmptiesBothBuffers(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -270,8 +268,8 @@ func socketAbortedWithDataLeft(t *testing.T) *testSocket {
 	return s
 }
 
-// smoltcp's tests never use a socket again, which the API allows once it is
-// CLOSED: Listen and Connect start the next connection with empty buffers
+// A CLOSED socket may be used again: Listen and Connect start the next
+// connection with empty buffers
 // and an empty assembler, whatever the last one left in them.
 func TestAReusedSocketStartsWithNothingLeftOver(t *testing.T) {
 	t.Parallel()

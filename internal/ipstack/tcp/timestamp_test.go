@@ -1,13 +1,7 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for TCP timestamps: its "Timestamp
-// tests" section (src/socket/tcp.rs, lines 9607-9841). Two of them are
-// ported, without their timestamp_enabled() assertions (PORTING-ipstack.md,
-// section 6): without a generator, the socket never enables timestamps, and
-// what the tests check is that it does not echo the peer's.
-// test_tsval_established_connection, test_tsval_disabled_in_remote_client
-// and test_tsval_disabled_in_remote_server are not ported: they need the
-// omitted timestamp generator (sections 3 and 6).
+// Tests of TCP timestamps. Without a timestamp generator the socket never
+// enables them, so the tests check that it does not echo the peer's.
 
 import (
 	"testing"

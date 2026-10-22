@@ -21,7 +21,7 @@ import (
 const closedDuringHandshake = "the server closed the connection during the handshake"
 
 // readAheadLimit is the most application data taken in ahead of the reader:
-// as much as rustls holds of received plaintext.
+// the most plaintext one TLS record carries.
 const readAheadLimit = 16 * 1024
 
 // TLSConn is a TLS connection through a [Link]. It is a net.Conn, and like
@@ -52,8 +52,7 @@ const readAheadLimit = 16 * 1024
 // The deadlines are those set on the TLSConn, and they bound the TLS
 // goodbye too: crypto/tls's own five-second limit for sending close_notify
 // does not apply, so a goodbye queued behind a full send buffer at 300
-// bytes per second still leaves within a longer write deadline, as in the
-// Rust version.
+// bytes per second still leaves within a longer write deadline.
 //
 // The zero TLSConn is not usable; [Link.DialTLS] and [TLSConnector.Secure]
 // make one.
@@ -210,13 +209,13 @@ func (c *TLSConn) Write(p []byte) (int, error) {
 // WriteSome encrypts and queues what the session has room for of p,
 // waiting until the write deadline for room, and returns how much of p it
 // took: perhaps not all of it, which is still sent, so exactly the rest can
-// be written again. Unlike Write, it takes no more once that much is taken,
-// as the Rust version's send_until does: ErrTimedOut means that nothing was
-// taken, and with another error the count says what was. What it took but
-// could not hand to TCP by the deadline stays in the session for the
-// connection's next calls to send, as for Write; the link's own Close drops
-// it, so call WaitAcknowledged first. It is refused as Write is, taking
-// nothing; an empty p only sends the records still waiting.
+// be written again. Unlike Write, it takes no more once that much is taken:
+// ErrTimedOut means that nothing was taken, and with another error the count
+// says what was. What it took but could not hand to TCP by the deadline
+// stays in the session for the connection's next calls to send, as for
+// Write; the link's own Close drops it, so call WaitAcknowledged first. It
+// is refused as Write is, taking nothing; an empty p only sends the records
+// still waiting.
 func (c *TLSConn) WriteSome(p []byte) (int, error) {
 	if err := c.usable(); err != nil {
 		return 0, err
@@ -368,8 +367,7 @@ func (c *TLSConn) Close() error {
 		return nil
 	}
 	// As CloseWrite does, take in what arrived — session tickets for the
-	// next connection — and, as in Rust, send no close_notify for a session
-	// that failed.
+	// next connection — and send no close_notify for a session that failed.
 	if err := c.takeInArrivedRecords(); err != nil {
 		closeAbandoned(c.transport)
 		return err

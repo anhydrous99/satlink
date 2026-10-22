@@ -11,9 +11,9 @@ import (
 // The Unix platforms the CLI builds for: those that go.bug.st/serial
 // supports. terminal_windows.go has Windows.
 
-// isTerminal reports whether file is a terminal, as isatty(3) does, which
-// the Rust version's is_terminal asked: whether the file has terminal
-// settings to read. /dev/null and other character devices have none.
+// isTerminal reports whether file is a terminal, as isatty(3) does: whether
+// the file has terminal settings to read. /dev/null and other character devices
+// have none.
 func isTerminal(file *os.File) bool {
 	connection, err := file.SyscallConn()
 	if err != nil {

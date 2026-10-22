@@ -2,9 +2,8 @@ package tcp
 
 import "errors"
 
-// The errors a socket's operations return. smoltcp has one enum per
-// operation (ListenError, ConnectError, SendError, RecvError) with these
-// variants and texts; each operation documents which of them it returns.
+// The errors a socket's operations return. Each operation documents which of
+// them it returns.
 var (
 	// ErrInvalidState reports an operation the socket's state does not
 	// allow: listening or connecting while open, sending while the transmit

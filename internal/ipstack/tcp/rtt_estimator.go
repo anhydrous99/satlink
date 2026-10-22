@@ -60,8 +60,7 @@ const backoffFactor = 2
 const backoffsBeforeForgettingRTT = 3
 
 // rttEstimator computes the retransmission timeout from round-trip time
-// measurements, as RFC 6298 specifies: smoltcp's RttEstimator. Times are
-// whole milliseconds, as smoltcp keeps them.
+// measurements, as RFC 6298 specifies. Times are whole milliseconds.
 type rttEstimator struct {
 	// haveMeasurement is true if we have made at least one RTT measurement.
 	haveMeasurement bool
@@ -88,8 +87,7 @@ type rttSample struct {
 	seq    wire.TCPSeqNumber
 }
 
-// newRTTEstimator returns an estimator without measurements: smoltcp's
-// RttEstimator::default.
+// newRTTEstimator returns an estimator without measurements.
 func newRTTEstimator() rttEstimator {
 	return rttEstimator{rto: initialRTOMillis}
 }
@@ -196,8 +194,7 @@ func absoluteDifference(a, b uint32) uint32 {
 	return b - a
 }
 
-// elapsedBetween returns how far apart two times are, whichever comes first,
-// as smoltcp's Instant subtraction does.
+// elapsedBetween returns how far apart two times are, whichever comes first.
 func elapsedBetween(earlier, later time.Time) time.Duration {
 	elapsed := later.Sub(earlier)
 	if elapsed < 0 {

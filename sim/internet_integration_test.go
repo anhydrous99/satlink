@@ -261,8 +261,8 @@ func TestSeveralConnectionsAreServedAtOnce(t *testing.T) {
 	}
 }
 
-// Go only, for a path the Rust tests leave out: the web server lets a
-// client go that hangs up before its request has ended, without an answer.
+// The web server lets a client go that hangs up before its request has
+// ended, without an answer.
 func TestAWebClientThatGivesUpBeforeItsRequestEndsIsLetGoUnanswered(t *testing.T) {
 	t.Parallel()
 	network := connectNetwork(t, fastConfig())
@@ -277,9 +277,8 @@ func TestAWebClientThatGivesUpBeforeItsRequestEndsIsLetGoUnanswered(t *testing.T
 	}
 }
 
-// Go only: the Rust tests check this through the CLI's net tcp, which
-// fails an upload whose end the web server reset. The client never closes
-// its side, so only a reset can close its connection.
+// The CLI's net tcp fails an upload whose end the web server reset. The
+// client never closes its side, so only a reset can close its connection.
 func TestDataSentAfterTheWebServerClosedIsAnsweredWithAReset(t *testing.T) {
 	t.Parallel()
 	network := connectNetwork(t, fastConfig())
@@ -457,11 +456,10 @@ func TestAClientThatHangsUpWithoutCloseNotifyIsStillToldGoodbye(t *testing.T) {
 	}
 }
 
-// Go only, for a rule of Rust's that its tests leave out: the server
-// closes the connection only once the rest of the echo and its
-// close_notify have gone, as Rust's is_finished waits until rustls has
-// nothing left to write. The client hangs up as soon as its records are on
-// the connection, with most of the echo still to come.
+// The server closes the connection only once the rest of the echo and its
+// close_notify have gone: the session is finished only when it has nothing
+// left to write. The client hangs up as soon as its records are on the
+// connection, with most of the echo still to come.
 func TestAClientThatHangsUpStillGetsTheRestOfItsEchoBeforeTheGoodbye(t *testing.T) {
 	t.Parallel()
 	network := connectNetwork(t, fastConfig())
@@ -505,10 +503,10 @@ func TestThePublishedKeyHashIsThatOfTheBundledCertificate(t *testing.T) {
 	}
 }
 
-// Go only: a TLS session runs in a goroutine of its own, which must end
-// when the session would end in Rust, with the internet it belongs to or
-// with the connection the internet forgets. These tests count the
-// goroutines of the whole test binary, so none runs in parallel.
+// A TLS session runs in a goroutine of its own, which must end when the
+// session ends: with the internet it belongs to, or with the connection the
+// internet forgets. These tests count the goroutines of the whole test
+// binary, so none runs in parallel.
 
 func TestATLSSessionEndsWhenTheNetworkDropsTheCall(t *testing.T) {
 	network := connectNetwork(t, fastConfig())

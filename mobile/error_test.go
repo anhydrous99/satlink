@@ -397,7 +397,7 @@ func TestEveryKindHasItsMessage(t *testing.T) {
 		{SatlinkError{Kind: SatlinkErrorInvalidArgument, Reason: "maxLen must be at least 1"}, "invalid argument: maxLen must be at least 1"},
 		{SatlinkError{Kind: SatlinkErrorPolicyDenied, Destination: "echo.test:0"}, "echo.test:0 is not allowed by the link settings"},
 		{SatlinkError{Kind: SatlinkErrorInvalidHost, Host: "1.2.3"}, `"1.2.3" is not a valid host name`},
-		// Rust's {:?} of a str, where Go's %q would write "a\fb".
+		// A form feed is escaped as \u{c}, where Go's %q would write "a\fb".
 		{SatlinkError{Kind: SatlinkErrorInvalidHost, Host: "a\fb"}, `"a\u{c}b" is not a valid host name`},
 		{SatlinkError{Kind: SatlinkErrorNameNotFound, Host: "nowhere.test"}, "no address found for nowhere.test"},
 		{SatlinkError{Kind: SatlinkErrorNoDNSServer}, "the link has no DNS server"},

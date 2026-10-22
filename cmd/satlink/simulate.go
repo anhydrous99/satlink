@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -56,7 +56,7 @@ func (s *simulation) Set(name string) error {
 			return nil
 		}
 	}
-	return errors.New(rustdebug.Quote(name) + " is not a simulated link")
+	return errors.New(debugtext.Quote(name) + " is not a simulated link")
 }
 
 // config returns the simulated handset's configuration — the default one,

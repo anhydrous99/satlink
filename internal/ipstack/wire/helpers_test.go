@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// The addresses smoltcp's TCP and UDP tests send segments between.
+// The addresses the TCP and UDP tests send segments between.
 var (
 	testSrcAddr = netip.MustParseAddr("192.168.1.1")
 	testDstAddr = netip.MustParseAddr("192.168.1.2")
@@ -62,8 +62,8 @@ func expectPanicWith(t *testing.T, message string, action func()) {
 	}
 }
 
-// filled returns a buffer of length octets, each set to octet: smoltcp's
-// tests emit into buffers filled with 0xa5 to show that every octet is
+// filled returns a buffer of length octets, each set to octet. The tests
+// emit into buffers filled with 0xa5 to show that every octet is
 // written.
 func filled(length int, octet byte) []byte {
 	buffer := make([]byte, length)

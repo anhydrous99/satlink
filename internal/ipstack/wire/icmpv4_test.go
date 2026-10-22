@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// icmpv4EchoPacketBytes is smoltcp's ECHO_PACKET_BYTES: an echo request.
+// icmpv4EchoPacketBytes is an echo request.
 func icmpv4EchoPacketBytes() []byte {
 	return []byte{0x08, 0x00, 0x8e, 0xfe, 0x12, 0x34, 0xab, 0xcd, 0xaa, 0x00, 0x00, 0xff}
 }
@@ -52,7 +52,6 @@ func icmpv4PortUnreachableRepr() ICMPv4Repr {
 	}
 }
 
-// Ported from smoltcp's wire/icmpv4.rs test_echo_deconstruct.
 func TestICMPv4PacketEchoDeconstruct(t *testing.T) {
 	t.Parallel()
 	packet := ICMPv4Packet(icmpv4EchoPacketBytes())
@@ -70,7 +69,6 @@ func TestICMPv4PacketEchoDeconstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/icmpv4.rs test_echo_construct.
 func TestICMPv4PacketEchoConstruct(t *testing.T) {
 	t.Parallel()
 	packet := ICMPv4Packet(filled(12, 0xa5))
@@ -87,7 +85,6 @@ func TestICMPv4PacketEchoConstruct(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/icmpv4.rs test_echo_parse.
 func TestICMPv4ReprEchoParse(t *testing.T) {
 	t.Parallel()
 	repr, err := ParseICMPv4Repr(ICMPv4Packet(icmpv4EchoPacketBytes()), ChecksumCapabilities{})
@@ -97,7 +94,6 @@ func TestICMPv4ReprEchoParse(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/icmpv4.rs test_echo_emit.
 func TestICMPv4ReprEchoEmit(t *testing.T) {
 	t.Parallel()
 	repr := icmpv4EchoPacketRepr()
@@ -110,7 +106,6 @@ func TestICMPv4ReprEchoEmit(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/icmpv4.rs test_check_len.
 func TestICMPv4PacketCheckLen(t *testing.T) {
 	t.Parallel()
 	buffer := []byte{0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -200,7 +195,7 @@ func TestICMPv4ReprEmitQuotesTheFullLengthOfTheDatagram(t *testing.T) {
 		t.Errorf("quoted total length %d, checksums %v %v; want 1020 and both correct",
 			quoted.TotalLen(), quoted.VerifyChecksum(), packet.VerifyChecksum())
 	}
-	// smoltcp parses only a quote that holds everything its header
+	// The parser accepts only a quote that holds everything its header
 	// announces, so it cannot read such an error back.
 	if _, err := ParseICMPv4Repr(packet, ChecksumCapabilities{}); !errors.Is(err, ErrMalformed) {
 		t.Errorf("ParseICMPv4Repr = %v, want ErrMalformed", err)

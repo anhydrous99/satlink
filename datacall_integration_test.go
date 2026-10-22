@@ -102,7 +102,7 @@ func plusSigns(transport *scripted) int {
 
 // assertCallMayStillBeUp fails the test unless err says whether the call
 // may still be up as want does: through its sentinel, and in the field of
-// its *satlink.Error, the Rust version's CallFailure.call_may_still_be_up.
+// its *satlink.Error, the CallMayStillBeUp field.
 func assertCallMayStillBeUp(t *testing.T, err error, want bool) {
 	t.Helper()
 	if got := errors.Is(err, satlink.ErrCallMayStillBeUp); got != want {
@@ -430,7 +430,7 @@ func TestAHandsetStillRelayingDataAfterDTRDropsIsReportedPromptly(t *testing.T) 
 	if elapsed := time.Since(started); elapsed >= 4*time.Second {
 		t.Errorf("EndDataCall took %v, want under 4s", elapsed)
 	}
-	// Go only: two seconds of data after the drop show that it changed
+	// Two seconds of data after the drop show that it changed
 	// nothing, and end the hang-up: no ATH goes out to wait for an answer
 	// that a handset still online never gives.
 	if !transport.dtrDropped {
@@ -517,7 +517,7 @@ func TestAHangUpWithoutACommandDeadlineStillReachesTheDTRDrop(t *testing.T) {
 }
 
 func TestAnUnansweredATHAfterAConfirmedEscapeStillReachesTheDTRDrop(t *testing.T) {
-	// Go only. Slow — ten seconds for ATH's answer — but timing-insensitive.
+	// Slow — ten seconds for ATH's answer — but timing-insensitive.
 	t.Parallel()
 	// The escape is confirmed, but ATH goes unanswered: without a command
 	// deadline, only the ten-second cap on ATH's wait lets the DTR drop end
@@ -544,8 +544,8 @@ func TestAnUnansweredATHAfterAConfirmedEscapeStillReachesTheDTRDrop(t *testing.T
 }
 
 func TestAnErrorPassedOnKeepsACallThatMayStillBeUp(t *testing.T) {
-	// Rust's `?` turns the failure into Error::CallMayStillBeUp; a Go error
-	// passed on keeps saying so, even wrapped.
+	// An error passed on keeps saying that the call may still be up, even
+	// wrapped.
 	transport := newScripted(dialStep(connectReply))
 	call := mustDial(t, newTestHandset(transport), callSettings())
 	closeCall := func(call *satlink.DataCall) error {
@@ -686,7 +686,7 @@ func TestALateAnswerToATimedOutCommandDoesNotPassForATAs(t *testing.T) {
 	assertAllPlayed(t, transport)
 }
 
-// The tests below are Go only: they cover what the Rust tests leave out.
+// The tests below cover the escape's guard of silence.
 
 func TestTheEscapeKeepsTheSettingsGuardOfSilence(t *testing.T) {
 	// Slow — two guards longer than the default — but timing-insensitive.
@@ -995,7 +995,7 @@ func TestEndDataCallRefusesAGuardBeyondAnyHandsets(t *testing.T) {
 }
 
 func TestEndDataCallThatFailsSaysTheCallMayStillBeUp(t *testing.T) {
-	// Go only: the flag says what the Rust version's doc says of every
+	// The flag says what the CallMayStillBeUp field's doc says of every
 	// error. Deaf to the escape, to ATH and to DTR, the handset may still be
 	// in the call.
 	transport := newScripted()

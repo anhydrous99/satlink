@@ -94,8 +94,7 @@ type LinkSettings struct {
 	CloseGraceSeconds int64
 
 	// mu guards allowRules and hosts: the app may add to them from one
-	// thread while another hands the settings to a call, which the Rust
-	// bindings' records, copied as they crossed into the library, allowed.
+	// thread while another hands the settings to a call, which copies them.
 	mu         sync.Mutex
 	allowRules []string
 	hosts      map[string]string
@@ -166,8 +165,8 @@ type LinkState struct {
 	Reason *LinkCloseReason
 }
 
-// LinkStatus is a snapshot of a link. Its State and DNSServers are never
-// nil.
+// LinkStatus reports a link at one moment. Its State and DNSServers are
+// never nil.
 type LinkStatus struct {
 	// State is where the link is in its life.
 	State *LinkState
@@ -319,8 +318,8 @@ func establishOwnLink(handset *satlink.Handset, config satnet.Config, listener L
 // listener, if not nil, hearing every change of its state.
 func startLink(established *satnet.Link, listener LinkListener) *SatelliteLink {
 	watcher := established.Watcher()
-	// The Rust bindings start the listener's thread before dialling, so that
-	// failing to start it costs no airtime; starting a goroutine cannot fail.
+	// The listener's goroutine starts before dialling, so that failing to start
+	// it costs no airtime; starting a goroutine cannot fail.
 	if listener != nil {
 		// The goroutine holds the watcher alone, never the link, so that a
 		// link the app drops still hangs up.
@@ -474,8 +473,7 @@ func (l *SatelliteLink) Close() (err error) {
 const highestPort = 1<<16 - 1
 
 // portOf returns port as a link's port number, refusing what no port
-// number can be. Port 0 is left for the policy to refuse, as the Rust
-// bindings' u16 left it.
+// number can be. Port 0 is left for the policy to refuse.
 func portOf(port int) (uint16, error) {
 	if port < 0 || port > highestPort {
 		return 0, invalidArgument("port must be between 0 and 65535")

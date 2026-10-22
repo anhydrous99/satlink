@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Go-only tests of the endpoint's exported API: the names and texts of its
+// Tests of the endpoint's exported API: the names and texts of its
 // values, how they compare, and what it hands out — IPv4 settings,
 // datagrams, output and statistics.
 
@@ -56,7 +56,7 @@ func TestDownReasonKindsAreNamed(t *testing.T) {
 	}
 }
 
-func TestDownReasonsReadAsRustDisplaysThem(t *testing.T) {
+func TestDownReasonsStringMessages(t *testing.T) {
 	tests := []struct {
 		reason DownReason
 		want   string

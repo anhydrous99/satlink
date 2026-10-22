@@ -17,11 +17,11 @@ import (
 	"github.com/anhydrous99/satlink/sim"
 )
 
-// Go only: whatever panics in the link's driver, the link reports itself
+// Whatever panics in the link's driver, the link reports itself
 // closed, the handset is released, and the process is kept alive; a call
-// that a panic kept from being hung up is still hung up. Rust's driver
-// thread, unwinding, dropped the transport, whose DTR drop ended the call;
-// here the transport stays with the app, so the driver must hang up itself.
+// that a panic kept from being hung up is still hung up. Unwinding the
+// driver would drop the transport, whose DTR drop ends the call; here the
+// transport stays with the app, so the driver must hang up itself.
 // A hang-up that itself panics cannot be run again: the core pulses DTR as
 // the panic leaves it, which ends the call after AT&D2, but nothing confirms
 // that, so the link reports that the call may still be up — for the app to
@@ -329,8 +329,8 @@ func TestAHangUpThatPanicsAfterAnEarlierPanicSparesTheProcess(t *testing.T) {
 	expectThePanickedDriversError(t, err)
 	expectClosed(t, link.Watcher(), satnet.CloseReasonRequested)
 	expectNotBusy(t, handset)
-	// Go only, as in TestAPanicWhileHangingUpStillReportsTheLinkClosed: the
-	// core pulsed DTR as the panic left the hang-up, which ended the call.
+	// As in TestAPanicWhileHangingUpStillReportsTheLinkClosed, the core pulsed
+	// DTR as the panic left the hang-up, which ended the call.
 	if faulty.DTRDrops() < 1 || control.Stats().InDataCall {
 		t.Errorf("DTR dropped %d times, and the call still up: %t; want the pulse to have ended the call",
 			faulty.DTRDrops(), control.Stats().InDataCall)

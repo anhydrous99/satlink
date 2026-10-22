@@ -249,12 +249,11 @@ func (s *Socket) locateReceiveWindow(a *arrival) {
 		a.windowEnd = lastAck.Add(int(s.remoteLastWindow) << s.remoteWindowShift)
 	}
 	// A SYN announces its window unscaled, yet the socket reads every window
-	// it sent with its own scale, as smoltcp does. With a receive buffer that
-	// needs a scale, the window of its SYN therefore reaches beyond the buffer
-	// until the socket sends its next segment. smoltcp takes data up to there,
-	// and queuing it panics or hands the application octets the peer never
-	// sent; the port takes no more than the buffer can hold
-	// (PORTING-ipstack.md, section 9).
+	// it sent with its own scale. With a receive buffer that needs a scale, the
+	// window of its SYN therefore reaches beyond the buffer until the socket
+	// sends its next segment. Taking data up to there would panic or hand the
+	// application octets the peer never sent, so the socket takes no more than
+	// the buffer can hold.
 	if bufferEnd := a.windowStart.Add(s.receiveBuffer.Window()); a.windowEnd.Compare(bufferEnd) > 0 {
 		a.windowEnd = bufferEnd
 	}
@@ -338,10 +337,9 @@ func (a *arrival) emptySegmentInWindow() bool {
 // the acceptability tests, which compare modulo 2³², take a segment that
 // starts or ends 2³¹ − 1 or 2³¹ after the window's start for one inside it:
 // those numbers lie 2³¹ from the window's end or its start, and of two
-// numbers 2³¹ apart, each compares as before the other. smoltcp then panics,
-// places the segment's data far beyond the receive buffer, or takes a RST
-// from there and ends the connection; the port refuses the segment
-// (PORTING-ipstack.md, section 9).
+// numbers 2³¹ apart, each compares as before the other. Accepting such a
+// segment would panic, place its data far beyond the receive buffer, or take a
+// RST from there and end the connection, so the socket refuses it.
 func (a *arrival) windowEndsBeforeItStarts() bool {
 	return a.windowEnd.Compare(a.windowStart) < 0
 }
@@ -445,14 +443,13 @@ func (s *Socket) effectiveControl(a *arrival) wire.TCPControl {
 		return wire.TCPControlNone
 	case a.windowEnd.Compare(a.segmentEnd()) < 0 && s.takesFIN():
 		// trimToReceiveWindow took the segment's data only up to the window's
-		// end, and the FIN follows the octets it cut off. smoltcp takes the
-		// FIN anyway, ending the stream early and acknowledging the first
-		// octet cut off as delivered; RFC 9293 (3.10.7.4) trims a segment to
-		// the window "including SYN and FIN" (PORTING-ipstack.md, section 9).
-		// The peer sends the FIN again with the rest of its data. A FIN right
-		// at the window's end is still taken: it needs no room in the buffer
-		// (smoltcp's test_zero_window_fin). A state that takes no FIN keeps
-		// it, and transition drops the segment whole, as smoltcp does.
+		// end, and the FIN follows the octets it cut off. Taking the FIN anyway
+		// would end the stream early and acknowledge the first octet cut off as
+		// delivered; RFC 9293 (3.10.7.4) trims a segment to the window
+		// "including SYN and FIN". The peer sends the FIN again with the rest of
+		// its data. A FIN right at the window's end is still taken: it needs no
+		// room in the buffer. A state that takes no FIN keeps it, and transition
+		// drops the segment whole.
 		netlog.Trace("ignoring FIN because its data was cut at the receive window's end",
 			"window_end", a.windowEnd, "segment_end", a.segmentEnd())
 		return wire.TCPControlNone

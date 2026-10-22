@@ -122,9 +122,9 @@ type repeatKey struct {
 	fin             bool
 	acknowledgement wire.Optional[int32]
 	window          uint16
-	// message is the whole DNS message (repeatDNS). Rust keeps a hash of
-	// it; a string keeps the key comparable and exact, for a few hundred
-	// bytes per remembered query.
+	// message is the whole DNS message (repeatDNS). A string rather than a
+	// hash keeps the key comparable and exact, for a few hundred bytes per
+	// remembered query.
 	message string
 }
 
@@ -203,8 +203,8 @@ func dnsRepeatKey(destination netip.Addr, payload []byte) (repeatKey, bool) {
 	}, true
 }
 
-// String describes the packet the key identifies, for the log, as Rust's
-// Debug does (with the DNS message's length in place of its hash).
+// String describes the packet the key identifies, for the log. A DNS query
+// is described by the length of its message rather than the message.
 func (k repeatKey) String() string {
 	if k.kind == repeatDNS {
 		return fmt.Sprintf("Dns { source_port: %d, destination: %v, message_len: %d }",

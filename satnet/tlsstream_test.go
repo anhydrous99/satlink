@@ -418,10 +418,9 @@ func servePeerStoppingAfterItsFlight(t *testing.T, tcp *fakeTCP, config *tls.Con
 	return stopped
 }
 
-// TestAHandshakeWhoseFinishedCannotLeaveInTimeFails is Go only. As Rust's
-// connect does, the handshake fails when the client's last flight, its
-// Finished among it, cannot leave by the deadline: the server has yet to
-// finish its handshake.
+// TestAHandshakeWhoseFinishedCannotLeaveInTimeFails checks that the handshake
+// fails when the client's last flight, its Finished among it, cannot leave by
+// the deadline: the server has yet to finish its handshake.
 func TestAHandshakeWhoseFinishedCannotLeaveInTimeFails(t *testing.T) {
 	fixture := newTLSFixture(t)
 	tcp := newFakeTCP(trickleSendRoom)
@@ -742,8 +741,8 @@ func TestAFailedSessionReportsWhyOnEveryCall(t *testing.T) {
 			t.Errorf("%s = %v, want the first failure %v", name, err, failure)
 		}
 	}
-	// Last, as it makes the other calls fail with net.ErrClosed: as in Rust,
-	// a failed session gets no close_notify.
+	// Last, as it makes the other calls fail with net.ErrClosed: a failed
+	// session gets no close_notify.
 	sentBefore := peer.tcp.waitingForServer()
 	if err := conn.Close(); err != failure {
 		t.Errorf("Close = %v, want the first failure %v", err, failure)
@@ -975,10 +974,10 @@ func TestAWriteAfterCloseWriteIsRefusedAsTCPRefusesOneWithoutFailingTheSession(t
 	readExactly(t, conn, []byte("goodbye"))
 }
 
-// TestAFailedSessionStillSaysWhyOnceTheConnectionEnded is the Rust unit test
-// over the fake transport: the session fails on a record no server would
-// send, as when a forged record arrives, and the server then hangs up. The
-// end of the connection must not hide why the session failed.
+// TestAFailedSessionStillSaysWhyOnceTheConnectionEnded checks, over the fake
+// transport, that the session fails on a record no server would send, as when
+// a forged record arrives, and the server then hangs up. The end of the
+// connection must not hide why the session failed.
 func TestAFailedSessionStillSaysWhyOnceTheConnectionEnded(t *testing.T) {
 	fixture := newTLSFixture(t)
 	peer := servePeer(t, fixture.server, func(peer *tlsPeer) {
@@ -1147,7 +1146,7 @@ func TestDataTakenInBeforeTheSessionFailedIsReadFirst(t *testing.T) {
 
 	read, err := conn.Read(buffer)
 
-	// As Rust's receive_until reads what was decrypted before anything else.
+	// What was decrypted is read before anything else.
 	if err != nil || string(buffer[:read]) != "authentic" {
 		t.Errorf("Read = %q, %v; want what arrived intact before the failure", buffer[:read], err)
 	}
@@ -1187,8 +1186,8 @@ func TestASessionClosedWithoutReadingStillLetsTheNextResume(t *testing.T) {
 	}
 }
 
-// TestASessionResumesWhateverTheCaseOfItsServerName is Go only: rustls finds
-// a session for a server name whatever the ASCII case of either.
+// TestASessionResumesWhateverTheCaseOfItsServerName checks that a session is
+// found for a server name whatever the ASCII case of either.
 func TestASessionResumesWhateverTheCaseOfItsServerName(t *testing.T) {
 	for _, names := range []struct{ first, then string }{
 		{"TLS.Test", tlsTestHost},

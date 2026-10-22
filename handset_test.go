@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Go only: the names the Rust CLI printed with {:?}, and the rules the
-// handset applies to commands, numbers and the waits of a hang-up.
+// The names of the statuses, and the rules the handset applies to commands,
+// numbers and the waits of a hang-up.
 
 func TestStatusNames(t *testing.T) {
 	tests := []struct {
@@ -79,10 +79,10 @@ func TestDialableNumbers(t *testing.T) {
 	}
 }
 
-func TestARefusedNumberIsQuotedAsTheRustVersionQuotedIt(t *testing.T) {
+func TestARefusedNumberQuotesControlCharacters(t *testing.T) {
 	err := validateNumber("1\v2")
 
-	// Rust's {:?} of a str, where Go's %q would write "1\v2".
+	// Control characters are escaped as \u{b}, not as \v.
 	if want := `invalid argument: "1\u{b}2" is not a dialable number`; err == nil || err.Error() != want {
 		t.Errorf("validateNumber = %v, want %s", err, want)
 	}

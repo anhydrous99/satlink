@@ -8,8 +8,7 @@ import (
 )
 
 // AssemblerMaxSegmentCount is how many separate runs of data an Assembler
-// tracks: smoltcp's ASSEMBLER_MAX_SEGMENT_COUNT default, which the workspace
-// keeps. Out-of-order data that would need a further run is dropped, and the
+// tracks. Out-of-order data that would need a further run is dropped, and the
 // peer sends it again.
 const AssemblerMaxSegmentCount = 4
 
@@ -127,7 +126,7 @@ func (a *Assembler) DataRanges() iter.Seq2[int, int] {
 	}
 }
 
-// String formats the runs as smoltcp does: holes in parentheses and data
+// String formats the runs: holes in parentheses and data
 // lengths, as in "[ 100 (200) 100 ]".
 func (a *Assembler) String() string {
 	var text strings.Builder
@@ -220,7 +219,7 @@ func (c contig) withHoleOf(size int) contig {
 	return contig{holeSize: size, dataSize: c.totalSize() - size}
 }
 
-// String formats the contig as smoltcp does: the hole in parentheses, then
+// String formats the contig: the hole in parentheses, then
 // the data length.
 func (c contig) String() string {
 	var parts []string

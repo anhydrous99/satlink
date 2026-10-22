@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
@@ -90,7 +90,7 @@ func newZone(hosts []HostAddress) zone {
 func checkHosts(hosts []HostAddress) error {
 	for _, host := range hosts {
 		if !host.Address.Is4() {
-			return errors.New(rustdebug.Quote(host.Name) + " in hosts needs an IPv4 address")
+			return errors.New(debugtext.Quote(host.Name) + " in hosts needs an IPv4 address")
 		}
 	}
 	return nil

@@ -49,9 +49,8 @@ func (s *Socket) scaledWindow() uint16 {
 // Nothing is left of that window once the peer's sequence numbers reach past
 // its end. That happens when a peer's SYN reaches a connecting socket before
 // the socket's own SYN has announced a window, or answers a SYN announcing a
-// zero window (a socket without a receive buffer). smoltcp's subtraction
-// underflows and panics then, where the port returns 0 (PORTING-ipstack.md,
-// section 9).
+// zero window (a socket without a receive buffer). The subtraction would
+// underflow and panic then, so the socket returns 0 instead.
 func (s *Socket) lastScaledWindow() (uint16, bool) {
 	lastAck, ok := s.remoteLastAck.Get()
 	if !ok {

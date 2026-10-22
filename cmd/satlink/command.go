@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The tree of commands, as the Rust version declared it with clap. clap's
-// interface is what users of the Rust version knew — where an option may
+// The tree of commands, as clap declares it. clap's interface is what users of
+// satlink rely on — where an option may
 // stand, which token is a value, the help pages, the errors — and cobra and
 // its flag library differ from it in all of these. So the command line is
 // read, documented and checked as clap did it (commandline.go, help.go,

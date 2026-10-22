@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestUnsignedNumbersAreReadAsRustReadsAU64(t *testing.T) {
+func TestUnsignedNumbersAreReadAsU64s(t *testing.T) {
 	tests := []struct {
 		text string
 		want uint64
@@ -33,7 +33,7 @@ func TestUnsignedNumbersAreReadAsRustReadsAU64(t *testing.T) {
 	}
 }
 
-func TestSignedNumbersAreReadAsRustReadsAnI64(t *testing.T) {
+func TestSignedNumbersAreReadAsI64s(t *testing.T) {
 	tests := []struct {
 		text string
 		want int64

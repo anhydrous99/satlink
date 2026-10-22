@@ -37,16 +37,15 @@ func IsBroadcast(addr netip.Addr) bool {
 }
 
 // IsUnicast reports whether addr is an IPv4 address that a single host can
-// have: neither broadcast, multicast nor unspecified (smoltcp's
-// x_is_unicast). Non-IPv4 addresses are never unicast here.
+// have: neither broadcast, multicast nor unspecified. Non-IPv4 addresses are
+// never unicast here.
 func IsUnicast(addr netip.Addr) bool {
 	return addr.Is4() && !IsBroadcast(addr) && !addr.IsMulticast() && !addr.IsUnspecified()
 }
 
 // SubnetBroadcast returns the broadcast address of the IPv4 network prefix
-// belongs to, and false for /31 and /32 networks, which have none
-// (smoltcp's Ipv4Cidr::broadcast), and for a prefix that is not a valid IPv4
-// one. The prefix's address need not be masked.
+// belongs to, and false for /31 and /32 networks, which have none, and for a
+// prefix that is not a valid IPv4 one. The prefix's address need not be masked.
 func SubnetBroadcast(prefix netip.Prefix) (netip.Addr, bool) {
 	if !prefix.Addr().Is4() || !prefix.IsValid() || prefix.Bits() >= pointToPointPrefixLen {
 		return netip.Addr{}, false
@@ -323,8 +322,7 @@ func (p IPv4Packet) setFlag(flag uint16, value bool) {
 }
 
 // IPv4Repr is a high-level representation of an IPv4 header: everything the
-// stack reads from or writes into one. The field names are smoltcp's, which
-// it shares with IPv6.
+// stack reads from or writes into one.
 type IPv4Repr struct {
 	// SrcAddr is the source address, an IPv4 address (Is4).
 	SrcAddr netip.Addr
@@ -410,7 +408,7 @@ func (r IPv4Repr) Emit(packet IPv4Packet, checksums ChecksumCapabilities) {
 	}
 }
 
-// String formats the header as smoltcp does: "IPv4 src=… dst=… proto=…".
+// String formats the header as "IPv4 src=… dst=… proto=…".
 func (r IPv4Repr) String() string {
 	return fmt.Sprintf("IPv4 src=%v dst=%v proto=%v", r.SrcAddr, r.DstAddr, r.NextHeader)
 }

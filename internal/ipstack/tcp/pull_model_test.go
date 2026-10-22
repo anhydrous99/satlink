@@ -1,8 +1,7 @@
 package tcp
 
-// Go-specific tests of the pull model: what Dispatch leaves undone when emit
-// refuses a segment, and what it keeps (EmitFunc; PORTING-ipstack.md,
-// section 5, contract 3).
+// Tests of the pull model: what Dispatch leaves undone when emit refuses a
+// segment, and what it keeps.
 
 import (
 	"bytes"

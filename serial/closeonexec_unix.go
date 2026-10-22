@@ -10,8 +10,8 @@ import (
 )
 
 // openCloseOnExec opens the port as go.bug.st/serial's Open does, then marks
-// its descriptors close-on-exec, as the Rust version's serial library opens
-// them (O_CLOEXEC). The library opens without it, and so every child process
+// its descriptors close-on-exec (O_CLOEXEC). The library opens without it,
+// and so every child process
 // started while the port is open — through os/exec, say — would inherit it:
 // a tty hangs up, dropping DTR, only on its last close, so a call would stay
 // up, billing, as long as such a child lives, Close and a crash of the

@@ -1,14 +1,14 @@
 // Package wire reads and writes the packets the stack speaks: IPv4, TCP, UDP,
-// ICMPv4 and DNS. It is a port of the parts of smoltcp's wire module that the
-// enabled feature set compiles (see the ipstack package documentation).
+// ICMPv4 and DNS. It follows the design of smoltcp's wire module (see the
+// ipstack package documentation).
 //
-// It works on two levels, as smoltcp does.
+// It works on two levels.
 //
 // The packet level gives structured access to the octets of a packet without
 // judging their content: IPv4Packet, TCPPacket, UDPPacket, ICMPv4Packet and
 // DNSPacket are byte slices with accessors and setters for every header field.
-// Converting a slice, as in IPv4Packet(buffer), is smoltcp's new_unchecked;
-// the New… constructors are its new_checked and validate the length fields.
+// Converting a slice, as in IPv4Packet(buffer), does not check the buffer;
+// the New… constructors do, and validate the length fields.
 // When parsing untrusted input, always use a New… constructor (or CheckLen):
 // once it has succeeded, no accessor panics as long as the buffer is not
 // changed. When emitting, use the conversion on a buffer of exactly the length
@@ -35,19 +35,20 @@
 // checksum) panic unless it is IPv4. The sockets refuse other addresses
 // where they enter the stack, so nothing the stack builds reaches that panic.
 // Endpoints are netip.AddrPort values, and ListenEndpoint is an endpoint
-// whose address may be left open. Header field names follow smoltcp and the
-// RFCs (SrcAddr, DstPort, HopLimit…).
+// whose address may be left open. Header field names follow the RFCs
+// (SrcAddr, DstPort, HopLimit…).
 //
 // Optional header fields whose zero value is meaningful, such as an
 // acknowledgement number or a window scale of 0, are Optional values.
 //
 // IPv4Repr and TCPRepr have HeaderLen (the header) and BufferLen (header and
-// payload); smoltcp's Ipv4Repr::buffer_len is the header length only.
+// payload); unlike smoltcp's Ipv4Repr::buffer_len, which is the header length
+// only.
 // UDPRepr has only HeaderLen, as its payload travels beside it. ICMPv4Repr,
 // DNSRepr and DNSQuestion have only BufferLen, the length of everything they
 // emit.
 //
-// Parsing logs, as smoltcp does, a TCP window scale above 14 and a SACK
+// Parsing logs a TCP window scale above 14 and a SACK
 // option with more than three blocks, at debug level with the "pkg"
 // attribute "ipstack".
 //

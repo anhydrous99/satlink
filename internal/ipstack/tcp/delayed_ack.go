@@ -21,8 +21,7 @@ const (
 )
 
 // ackDelayTimer holds back segments that would carry only an ACK or a window
-// update, hoping the ACK can ride on outgoing data instead: smoltcp's
-// AckDelayTimer. The zero ackDelayTimer is idle.
+// update, hoping the ACK can ride on outgoing data instead. The zero ackDelayTimer is idle.
 type ackDelayTimer struct {
 	kind ackDelayTimerKind
 	// expiresAt is when a waiting timer lets its ACK go.

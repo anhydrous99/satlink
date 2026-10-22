@@ -1,9 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for Nagle's algorithm
-// (src/socket/tcp.rs, lines 9358-9483).
-// test_nagle_works_with_reduced_payload_from_options is not ported: it needs
-// the omitted TCP timestamp generator (PORTING-ipstack.md, sections 3 and 6).
+// Tests of Nagle's algorithm.
 
 import (
 	"testing"

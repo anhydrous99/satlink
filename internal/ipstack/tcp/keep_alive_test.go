@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for keep-alive (src/socket/tcp.rs,
-// lines 8745-8822).
+// Tests of keep-alive.
 
 import (
 	"testing"

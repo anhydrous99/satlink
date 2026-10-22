@@ -35,7 +35,7 @@ func TestErrorKindLabels(t *testing.T) {
 	}
 }
 
-func TestErrorTextsAreTheRustOnes(t *testing.T) {
+func TestErrorTexts(t *testing.T) {
 	tests := []struct {
 		err  *Error
 		want string
@@ -45,7 +45,7 @@ func TestErrorTextsAreTheRustOnes(t *testing.T) {
 		{&Error{Kind: ErrTransport, Message: "read", Err: io.EOF}, "transport error: read: EOF"},
 		{&Error{Kind: ErrTimeout, Command: "AT+CSQ"}, `timed out waiting for a response to "AT+CSQ"`},
 		{&Error{Kind: ErrCommandFailed, Command: "AT+BOGUS"}, `handset returned ERROR for "AT+BOGUS"`},
-		// Rust's {:?} of a str, where Go's %q would write "AT\a" and "AT\x01".
+		// Control characters are escaped as \u{7} and \u{1}, not as \a and \x01.
 		{&Error{Kind: ErrTimeout, Command: "AT\a"}, `timed out waiting for a response to "AT\u{7}"`},
 		{&Error{Kind: ErrCommandFailed, Command: "AT\x01"}, `handset returned ERROR for "AT\u{1}"`},
 		{&Error{Kind: ErrEquipment, Code: "SIM not inserted"}, "+CME ERROR: SIM not inserted"},

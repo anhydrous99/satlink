@@ -82,7 +82,7 @@ func TestCertificatesThatDoNotParseAreATLSError(t *testing.T) {
 	}
 }
 
-func TestTLSSettingsAreCheckedInTheRustVersionsOrder(t *testing.T) {
+func TestTLSSettingsAreCheckedInOrder(t *testing.T) {
 	tests := []struct {
 		name                     string
 		badPEM, badPin, noPublic bool

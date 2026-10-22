@@ -1,8 +1,6 @@
 package tcp
 
-// Go-specific tests (PORTING-ipstack.md, section 6) of what Dispatch sends,
-// and when, and of PollAt (segments.go, dispatch.go, transmit.go, timer.go,
-// delayed_ack.go, window.go).
+// Tests of what Dispatch sends, and when, and of PollAt.
 
 import (
 	"bytes"
@@ -18,10 +16,10 @@ import (
 // The handshake
 // =========================================================================
 
-// smoltcp's tests of a simultaneous open have the socket's SYN go out first.
+// In a simultaneous open the socket's SYN goes out first.
 // A peer's SYN that arrives before it, while the socket has announced no
-// window yet, makes smoltcp's poll_at panic (PORTING-ipstack.md, section 9);
-// the port answers it with its SYN|ACK at once.
+// window yet, would make poll_at panic; the socket answers it with its
+// SYN|ACK at once.
 func TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -53,9 +51,8 @@ func TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce(t *testing.T) {
 
 // A SYN|ACK that answers a SYN announcing a zero window, from a socket
 // without a receive buffer, leaves the receive window ending before it
-// starts, as an early SYN of the peer's does, and smoltcp's poll_at then
-// panics (PORTING-ipstack.md, section 9); the port acknowledges the SYN|ACK
-// at once.
+// starts, as an early SYN of the peer's does, and poll_at would then panic;
+// the socket acknowledges the SYN|ACK at once.
 func TestASYNACKToASocketWithoutAReceiveBufferIsAcknowledgedAtOnce(t *testing.T) {
 	t.Parallel()
 	s := socketConnectedWithoutAReceiveBuffer(t)
@@ -90,8 +87,8 @@ func TestLocalMSSFollowsTheIPMTU(t *testing.T) {
 	receive(t, s, dataFromLocal(0, data[:linkMSS]))
 }
 
-// smoltcp's tests compare the MSS the socket takes from the peer's SYN with
-// its DEFAULT_MSS and MIN_REMOTE_MSS: a peer whose SYN has no MSS option, or
+// The tests compare the MSS the socket takes from the peer's SYN with the
+// default and the minimum MSS: a peer whose SYN has no MSS option, or
 // an MSS of 0, gets segments of 536 octets, RFC 879's default, and one
 // announcing a tiny MSS gets segments of 48 octets.
 func TestSegmentsFollowThePeersMSS(t *testing.T) {
@@ -176,7 +173,7 @@ func TestRetransmissionsBackOffUpToSixtySeconds(t *testing.T) {
 
 // RFC 6298 (5.1) starts the retransmission timer with a segment only when it
 // is not running already, so that it expires an RTO after the oldest
-// unacknowledged data went out. smoltcp's tests send every segment before a
+// unacknowledged data went out. The tests send every segment before a
 // timeout at the same instant, where a timer restarted by each would expire
 // at the same time.
 func TestLaterDataDoesNotRestartTheRetransmissionTimer(t *testing.T) {
@@ -209,7 +206,7 @@ func TestRetransmittedDataIsNotTimed(t *testing.T) {
 	}
 }
 
-// smoltcp's test of the estimator only samples. Each acknowledgement of a
+// The estimator only samples. Each acknowledgement of a
 // timed segment ends that sample, so the next round trip is timed from a
 // segment of its own: the age of the connection does not grow the RTO. The
 // second round trip starts long after the first, as the smallest RTO, 1 s,
@@ -237,7 +234,7 @@ func TestEachRoundTripIsTimedFromItsOwnSegment(t *testing.T) {
 
 // An ACK of later data acknowledges the timed segment too, so it measures the
 // segment's round trip: a delayed ACK of two segments, as Linux sends in a
-// bulk transfer, measures the first. smoltcp's tests acknowledge exactly the
+// bulk transfer, measures the first. The tests acknowledge exactly the
 // end of the timed segment.
 func TestAnACKBeyondTheTimedSegmentMeasuresItsRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -312,8 +309,8 @@ func TestOnlyTheThirdDuplicateACKTriggersAFastRetransmission(t *testing.T) {
 
 // A fast retransmission of the last data queued ends it as its first
 // transmission did: with PSH while the socket is open, and with the FIN
-// once it has closed. smoltcp's tests of fast retransmission resend data
-// with more queued behind it, and quash PSH.
+// once it has closed. Fast retransmission resends data with more queued
+// behind it, and quashes PSH.
 func TestAFastRetransmissionOfTheLastDataEndsItAsItsFirstTransmissionDid(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -366,7 +363,7 @@ func TestZeroWindowProbesBackOffUpToSixtySeconds(t *testing.T) {
 // Data queued while the socket probes a closed window leaves the probes'
 // schedule alone: a send starts the probe timer only when the socket times
 // nothing else, so it neither makes a probe due at once nor resets the
-// backoff. smoltcp's tests queue data only before the window closes.
+// backoff. The tests queue data only before the window closes.
 func TestDataQueuedWhileProbingKeepsTheProbeSchedule(t *testing.T) {
 	t.Parallel()
 	s := socketProbingAClosedWindow(t)
@@ -381,7 +378,7 @@ func TestDataQueuedWhileProbingKeepsTheProbeSchedule(t *testing.T) {
 // A retransmission timeout leaves the timer idle even when nothing can be
 // sent again, as the peer's window has closed since the data went out, and
 // the idle timer times keep-alives again: the next one goes a whole interval
-// after the timeout, and draws an ACK that tells the window. smoltcp's tests
+// after the timeout, and draws an ACK that tells the window. The tests
 // of retransmission run without keep-alive.
 func TestKeepAliveResumesAfterARetransmissionTimeoutIntoAClosedWindow(t *testing.T) {
 	t.Parallel()
@@ -418,7 +415,7 @@ func TestSetKeepAliveArmsAnIdleTimerOnlyOnce(t *testing.T) {
 
 // Turning keep-alive off on a socket without it arms none: only turning it
 // on winds the timer up, with a keep-alive due at once, at the epoch, as
-// smoltcp's set_keep_alive does.
+// setting keep-alive does.
 func TestSetKeepAliveOffArmsNoKeepAlive(t *testing.T) {
 	t.Parallel()
 	for _, interval := range []time.Duration{0, -time.Second} {
@@ -434,8 +431,7 @@ func TestSetKeepAliveOffArmsNoKeepAlive(t *testing.T) {
 	}
 }
 
-// Turning keep-alive off leaves the timer alone, as smoltcp's set_keep_alive
-// does: a keep-alive already timed goes out on time, and only then is
+// Turning keep-alive off leaves the timer alone: a keep-alive already timed goes out on time, and only then is
 // keep-alive off.
 func TestTurningKeepAliveOffLetsTheKeepAliveAlreadyTimedGo(t *testing.T) {
 	t.Parallel()
@@ -499,7 +495,7 @@ func TestTimeoutAbortsAnIdleConnection(t *testing.T) {
 	}
 }
 
-// smoltcp's tests of TIME-WAIT compute its end from CLOSE_DELAY, or look a
+// The tests of TIME-WAIT compute its end from closeDelay, or look a
 // minute later: TIME-WAIT lasts 10 s.
 func TestTimeWaitLastsTenSeconds(t *testing.T) {
 	t.Parallel()
@@ -518,9 +514,8 @@ func TestTimeWaitLastsTenSeconds(t *testing.T) {
 // Acknowledgements and window updates
 // =========================================================================
 
-// smoltcp's own tests of delayed ACKs look a millisecond after the delay; the
-// ACK is due when the delay is over, not after (smoltcp's
-// AckDelayTimer::Waiting(t) => t <= timestamp).
+// The tests of delayed ACKs look a millisecond after the delay; the ACK is
+// due when the delay is over, not after.
 func TestDelayedACKIsDueWhenItExpires(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -580,7 +575,7 @@ func TestDelayedACKStopsWhenAnACKGoesOut(t *testing.T) {
 }
 
 // More data arriving while an ACK waits does not restart the delay: the ACK
-// of both goes when the delay the first started is over. smoltcp's tests
+// of both goes when the delay the first started is over. The tests
 // check only that enough data cuts the delay short.
 func TestMoreDataDoesNotRestartTheACKDelay(t *testing.T) {
 	t.Parallel()
@@ -609,7 +604,7 @@ func TestOutOfOrderDataStartsNoACKDelay(t *testing.T) {
 
 // Data that fills a gap advances the acknowledgement number, so it starts
 // the ACK delay, which the socket decides before the ACK that RFC 5681 asks
-// for goes out at once. That ACK leaves the delay running, as in smoltcp, so
+// for goes out at once. That ACK leaves the delay running, so
 // that the next data is acknowledged when the delay is over: less than a
 // whole delay after it arrived.
 func TestDataThatFillsAGapStartsAnACKDelayItsImmediateACKLeavesRunning(t *testing.T) {
@@ -626,7 +621,7 @@ func TestDataThatFillsAGapStartsAnACKDelayItsImmediateACKLeavesRunning(t *testin
 	receive(t, s.at(defaultACKDelay), ackFromLocal(7, defaultBufferLen-7))
 }
 
-// smoltcp sets PSH on the last segment of the buffered data only if it
+// PSH is set on the last segment of the buffered data only if it
 // carries data.
 func TestBareACKCarriesNoPSH(t *testing.T) {
 	t.Parallel()
@@ -642,7 +637,7 @@ func TestBareACKCarriesNoPSH(t *testing.T) {
 // field holds as the field's largest value, rather than the buffer's size
 // cut to 16 bits, which would announce a window closed or nearly so. That
 // holds for the ACKs Dispatch sends and for those that answer a segment at
-// once. smoltcp's test_syn_sent_syn_ack_no_window_scaling stops at the
+// once. The SYN-SENT test without window scaling stops at the
 // peer's SYN|ACK, before the socket announces any window.
 func TestALargeWindowSaturatesTheFieldForAPeerWithoutWindowScaling(t *testing.T) {
 	t.Parallel()
@@ -702,7 +697,7 @@ func TestWindowUpdateIsDueAtOnce(t *testing.T) {
 // With a receive buffer that needs a window scale, the socket compares the
 // window it would announce with the one it last announced in the field's
 // scaled units: a window that has doubled is announced at once, as without
-// scaling. smoltcp's tests of window updates use buffers that need no scale.
+// scaling. The tests of window updates use buffers that need no scale.
 func TestScaledWindowGrowthIsAnnouncedAtOnce(t *testing.T) {
 	t.Parallel()
 	// A buffer of 128 KiB needs a window scale of 2: the window field counts
@@ -765,14 +760,12 @@ func socketFinWait1WithItsFINSent(t *testing.T) *testSocket {
 	return s
 }
 
-// TestWindowGrowthIsNotAnnouncedAfterThePeersFIN checks what smoltcp's
-// test_close_wait_no_window_update and test_time_wait_no_window_update
-// (TestCloseWaitNoWindowUpdate and TestTimeWaitNoWindowUpdate, in
-// window_test.go) are about. Once the peer has sent its FIN it sends no more
-// data, so the socket announces no window update. In those tests the window
-// grows from 60 to 64 octets, which windowToUpdate would not announce in any
-// state, as it has not doubled; so they pass whatever the state, in smoltcp
-// too. Here the window grows from 4 to 64 octets.
+// TestWindowGrowthIsNotAnnouncedAfterThePeersFIN checks that, once the peer
+// has sent its FIN, the socket announces no window update: the peer sends no
+// more data. The window tests in window_test.go (TestCloseWaitNoWindowUpdate
+// and TestTimeWaitNoWindowUpdate) grow the window from 60 to 64 octets, which
+// has not doubled, so they pass whatever the state. Here the window grows from
+// 4 to 64 octets.
 func TestWindowGrowthIsNotAnnouncedAfterThePeersFIN(t *testing.T) {
 	t.Parallel()
 	// received is what the peer sends before its FIN: all but 4 octets of

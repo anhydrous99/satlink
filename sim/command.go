@@ -26,7 +26,7 @@ const (
 	bearerFields = 3
 )
 
-// Bit sizes of the numbers commands carry, as Rust's u8 and u32.
+// Bit sizes of the numbers commands carry.
 const (
 	bearerFieldBits = 8
 	smsIndexBits    = 32
@@ -350,8 +350,8 @@ func parseBearer(value string) (bearer, bool) {
 	return bearer{speed: parsed[0], name: parsed[1], connectionElement: parsed[2]}, true
 }
 
-// parseUnsigned parses a decimal number of at most bits bits as Rust's
-// unsigned FromStr does: digits after an optional '+', nothing else.
+// parseUnsigned parses a decimal number of at most bits bits: digits after
+// an optional '+', nothing else.
 func parseUnsigned(text string, bits int) (uint64, bool) {
 	number, err := strconv.ParseUint(strings.TrimPrefix(text, "+"), 10, bits)
 	return number, err == nil
@@ -390,8 +390,7 @@ func isDialable(number string) bool {
 	return digits != "" && strings.Trim(digits, "0123456789*#") == ""
 }
 
-// acceptedIf returns parsed when ok, and no command otherwise, as Rust's
-// bool::then does.
+// acceptedIf returns parsed when ok, and no command otherwise.
 func acceptedIf(parsed command, ok bool) (command, bool) {
 	if !ok {
 		return command{}, false

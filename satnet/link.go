@@ -73,8 +73,7 @@ type Link struct {
 //
 // On failure handset is released. The call has been hung up and the
 // handset is in command mode, unless that hang-up failed too: the error
-// then still says why the link did not come up, as in the Rust version,
-// and its CallMayStillBeUp is set — errors.Is(err,
+// then still says why the link did not come up, and its CallMayStillBeUp is set — errors.Is(err,
 // satlink.ErrCallMayStillBeUp) — as the call may still be up and billing;
 // the handset's EndDataCall retries once the handset answers again, and
 // power-cycling it is the last resort. The error is an [*Error]:
@@ -91,8 +90,8 @@ func Establish(handset *satlink.Handset, config Config) (*Link, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Rust starts the driver's thread before dialling, so that failing to
-	// start it costs no airtime; starting a goroutine cannot fail.
+	// startDriver below runs after the dial; a goroutine cannot fail to
+	// start, so this order costs no airtime.
 	call, err := handset.DialData(config.Number, config.Call)
 	if err != nil {
 		return nil, handsetError(err)

@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -97,7 +97,7 @@ func (g *gateway) followLinkEvents(now time.Time) {
 		case ppp.EventUp:
 			settings := event.IPv4
 			logInfo("simulated gateway: IPv4 up, " +
-				rustdebug.IPv4Settings(settings.LocalAddress, settings.PeerAddress, settings.DNSServers))
+				debugtext.IPv4Settings(settings.LocalAddress, settings.PeerAddress, settings.DNSServers))
 			g.connectInternet(now)
 		case ppp.EventDown:
 			logInfo(fmt.Sprintf("simulated gateway: PPP down, %v", event.Reason))

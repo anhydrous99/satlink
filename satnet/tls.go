@@ -30,7 +30,7 @@ const pemCertificateType = "CERTIFICATE"
 // pemSectionStart begins every PEM section, whatever its type.
 const pemSectionStart = "-----BEGIN "
 
-// The texts of the trust settings' errors, as the Rust version words them.
+// The texts of the trust settings' errors.
 const (
 	invalidPEMMessage       = "invalid PEM"
 	noPEMCertificateMessage = "the PEM data holds no certificate"
@@ -65,11 +65,10 @@ type TLSOptions struct {
 	// satisfy would let an attacker append the pinned certificate to an
 	// unrelated valid chain.
 	//
-	// A server that holds several certificates may send satnet another one
-	// than it sends the Rust version, so pin the key of each: crypto/tls,
+	// A server that holds several certificates may send one with a key other
+	// than the one a client would expect, so pin the key of each: crypto/tls,
 	// which cannot be told otherwise, asks for ML-DSA, then RSA-PSS,
-	// signatures before ECDSA ones, where rustls asks for ECDSA first and
-	// never for ML-DSA or P-521.
+	// signatures before ECDSA ones.
 	PinnedPublicKeys [][sha256.Size]byte
 
 	// ALPNProtocols are offered through ALPN, most preferred first.
@@ -82,23 +81,19 @@ type TLSOptions struct {
 // several goroutines.
 //
 // Connections use TLS 1.2 or 1.3 with X25519, P-256 and P-384 key exchange,
-// the groups rustls's ring backend offers, and send a key share for X25519
-// only: no post-quantum key share. TLS 1.2 is offered with rustls's suites
-// only, ECDHE with AES-GCM or ChaCha20-Poly1305. A server's certificate
-// chain must not hold an RSA key of under 2041 or over 8192 bits, or an
-// ECDSA key on P-224, which rustls's ring backend refuses too: a server or
-// a CA with a short RSA key is refused, as in the Rust version. It may hold
-// ML-DSA and P-521 keys, which ring cannot verify, as crypto/tls asks
-// servers for them, and a server that holds several certificates may send
-// another one than it sends the Rust version: see
-// [TLSOptions.PinnedPublicKeys]. crypto/tls resumes a TLS 1.2 session with
-// a ticket only, where rustls also resumed one by its session ID: a TLS 1.2
-// server that issues no tickets costs a full handshake every time. The
-// public web PKI is Mozilla's root program, as the NSS bundle of
+// and send a key share for X25519 only: no post-quantum key share. TLS 1.2
+// is offered with ECDHE suites only, using AES-GCM or ChaCha20-Poly1305. A
+// server's certificate chain must not hold an RSA key of under 2041 or over
+// 8192 bits, or an ECDSA key on P-224: a server or a CA with a short RSA key
+// is refused. It may hold ML-DSA and P-521 keys, which crypto/tls asks
+// servers for, and a server that holds several certificates may send one
+// with a different key: see [TLSOptions.PinnedPublicKeys]. crypto/tls
+// resumes a TLS 1.2 session by its ticket only: a TLS 1.2 server that issues
+// no tickets costs a full handshake every time. The public web PKI is
+// Mozilla's root program, as the NSS bundle of
 // golang.org/x/crypto/x509roots/fallback carries it, whatever the operating
 // system trusts. For a root it phases out, NSS distrusts what the root
-// issued after a date, which the bundle carries and the Rust version's
-// roots could not: such a chain is refused.
+// issued after a date, which the bundle carries: such a chain is refused.
 //
 // The zero TLSConnector is not usable; create one with [NewTLSConnector].
 type TLSConnector struct {
@@ -119,11 +114,10 @@ func NewTLSConnector(options TLSOptions) (*TLSConnector, error) {
 	}
 	config := &tls.Config{
 		MinVersion: tls.VersionTLS12,
-		// The TLS 1.2 suites rustls offers. crypto/tls ignores the list's
-		// order; its TLS 1.3 suites, which a client cannot choose, are
-		// rustls's three.
+		// The TLS 1.2 suites. crypto/tls ignores the list's order; its TLS
+		// 1.3 suites, which a client cannot choose, are fixed.
 		CipherSuites: ringprovider.TLS12CipherSuites(),
-		// The groups of rustls's ring backend, without the post-quantum ones:
+		// The groups, without the post-quantum ones:
 		// X25519MLKEM768 would add about 2.3 KB to every handshake, 1.2 KB of
 		// it in the ClientHello. crypto/tls ignores the list's order and
 		// sends a key share for the first of its own order, X25519.
@@ -131,11 +125,11 @@ func NewTLSConnector(options TLSOptions) (*TLSConnector, error) {
 		ClientSessionCache: caseBlindSessionCache{sessions: tls.NewLRUClientSessionCache(0)},
 		RootCAs:            roots,
 		// Refuses chains holding an RSA key of under 2041 or over 8192 bits,
-		// or an ECDSA key on P-224, as rustls's ring backend does: crypto/tls
-		// alone would take RSA keys from 1024 bits.
+		// or an ECDSA key on P-224: crypto/tls alone would take RSA keys from
+		// 1024 bits.
 		VerifyPeerCertificate: verifyChainKeys,
 		NextProtos:            slices.Clone(options.ALPNProtocols),
-		// Records as large as rustls's, up to 16 KiB of plaintext:
+		// Records of up to 16 KiB of plaintext, the TLS maximum:
 		// crypto/tls would otherwise send its first 128 KB in records of
 		// about 1.2 KB, each with 22 bytes of TLS 1.3 overhead.
 		DynamicRecordSizingDisabled: true,
@@ -147,10 +141,10 @@ func NewTLSConnector(options TLSOptions) (*TLSConnector, error) {
 }
 
 // caseBlindSessionCache is a session cache that ignores the ASCII case of
-// the server names it keeps sessions for, as rustls's does: a session made
-// for "API.example.com" resumes for "api.example.com", where crypto/tls
-// would key it by the name as written and pay for a full handshake. The
-// handshake still names the server as written, as rustls's does.
+// the server names it keeps sessions for: a session made for
+// "API.example.com" resumes for "api.example.com", where crypto/tls would
+// key it by the name as written and pay for a full handshake. The handshake
+// still names the server as written.
 type caseBlindSessionCache struct {
 	sessions tls.ClientSessionCache
 }
@@ -239,7 +233,7 @@ func parsePEMCertificates(data []byte) ([]*x509.Certificate, error) {
 }
 
 // sectionStarts counts the PEM sections that data begins, where pem.Decode
-// and rustls's parser look for them: at the start of the data or of a line.
+// looks for them: at the start of the data or of a line.
 // A marker inside a line, in a comment say, begins nothing.
 func sectionStarts(data []byte) int {
 	starts := bytes.Count(data, []byte("\n"+pemSectionStart))
@@ -340,10 +334,9 @@ func (l *Link) DialTLS(host string, port uint16, connector *TLSConnector, timeou
 	return connector.secure(conn, host, deadline)
 }
 
-// isValidServerName reports whether name can be a TLS server name, as
-// rustls's ServerName::try_from decides: an IP address without a zone, or a
-// host name whose last label is not all digits, which would make it an
-// address.
+// isValidServerName reports whether name can be a TLS server name: an IP
+// address without a zone, or a host name whose last label is not all digits,
+// which would make it an address.
 func isValidServerName(name string) bool {
 	if address, err := netip.ParseAddr(name); err == nil {
 		return address.Zone() == ""

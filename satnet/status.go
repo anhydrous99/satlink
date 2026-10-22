@@ -176,7 +176,7 @@ type Usage struct {
 	BytesReceived uint64
 }
 
-// Status is a snapshot of a link. Two Status values compared with ==
+// Status is the state of a link at one moment. Two Status values compared with ==
 // compare IPv4 by pointer, not the settings; compare the fields instead.
 type Status struct {
 	// State is where the link is in its life.
@@ -185,7 +185,7 @@ type Status struct {
 	// the data rate.
 	ConnectMessage string
 	// IPv4 is the addressing PPP agreed on; nil until it has. It is the
-	// snapshot's own copy.
+	// Status's own copy.
 	IPv4 *IPv4Settings
 	// Usage is the airtime and traffic so far.
 	Usage Usage

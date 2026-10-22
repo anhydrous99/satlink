@@ -15,17 +15,15 @@ import (
 // segment must be serialized before EmitFunc returns.
 //
 // An error means the segment was not sent, typically because the device has
-// no room for it. The socket then skips exactly what smoltcp skips after its
-// failed emit(…)? (tcp.rs:2791-2853): it does not record the segment as sent
-// (the sequence numbers, and the acknowledgement and window last
-// advertised), take an RTT sample, arm the retransmission timer, rewind the
-// keep-alive or zero-window-probe timer, stop the delayed-ACK timer, or
-// forget the peer after an abort's RST. What Dispatch decided before
-// emitting stands (tcp.rs:2453-2512, :2639): the start of the timeout clock,
-// an abort on timeout, a retransmission timeout's rewind and backoff, and a
-// fast retransmission's start. The next Dispatch therefore sends the same
-// segment, unless something changed in between; a refused fast
-// retransmission is not repeated, as in smoltcp.
+// no room for it. The socket then does not record the segment as sent (the
+// sequence numbers, and the acknowledgement and window last advertised), take
+// an RTT sample, arm the retransmission timer, rewind the keep-alive or
+// zero-window-probe timer, stop the delayed-ACK timer, or forget the peer after
+// an abort's RST. What Dispatch decided before emitting stands: the start of
+// the timeout clock, an abort on timeout, a retransmission timeout's rewind and
+// backoff, and a fast retransmission's start. The next Dispatch therefore sends
+// the same segment, unless something changed in between; a refused fast
+// retransmission is not repeated.
 type EmitFunc func(ip wire.IPv4Repr, segment wire.TCPRepr) error
 
 // Accepts reports whether a segment that arrived in datagram ip belongs to
@@ -71,8 +69,8 @@ func (s *Socket) listenEndpointMatches(ip wire.IPv4Repr, segment wire.TCPRepr) b
 // payload, and its IP header is new: ip's addresses swapped, NextHeader
 // wire.IPProtocolTCP, HopLimit wire.DefaultHopLimit, and PayloadLen the
 // reply's BufferLen (SACK blocks included). The interface sends the reply
-// through the slot of the received datagram, which is always usable: smoltcp
-// assumes it can send zero or one packets for every packet it receives.
+// through the slot of the received datagram, which is always usable: the
+// interface can send zero or one packets for every packet it receives.
 // segment.Payload is copied, not kept.
 func (s *Socket) Process(cx *socket.Context, ip wire.IPv4Repr, segment wire.TCPRepr) (wire.IPv4Repr, wire.TCPRepr, bool) {
 	answer, ok := s.process(cx, ip, segment)

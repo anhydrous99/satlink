@@ -1,11 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for retransmission on packet loss
-// (src/socket/tcp.rs, lines 6395-7519).
-// test_congestion_window_limits_data_in_flight and
-// test_congestion_window_doesnt_limit_fast_retransmit are not ported: they
-// test Reno congestion control, which the workspace does not compile
-// (PORTING-ipstack.md, sections 3 and 6).
+// Tests of retransmission on packet loss.
 
 import (
 	"math"
@@ -25,8 +20,7 @@ func assertDuplicateACKs(t *testing.T, s *testSocket, want uint8, why string) {
 }
 
 // assertRetransmitTimer fails the test, saying when, unless the socket's
-// timer is timing a retransmission: smoltcp's
-// assert!(s.timer.is_retransmit()).
+// timer is timing a retransmission.
 func assertRetransmitTimer(t *testing.T, s *testSocket, when string) {
 	t.Helper()
 	if !s.timer.isRetransmit() {

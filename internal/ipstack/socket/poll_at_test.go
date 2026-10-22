@@ -86,7 +86,7 @@ func TestPollAtEqualComparesInstants(t *testing.T) {
 	}
 }
 
-func TestPollAtStringNamesTheVariantAsSmoltcpsDebugDoes(t *testing.T) {
+func TestPollAtStringNamesTheVariant(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		poll PollAt

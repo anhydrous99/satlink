@@ -11,13 +11,12 @@ import (
 )
 
 // ErrInvalidIPAddr reports an interface address that is not an IPv4 unicast
-// address (or 0.0.0.0); smoltcp panics on those.
+// address (or 0.0.0.0). Where smoltcp panics on one, this returns it.
 var ErrInvalidIPAddr = errors.New("invalid interface address")
 
 // Context is what a socket knows about the interface it belongs to: the
 // current time, the random source, the largest datagram the device carries,
-// and the interface's addresses. smoltcp calls it iface::Context
-// (InterfaceInner).
+// and the interface's addresses.
 //
 // The interface owns the context and is the only one that changes it, at the
 // start of every poll and when its addresses change; sockets only read it.
@@ -153,8 +152,8 @@ func (cx *Context) IsUnicast(addr netip.Addr) bool {
 }
 
 // checkInterfaceAddress returns an error wrapping ErrInvalidIPAddr unless
-// prefix can be an interface address: smoltcp's check_ip_addrs, which allows
-// unicast addresses and the unspecified one, plus the checks that smoltcp's
+// prefix can be an interface address: it allows
+// unicast addresses and the unspecified one, plus the checks that the
 // types make unnecessary (IPv4 only, a prefix length of at most 32).
 func checkInterfaceAddress(prefix netip.Prefix) error {
 	addr := prefix.Addr()

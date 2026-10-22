@@ -242,7 +242,7 @@ func TestUDPDatagramsAreEchoed(t *testing.T) {
 		maxLen int
 		want   string
 	}{
-		// As in the Rust bindings: taken, and none of it kept.
+		// Taken, and none of it kept.
 		{sent: "arrived", maxLen: 0, want: ""},
 		{sent: "ping", maxLen: 64, want: "ping"},
 		{sent: "truncated", maxLen: 5, want: "trunc"},
@@ -310,9 +310,9 @@ func openUDPEcho(t *testing.T, link *mobile.SatelliteLink) *mobile.UDPConnection
 	return connection
 }
 
-// Go only: PORTING section 2 has the tests' connection helpers close their
-// connections, so that no test leaves one to satnet's runtime cleanup,
-// which runs only when garbage is collected.
+// The tests' connection helpers close their connections, so that no test
+// leaves one to satnet's runtime cleanup, which runs only when garbage is
+// collected.
 func TestTheConnectionHelpersCloseTheirConnectionsAtTheTestsEnd(t *testing.T) {
 	t.Parallel()
 	transport, _ := simulatedUSB(t)

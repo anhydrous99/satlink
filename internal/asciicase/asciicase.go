@@ -5,7 +5,7 @@ package asciicase
 const caseOffset = 'a' - 'A'
 
 // EqualFold reports whether a and b are the same but for the case of ASCII
-// letters, as Rust's eq_ignore_ascii_case compares them.
+// letters.
 func EqualFold(a, b string) bool {
 	if len(a) != len(b) {
 		return false
@@ -18,14 +18,12 @@ func EqualFold(a, b string) bool {
 	return true
 }
 
-// Lower returns text with its ASCII capital letters in small case, as
-// Rust's to_ascii_lowercase does.
+// Lower returns text with its ASCII capital letters in small case.
 func Lower(text string) string {
 	return mapBytes(text, lower)
 }
 
-// Upper returns text with its ASCII small letters in capitals, as Rust's
-// to_ascii_uppercase does.
+// Upper returns text with its ASCII small letters in capitals.
 func Upper(text string) string {
 	return mapBytes(text, upper)
 }

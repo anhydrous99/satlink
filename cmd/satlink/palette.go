@@ -1,7 +1,7 @@
 package main
 
-// The styles that the Rust version's clap gave its help and errors — the
-// ANSI rendering of its default styles — and the streams that showed them.
+// The styles that clap gives its help and errors — the ANSI rendering of its
+// default styles — and the streams that showed them.
 
 // The ANSI sequences of clap's default styles.
 const (

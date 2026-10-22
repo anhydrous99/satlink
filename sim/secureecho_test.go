@@ -12,8 +12,7 @@ import (
 	"time"
 )
 
-// Go only: the TLS echo's sessions, which run crypto/tls in goroutines of
-// their own. A TLSClient talks to a session directly here, its records
+// The TLS echo's sessions, which run crypto/tls in goroutines of their own. A TLSClient talks to a session directly here, its records
 // moved by the test as the service moves them between a session and its
 // TCP socket.
 
@@ -203,9 +202,9 @@ func TestASessionWhoseClientHungUpStillSaysGoodbye(t *testing.T) {
 	}
 }
 
-// Rust's hang_up says goodbye whatever the record state. A FIN in the
-// middle of a record fails crypto/tls's Read with io.ErrUnexpectedEOF
-// rather than io.EOF, and the session says goodbye all the same.
+// The session says goodbye whatever the record state. A FIN in the middle of
+// a record fails crypto/tls's Read with io.ErrUnexpectedEOF rather than
+// io.EOF, and the session says goodbye all the same.
 func TestASessionWhoseClientHungUpInTheMiddleOfARecordStillSaysGoodbye(t *testing.T) {
 	t.Parallel()
 	pair := connectSession(t, newSecureEchoConfig(), nil)
@@ -222,9 +221,9 @@ func TestASessionWhoseClientHungUpInTheMiddleOfARecordStillSaysGoodbye(t *testin
 	pair.assertServerSaidGoodbye()
 }
 
-// As Rust's is_finished, which waits until rustls has nothing left to
-// write: the connection closes only once the rest of the echo and the
-// close_notify have gone, or they would never leave.
+// The session is finished only once it has nothing left to write: the
+// connection closes only once the rest of the echo and the close_notify
+// have gone, or they would never leave.
 func TestASessionIsFinishedOnlyOnceItsLastRecordsHaveGone(t *testing.T) {
 	t.Parallel()
 	pair := connectSession(t, newSecureEchoConfig(), nil)
@@ -270,10 +269,10 @@ func TestASessionThatFailsEndsAndIgnoresTheRest(t *testing.T) {
 }
 
 // What `satlink --simulate -vv` shows of a session that fails, such as one
-// whose client rejects the certificate: Rust's text, with crypto/tls's
-// reason (docs/PORTING.md, section 3). The test records the process-wide
-// logger, so it does not run in parallel.
-func TestAFailedSessionLogsWhyAsTheRustVersionLoggedIt(t *testing.T) {
+// whose client rejects the certificate: the log text, with crypto/tls's
+// reason. The test records the process-wide logger, so it does not run in
+// parallel.
+func TestAFailedSessionLogsItsReason(t *testing.T) {
 	recorder := recordLogs(t)
 	echo := newSecureEcho(newSecureEchoConfig())
 	echo.start(sessionServerEnd, sessionClientEnd)
@@ -320,8 +319,8 @@ func TestAClientResumesItsSessionOnALaterConnection(t *testing.T) {
 	}
 }
 
-// TLS 1.2 and 1.3, as rustls's safe default protocol versions: a client
-// that speaks TLS 1.2 at most is served too.
+// TLS 1.2 and 1.3, the default protocol versions: a client that speaks
+// TLS 1.2 at most is served too.
 func TestTheEchoServesATLS12Client(t *testing.T) {
 	t.Parallel()
 	clientConfig := secureTestClientConfig(t, nil)
@@ -335,10 +334,9 @@ func TestTheEchoServesATLS12Client(t *testing.T) {
 	}
 }
 
-// TLS 1.2's cipher suites of rustls's ring provider, ECDHE with an AEAD
-// cipher: a client that offers one of them alone is served with it, as the
-// Rust echo served it. Only the ECDSA ones can be agreed: secure.test's key
-// is on P-256.
+// The ring provider's TLS 1.2 suites, ECDHE with an AEAD cipher: a client
+// that offers one of them alone is served with it. Only the ECDSA ones can
+// be agreed: secure.test's key is on P-256.
 func TestTheEchoServesATLS12ClientThatOffersOnlyAnAEADSuite(t *testing.T) {
 	t.Parallel()
 	for _, suite := range []uint16{
@@ -359,9 +357,9 @@ func TestTheEchoServesATLS12ClientThatOffersOnlyAnAEADSuite(t *testing.T) {
 	}
 }
 
-// rustls's ring provider has no suite with CBC: a client that offers only
-// such a suite is refused, as the Rust echo refused it. crypto/tls
-// implements all three, and its defaults would serve the first two.
+// The ring provider has no suite with CBC: a client that offers only such a
+// suite is refused. crypto/tls implements all three, and its defaults would
+// serve the first two.
 func TestTheEchoRefusesATLS12ClientThatOffersOnlyCBC(t *testing.T) {
 	t.Parallel()
 	for _, suite := range []uint16{
@@ -382,8 +380,8 @@ func TestTheEchoRefusesATLS12ClientThatOffersOnlyCBC(t *testing.T) {
 	}
 }
 
-// The key exchange groups of rustls's ring provider, which has no
-// post-quantum one: a client that prefers X25519MLKEM768, as crypto/tls's
+// The ring provider's key exchange groups, which include no post-quantum
+// one: a client that prefers X25519MLKEM768, as crypto/tls's
 // clients do by default, agrees X25519, whose key share takes 32 bytes of
 // the ServerHello rather than 1120.
 func TestTheEchoAgreesNoPostQuantumKeyExchange(t *testing.T) {
@@ -399,11 +397,10 @@ func TestTheEchoAgreesNoPostQuantumKeyExchange(t *testing.T) {
 	}
 }
 
-// As in Rust, whose echo writes as much plaintext at a time as a record
-// carries (ECHO_CHUNK_LEN), and whose rustls makes records as large as
-// that: the echo of a whole record is one record, so that the echo spends
-// no more on record overhead than the client did. crypto/tls would
-// otherwise start each connection with small records.
+// The echo writes as much plaintext at a time as a record carries, and it
+// makes records as large as that: the echo of a whole record is one record,
+// so that the echo spends no more on record overhead than the client did.
+// crypto/tls would otherwise start each connection with small records.
 func TestTheEchoOfAWholeRecordIsOneRecord(t *testing.T) {
 	t.Parallel()
 	clientConfig := secureTestClientConfig(t, nil)

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// testClientLCP returns the client policy of the Rust tests: the default
+// testClientLCP returns the client policy used by these tests: the default
 // MRU and no control characters escaped towards us.
 func testClientLCP() *lcpNegotiator {
 	return newClientLCP(DefaultMRU, 0)

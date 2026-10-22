@@ -45,8 +45,7 @@ func (o *globalOptions) arguments() []*argument {
 
 // withHandset opens the simulated handset, or the serial port given or
 // discovered, readies it for commands and lets use have it. It closes the
-// handset again whatever happens — a panic included, as the Rust version's
-// handset was dropped while a panic unwound.
+// handset again whatever happens — a panic included, as the panic unwinds.
 func (c *cli) withHandset(use func(*satlink.Handset) error) error {
 	transport, err := c.openTransport()
 	if err != nil {
@@ -93,8 +92,8 @@ func (c *cli) openTransport() (satlink.Transport, error) {
 }
 
 // portPath is the serial device given — even an empty one, which then fails
-// to open, as in the Rust version — or else the only handset discovered, as
-// serial.ChoosePort chooses it.
+// to open — or else the only handset discovered, as serial.ChoosePort chooses
+// it.
 func (c *cli) portPath() (string, error) {
 	if c.options.port.given {
 		return c.options.port.text, nil
@@ -109,8 +108,7 @@ func (c *cli) portPath() (string, error) {
 // closeHandset closes the handset's transport, which drops DTR, once the
 // command is done with it.
 func closeHandset(handset *satlink.Handset) {
-	// Closing the port is the last thing done with the handset, and a
-	// failure has no remedy: it is not reported, as the Rust version's
-	// dropped handset reported nothing.
+	// Closing the port is the last thing done with the handset, and a failure
+	// has no remedy: it is not reported.
 	_ = handset.Close()
 }

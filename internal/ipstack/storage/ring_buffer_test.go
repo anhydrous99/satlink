@@ -7,8 +7,7 @@ import (
 )
 
 // newDottedRing returns an empty ring of capacity octets whose storage is all
-// '.', so that a test sees which octets an operation wrote, as smoltcp's
-// tests do with vec![b'.'; capacity].
+// '.', so that a test sees which octets an operation wrote.
 func newDottedRing(capacity int) *RingBuffer[byte] {
 	ring := NewRingBuffer[byte](capacity)
 	for i := range ring.storage {
@@ -46,7 +45,7 @@ func assertCount(t *testing.T, what string, got, want int) {
 }
 
 // dequeueDotting dequeues count octets one at a time, overwriting each with
-// '.', as smoltcp's tests do.
+// '.'.
 func dequeueDotting(t *testing.T, ring *RingBuffer[byte], count int) {
 	t.Helper()
 	for range count {
@@ -335,7 +334,6 @@ func TestRingBufferDequeueSlice(t *testing.T) {
 	assertLen(t, ring, 0)
 }
 
-// Ported from smoltcp's test_buffer_get_unallocated.
 func TestRingBufferUnallocated(t *testing.T) {
 	t.Parallel()
 	ring := newDottedRing(12)
@@ -376,7 +374,6 @@ func TestRingBufferWriteUnallocated(t *testing.T) {
 	assertBytes(t, "Unallocated(9, 3)", ring.Unallocated(9, 3), "pqr")
 }
 
-// Ported from smoltcp's test_buffer_get_allocated.
 func TestRingBufferAllocated(t *testing.T) {
 	t.Parallel()
 	ring := newDottedRing(12)

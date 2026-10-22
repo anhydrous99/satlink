@@ -125,9 +125,9 @@ func (s *stack) lookupIndex(id lookupID) int {
 }
 
 // noteAnswer records that a DNS server answered for a name, saying what its
-// addresses are: a lookup of it that fails now found none. As in the Rust
-// version, every lookup of the name counts as answered, whichever of their
-// queries the answer was for. An answer to one of the app's UDP sockets is
+// addresses are: a lookup of it that fails now found none. Every lookup of
+// the name counts as answered, whichever of their queries the answer was
+// for. An answer to one of the app's UDP sockets is
 // theirs, and says nothing about our lookups.
 func (s *stack) noteAnswer(answer dnsAnswer) {
 	if !slices.Contains(s.dnsServers, answer.server) || slices.Contains(s.appUDPPorts(), answer.port) {
@@ -205,7 +205,7 @@ func tellsOfTheName(message wire.DNSPacket) bool {
 const responseQuestionCount = 1
 
 // nameText returns the name encoded at name, inside message, as text in
-// lower case: its labels as Rust's String::from_utf8_lossy reads them,
+// lower case: its labels read as UTF-8, with invalid bytes replaced,
 // joined by dots. It returns false for a name that does not decode.
 func nameText(message wire.DNSPacket, name []byte) (string, bool) {
 	var labels []string

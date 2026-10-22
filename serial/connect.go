@@ -70,9 +70,8 @@ func connect(path string, baud int, openPort portOpener, discoverPorts func() ([
 	initialized := false
 	defer func() {
 		if !initialized {
-			// Closed on every way out but success, a panic included, as the
-			// Rust version's unwinding dropped the port: closing gives it
-			// back and drops DTR. The initialisation's error, or the panic,
+			// Closed on every way out but success, a panic included: closing
+			// gives the port back and drops DTR. The initialisation's error, or the panic,
 			// is what the caller needs; a failed close adds nothing it could
 			// act on.
 			_ = handset.Close()

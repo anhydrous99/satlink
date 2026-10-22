@@ -1,7 +1,6 @@
 package tcp
 
-// The tests of smoltcp's socket/tcp.rs for the SYN-SENT state
-// (src/socket/tcp.rs, lines 3836-4504).
+// Tests of the SYN-SENT state.
 
 import (
 	"errors"

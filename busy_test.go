@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Go only: the second busy check, once a method has the lock.
+// The second busy check, once a method has the lock.
 
 func TestAMethodThatWaitedForTheLockWhileADialClaimedTheHandsetIsBusy(t *testing.T) {
 	// It passed the first check before the dial claimed the handset, then

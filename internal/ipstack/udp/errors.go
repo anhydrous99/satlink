@@ -2,9 +2,8 @@ package udp
 
 import "errors"
 
-// The errors a socket's operations return. smoltcp has one enum per
-// operation (BindError, SendError, RecvError) with these variants and texts;
-// each operation documents which of them it returns.
+// The errors a socket's operations return. Each operation documents which of
+// them it returns.
 var (
 	// ErrInvalidState reports a Bind on a socket that is already bound.
 	ErrInvalidState = errors.New("invalid state")

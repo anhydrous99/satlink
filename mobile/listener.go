@@ -12,8 +12,7 @@ import (
 // a port closer — waits for news before looking again.
 const listenerPoll = time.Second
 
-// listenerGoroutine names the listener goroutine, as the Rust bindings
-// named its thread.
+// listenerGoroutine names the listener goroutine.
 const listenerGoroutine = "satlink-link-listener"
 
 // deliverStateChanges tells listener about every change of the link's state

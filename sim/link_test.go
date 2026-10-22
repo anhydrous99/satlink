@@ -76,8 +76,7 @@ func TestLaterBytesQueueBehindABusyLine(t *testing.T) {
 func TestANegativeRateStillDeliversSlowly(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
-	// Rust's Some(0): in Go zero is unlimited, and a negative rate the
-	// slowest one.
+	// Zero is unlimited, and a negative rate is the slowest one.
 	line := testLine(0, -1)
 
 	line.send([]byte("x"), start)
@@ -94,7 +93,7 @@ func TestAHugeRateDeliversWithoutOverflowing(t *testing.T) {
 	line.send([]byte("fast"), start)
 
 	// Hours of elapsed time times the largest rate overflow 64 bits, which
-	// the Rust version's u128 arithmetic never did.
+	// the 128-bit arithmetic of mulDiv never does.
 	assertReceived(t, line, start.Add(3*time.Hour), "fast")
 }
 

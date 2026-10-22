@@ -5,8 +5,7 @@
 //     ([SimulatorConfig]), and initialised satlink handsets over them
 //     ([NewHandset], [InitializedHandset]);
 //   - [FaultyTransport], a transport that fails on cue: deaf to the escape
-//     or to DTR, panicking, unplugged, losing a hang-up, without +CPAS —
-//     the Rust tests' Faulty, StubbornUsb and NoDtrUsb transports in one;
+//     or to DTR, panicking, unplugged, losing a hang-up, without +CPAS;
 //   - [ByteTransport], a mobile.ByteTransport over any satlink.Transport,
 //     standing in for the host app's USB transport;
 //   - [Eventually], which waits for a condition instead of sleeping for a

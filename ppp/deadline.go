@@ -7,7 +7,7 @@ import (
 
 // The deadline arithmetic the protocol timers share. Each timer keeps its
 // deadline as a time.Time, the zero Time meaning that the timer is not
-// running (Rust's None).
+// running.
 
 // isDue reports whether deadline has come at now. The zero deadline never
 // comes.
@@ -29,7 +29,7 @@ func earliest(deadlines ...time.Time) time.Time {
 
 // scaled returns duration × count, saturating at the longest Duration where
 // the product would overflow: a negative product would put a deadline in
-// the past. (Rust's Duration, with its far larger range, panics instead.)
+// the past.
 func scaled(duration time.Duration, count int) time.Duration {
 	if count > 0 && duration > time.Duration(math.MaxInt64)/time.Duration(count) {
 		return time.Duration(math.MaxInt64)

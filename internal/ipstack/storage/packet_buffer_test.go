@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// newTestPacketBuffer returns the buffer smoltcp's tests use: four packets,
-// sixteen payload octets.
+// newTestPacketBuffer returns a buffer of four packets with sixteen payload
+// octets.
 func newTestPacketBuffer() *PacketBuffer[struct{}] {
 	return NewPacketBuffer[struct{}](4, 16)
 }
@@ -195,7 +195,6 @@ func TestPacketBufferCapacityTooSmall(t *testing.T) {
 	assertEnqueueFull(t, buffer, 32)
 }
 
-// Ported from smoltcp's test_contig_window_prioritized.
 func TestPacketBufferContiguousWindowPrioritized(t *testing.T) {
 	t.Parallel()
 	buffer := newTestPacketBuffer()
@@ -205,8 +204,7 @@ func TestPacketBufferContiguousWindowPrioritized(t *testing.T) {
 	mustEnqueue(t, buffer, 5)
 }
 
-// Ported from smoltcp's test_enqueue_fallible_full_metadata_fn_not_called:
-// with room for the payload only behind padding, and a single packet slot
+// With room for the payload only behind padding, and a single packet slot
 // left, the padding takes the slot and EnqueueWith fails without calling
 // fill.
 func TestPacketBufferEnqueueWithFullMetadataDoesNotCallFill(t *testing.T) {
@@ -228,8 +226,7 @@ func TestPacketBufferEnqueueWithFullMetadataDoesNotCallFill(t *testing.T) {
 	}
 }
 
-// As in smoltcp, padding added for a packet that then finds no packet slot
-// stays queued, and is dropped in turn when it reaches the front.
+// Padding added for a packet that then finds no packet slot stays queued, and is dropped in turn when it reaches the front.
 func TestPacketBufferEnqueueFailsWhenPaddingTakesTheLastSlot(t *testing.T) {
 	t.Parallel()
 	buffer := newTestPacketBuffer()

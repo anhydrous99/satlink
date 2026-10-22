@@ -43,8 +43,7 @@ func simulatedUSB(t *testing.T) (*simtest.ByteTransport, *sim.Control) {
 // escape, and DTR until its FaultyTransport's DeafToDTR is switched off:
 // nothing the library tries can end its calls. Only the simulator's own
 // Close, when the test ends, ends a call left up. The FaultyTransport's
-// PanicsOnNextEscape is the Rust StubbornUsb's panic_on_escape: whoever
-// sends the next escape dies.
+// PanicsOnNextEscape makes the next escape panic: whoever sends it dies.
 func stubbornUSB(t *testing.T, config sim.Config) (*simtest.ByteTransport, *simtest.FaultyTransport, *sim.Control) {
 	t.Helper()
 	simulator := simtest.NewSimulator(t, config)

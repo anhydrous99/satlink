@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -27,8 +27,7 @@ const readChunk = 1024
 // FCS — counted when estimating when the datagram will have left the line.
 const framingOverhead = 8
 
-// driverName names the driver goroutine in profiles, as Rust named its
-// thread.
+// driverName names the driver goroutine in profiles.
 const driverName = "satlink-link"
 
 // ipcpProtocol names IPCP in the close reason of an address the stack
@@ -156,9 +155,9 @@ func (d *driver) run(outcome *driverOutcome) {
 }
 
 // endCallLeftUp hangs up a call that a panic kept from being hung up.
-// Rust's driver thread, unwinding, dropped the data call and with it the
-// transport, whose DTR drop ended the call; here the transport stays with
-// the app, so only hanging up ends it — otherwise the call would stay up
+// Unwinding the driver would drop the data call and with it the transport,
+// whose DTR drop ends the call; the transport stays with the app here, so
+// only hanging up ends it — otherwise the call would stay up
 // and billing, and the handset claimed for good. Once its hang-up has run,
 // even one that panicked, a call only answers that it is over, without a
 // word to the handset: this is harmless then. A hang-up that panicked
@@ -272,7 +271,7 @@ func (d *driver) handlePPPEvents(e *engine, now time.Time) (CloseReason, bool) {
 // ipv4Up adopts the addresses IPCP agreed on, and reports a failure when the
 // stack cannot use them.
 func (d *driver) ipv4Up(e *engine, settings IPv4Settings, now time.Time) (CloseReason, bool) {
-	logInfo("IPv4 up: " + rustdebug.IPv4Settings(settings.LocalAddress, settings.PeerAddress, settings.DNSServers))
+	logInfo("IPv4 up: " + debugtext.IPv4Settings(settings.LocalAddress, settings.PeerAddress, settings.DNSServers))
 	mtu := min(d.tuning.MTU, d.ppp.MTU())
 	if err := e.linkUp(settings, mtu, now); err != nil {
 		reason := DownReason{Kind: ppp.DownReasonNegotiationFailed, Protocol: ipcpProtocol, Detail: err.Error()}
@@ -473,8 +472,7 @@ func hangUpError(err error) error {
 // panicMessage returns what a recovered panic says: its text, its error's
 // text, or that the driver panicked. It never panics itself, as it runs
 // while a panic is recovered: an error whose Error method panics — a nil
-// pointer, say — only says that the driver panicked, as a value Rust cannot
-// read does.
+// pointer, say — only says that the driver panicked.
 func panicMessage(recovered any) (message string) {
 	defer func() {
 		if recover() != nil {

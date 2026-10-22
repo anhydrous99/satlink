@@ -146,7 +146,7 @@ func TestSMSCommands(t *testing.T) {
 	})
 }
 
-func TestNumbersReadAsRustReadsThem(t *testing.T) {
+func TestNumbersReadWithinTheirBitWidths(t *testing.T) {
 	t.Parallel()
 	assertParses(t, []parseCase{
 		known(smsCommandOf(smsCommand{kind: smsDelete, index: 4})).forLine("AT+CMGD=+4"),

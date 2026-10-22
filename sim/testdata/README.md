@@ -2,8 +2,7 @@
 
 Fixtures for the simulator's TLS echo service. They protect nothing: the
 server's private key is published here on purpose, so that anyone can run the
-simulator. They are the Rust version's fixtures, unchanged, so the CA's name
-is still "iridium-sim test CA".
+simulator. The CA's name is "iridium-sim test CA".
 
 - `test-ca.pem`: the test CA, exported as `sim.SecureTestCAPEM()`. Trust it in
   tests, never in production.

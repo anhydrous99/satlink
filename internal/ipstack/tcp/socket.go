@@ -16,8 +16,8 @@ type SocketBuffer = storage.RingBuffer[byte]
 // NewSocketBuffer returns an empty buffer of capacity octets. A receive
 // buffer's capacity is the largest window the socket offers. RFC 7323 limits
 // window scaling to a shift of 14, enough for any buffer smaller than 1 GiB.
-// NewSocket refuses a larger one; one of exactly 1 GiB, which smoltcp takes
-// too, is offered with a shift of 15, which peers read as 14.
+// NewSocket refuses a larger one; one of exactly 1 GiB is offered with a
+// shift of 15, which peers read as 14.
 func NewSocketBuffer(capacity int) *SocketBuffer {
 	return storage.NewRingBuffer[byte](capacity)
 }
@@ -25,26 +25,24 @@ func NewSocketBuffer(capacity int) *SocketBuffer {
 // maxReceiveBufferLen is the largest receive buffer a socket takes. From
 // RFC 1323: "[...] the above constraints imply that 2 * the max window size
 // must be less than 2**31 [...] Thus, the shift count must be limited to 14
-// (which allows windows of 2**30 = 1 Gbyte)." smoltcp's check, kept here,
-// lets 2**30 itself through, and windowShiftFor gives it a shift of 15.
+// (which allows windows of 2**30 = 1 Gbyte)." The check here lets 2**30 itself
+// through, and windowShiftFor gives it a shift of 15.
 const maxReceiveBufferLen = 1 << 30
 
 // defaultACKDelay is how long a new socket waits before sending a bare
-// acknowledgement, hoping it can ride on outgoing data instead (smoltcp's
-// ACK_DELAY_DEFAULT).
+// acknowledgement, hoping it can ride on outgoing data instead.
 const defaultACKDelay = 10 * time.Millisecond
 
 // defaultMSS is the peer's maximum segment size until its SYN announces one:
-// the 536 octets every TCP must accept, RFC 879's default (smoltcp's
-// DEFAULT_MSS).
+// the 536 octets every TCP must accept, RFC 879's default.
 const defaultMSS = 536
 
 // minRemoteMSS is the smallest MSS the socket accepts from the peer, the same
 // value as Linux's TCP_MIN_SND_MSS: without it, a peer advertising a tiny MSS
-// could force segments that carry next to nothing. smoltcp chose it to exceed
-// the longest TCP options it sends, the 12 octets of timestamps, so that a
-// segment still carries some payload once they are subtracted from the
-// effective MSS. This port sends no options, and keeps smoltcp's value.
+// could force segments that carry next to nothing. The value exceeds the 12
+// octets of TCP timestamps, so that a segment still carries some payload once
+// they are subtracted from the effective MSS. This socket sends no options, and
+// the value is kept all the same.
 const minRemoteMSS = 48
 
 // Socket is a TCP socket. Its zero value is not usable; create one with
@@ -68,9 +66,9 @@ type Socket struct {
 	// nagleEnabled says whether Nagle's algorithm is on.
 	nagleEnabled bool
 
-	// The fields below describe the connection too, but smoltcp's reset does
-	// not reinitialise them, so neither does this port's: a new connection
-	// starts with what the last one left in them.
+	// The fields below describe the connection too, but a reset does not
+	// reinitialise them, so a new connection starts with what the last one left
+	// in them.
 
 	// remoteHasSACK says whether the remote supports selective ACK as
 	// described in RFC 2018.
@@ -90,7 +88,7 @@ type Socket struct {
 
 	// chooseISN returns the initial sequence number of a new connection. It
 	// draws one from the interface's random source; internal tests replace
-	// it with a fixed number, as smoltcp's cfg(test) build does.
+	// it with a fixed number.
 	chooseISN func(cx *socket.Context) wire.TCPSeqNumber
 }
 

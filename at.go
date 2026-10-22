@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
@@ -185,8 +185,7 @@ func (b *lineBuffer) push(data []byte) {
 
 // nextLine takes the next complete, non-empty line, without its CR, LF and
 // NUL padding, and reports whether there was one. Bytes that are not UTF-8
-// become U+FFFD, one for each maximal subpart of an ill-formed sequence, as
-// Rust's String::from_utf8_lossy makes them.
+// become U+FFFD, one for each maximal subpart of an ill-formed sequence.
 func (b *lineBuffer) nextLine() (string, bool) {
 	for {
 		end := bytes.IndexByte(b.buf, '\n')
@@ -258,8 +257,7 @@ func SplitCSV(s string) []string {
 	return append(fields, strings.TrimSpace(field.String()))
 }
 
-// fieldWidth is the size in bits of a numeric field, as the Rust version's
-// u8 and u32 parse it.
+// fieldWidth is the size in bits of a numeric field.
 type fieldWidth int
 
 // The widths of the numeric fields the handset reports.
@@ -271,8 +269,8 @@ const (
 	wordField fieldWidth = 32
 )
 
-// parseNumber parses fields[index], a decimal number of width bits, as
-// Rust's unsigned FromStr does: a leading '+' is accepted, while '-', other
+// parseNumber parses fields[index], an unsigned decimal number of width bits:
+// a leading '+' is accepted, while '-', other
 // signs and values out of range are refused, giving ErrParse with what (the
 // response's prefix) in its text.
 func parseNumber(fields []string, index int, what string, width fieldWidth) (int, error) {
@@ -295,12 +293,11 @@ func fieldAt(fields []string, index int) string {
 	return ""
 }
 
-// debugList writes items as the Rust version's {:?} of a Vec<String> does:
-// ["a", "b"].
+// debugList writes items as a bracketed list of quoted strings: ["a", "b"].
 func debugList(items []string) string {
 	quoted := make([]string, len(items))
 	for i, item := range items {
-		quoted[i] = rustdebug.Quote(item)
+		quoted[i] = debugtext.Quote(item)
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
 }

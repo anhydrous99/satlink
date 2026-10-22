@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// dnsCNAMEResponseBytes is the message of smoltcp's test_parse_name and
-// test_parse_response_cname: www.facebook.com is a CNAME for
+// dnsCNAMEResponseBytes is a message in which www.facebook.com is a CNAME for
 // star-mini.c10r.facebook.com, which has one A record.
 func dnsCNAMEResponseBytes() []byte {
 	return []byte{
@@ -45,7 +44,6 @@ func nameLabels(packet DNSPacket, name []byte) ([]string, error) {
 	return labels, nil
 }
 
-// Ported from smoltcp's wire/dns.rs test_parse_name.
 func TestDNSPacketParseName(t *testing.T) {
 	t.Parallel()
 	message := dnsCNAMEResponseBytes()
@@ -64,8 +62,7 @@ func TestDNSPacketParseName(t *testing.T) {
 	}
 }
 
-// dnsMessage is a message split into its sections, as smoltcp's tests'
-// Parsed holds it.
+// dnsMessage is a message split into its sections.
 type dnsMessage struct {
 	packet      DNSPacket
 	questions   []DNSQuestion
@@ -75,7 +72,7 @@ type dnsMessage struct {
 }
 
 // parseDNSMessage parses every section of message, which must leave no octet
-// over (smoltcp's Parsed::parse).
+// over.
 func parseDNSMessage(t *testing.T, message []byte) dnsMessage {
 	t.Helper()
 	packet, err := NewDNSPacket(message)
@@ -160,7 +157,6 @@ func checkARecord(t *testing.T, record DNSRecord, want aRecord) {
 
 const responseFlags = DNSFlagResponse | DNSFlagRecursionDesired | DNSFlagRecursionAvailable
 
-// Ported from smoltcp's wire/dns.rs test_parse_request.
 func TestDNSParseRequest(t *testing.T) {
 	t.Parallel()
 	parsed := parseDNSMessage(t, []byte{
@@ -177,7 +173,6 @@ func TestDNSParseRequest(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/dns.rs test_parse_response.
 func TestDNSParseResponse(t *testing.T) {
 	t.Parallel()
 	parsed := parseDNSMessage(t, []byte{
@@ -194,7 +189,6 @@ func TestDNSParseResponse(t *testing.T) {
 	checkARecord(t, parsed.answers[0], aRecord{name: []byte{0xc0, 0x0c}, ttl: 202, address: "172.217.168.174"})
 }
 
-// Ported from smoltcp's wire/dns.rs test_parse_response_multiple_a.
 func TestDNSParseResponseMultipleA(t *testing.T) {
 	t.Parallel()
 	parsed := parseDNSMessage(t, []byte{
@@ -216,7 +210,6 @@ func TestDNSParseResponseMultipleA(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/dns.rs test_parse_response_cname.
 func TestDNSParseResponseCNAME(t *testing.T) {
 	t.Parallel()
 	parsed := parseDNSMessage(t, dnsCNAMEResponseBytes())
@@ -237,7 +230,6 @@ func TestDNSParseResponseCNAME(t *testing.T) {
 	checkARecord(t, parsed.answers[1], aRecord{name: []byte{0xc0, 0x2e}, ttl: 5, address: "31.13.83.36"})
 }
 
-// Ported from smoltcp's wire/dns.rs test_parse_response_nxdomain.
 func TestDNSParseResponseNXDomain(t *testing.T) {
 	t.Parallel()
 	parsed := parseDNSMessage(t, []byte{
@@ -264,7 +256,6 @@ func TestDNSParseResponseNXDomain(t *testing.T) {
 	}
 }
 
-// Ported from smoltcp's wire/dns.rs test_emit.
 func TestDNSReprEmit(t *testing.T) {
 	t.Parallel()
 	repr := DNSRepr{
@@ -356,7 +347,7 @@ func TestDNSPacketReadsAnOpcodeWithoutAName(t *testing.T) {
 	}
 }
 
-func TestDNSPacketSetOpcodeReplacesTheLowThreeBitsAsSmoltcpDoes(t *testing.T) {
+func TestDNSPacketSetOpcodeReplacesTheLowThreeBits(t *testing.T) {
 	t.Parallel()
 	packet := DNSPacket(make([]byte, dnsHeaderLen))
 	packet.SetOpcode(9)
@@ -364,7 +355,7 @@ func TestDNSPacketSetOpcodeReplacesTheLowThreeBitsAsSmoltcpDoes(t *testing.T) {
 	packet.SetOpcode(DNSOpcodeQuery)
 
 	if packet.Opcode() != 8 {
-		t.Errorf("Opcode = %v, want Unknown(8): smoltcp leaves the opcode's high bit", packet.Opcode())
+		t.Errorf("Opcode = %v, want Unknown(8): the opcode's high bit is kept", packet.Opcode())
 	}
 }
 

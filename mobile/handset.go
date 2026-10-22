@@ -157,8 +157,7 @@ type IridiumHandset struct {
 	// with it; nil in a zero value.
 	handset *satlink.Handset
 
-	// mu serialises the methods but Close, as the Rust bindings' lock on
-	// the slot does, and every change of the slot.
+	// mu serialises the methods but Close, and every change of the slot.
 	mu sync.Mutex
 	// slotMu guards slot, borrower and closed. Taken after mu, it is held
 	// only briefly, never while the handset is in use, so Close, which
@@ -213,8 +212,7 @@ func initializedHandset(transport satlink.Transport) (*satlink.Handset, error) {
 // closeUnlessHandedOn closes handset unless *handedOn. A function that
 // hands a handset it made on only when it succeeds defers it, so that every
 // other way out, a panic the boundary recovers included, releases a serial
-// port that function opened, as the Rust bindings' unwinding dropped it:
-// the port is free again, and closing it drops DTR, which ends a call left
+// port that function opened: the port is free again, and closing it drops DTR, which ends a call left
 // up. What went wrong is what the app needs to hear; closing only lets go
 // of the port.
 func closeUnlessHandedOn(handset *satlink.Handset, handedOn *bool) {
@@ -269,9 +267,8 @@ func endStrandedCall(handset *satlink.Handset) error {
 // isCallMayStillBeUp reports whether err is the handset's
 // satlink.ErrCallMayStillBeUp: a data call it could not end may still be
 // up. That kind, which the app hears as SatlinkErrorHangUpFailed, strands
-// the handset, as in the Rust bindings; the CallMayStillBeUp flag that
-// other kinds may carry is Rust's CallFailure, which no IridiumHandset
-// method returns.
+// the handset. The CallMayStillBeUp flag that other kinds may carry is not
+// returned by any IridiumHandset method.
 func isCallMayStillBeUp(err error) bool {
 	var core *satlink.Error
 	return errors.As(err, &core) && core.Kind == satlink.ErrCallMayStillBeUp
@@ -518,7 +515,7 @@ func withHandset[T any](h *IridiumHandset, query func(*satlink.Handset) (T, erro
 // now — a zero IridiumHandset, a closed one, a link has it, or it is
 // stranded — and reports its error as the app sees it. An operation that
 // leaves a data call that may still be up — Answer's, taken by mistake —
-// strands the handset, as the Rust bindings' with does.
+// strands the handset.
 func (h *IridiumHandset) perform(operation func(*satlink.Handset) error) error {
 	handset, err := made(h.handset, "IridiumHandset")
 	if err != nil {

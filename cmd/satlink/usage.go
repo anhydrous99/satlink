@@ -5,11 +5,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/anhydrous99/satlink/internal/rustdebug"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
-// Command lines that do not parse, explained as the Rust version's clap
-// explained them: "error: …", tips on what may have been meant, the usage
+// Command lines that do not parse, explained as clap explains them: "error: …", tips on what may have been meant, the usage
 // line, and where to learn more — in clap's styles where it used them.
 
 // listIndent starts each tip, list of values and missing argument, as clap's
@@ -218,7 +217,7 @@ func possibleValueNames(arg *argument) []string {
 // holds whitespace, so that its ends can be seen.
 func quotedIfBlank(text string) string {
 	if text == "" || strings.ContainsFunc(text, unicode.IsSpace) {
-		return rustdebug.Quote(text)
+		return debugtext.Quote(text)
 	}
 	return text
 }

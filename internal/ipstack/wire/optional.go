@@ -2,7 +2,7 @@ package wire
 
 // Optional holds a value that may be absent, for header fields whose zero
 // value is meaningful: a sequence number, a window scale or an MSS of 0 are
-// all valid on the wire, so "absent" needs its own state. It is Rust's Option
+// all valid on the wire, so "absent" needs its own state. It is an option type
 // for the wire Reprs.
 //
 // The zero Optional is absent. Optional values compare with == when T does.

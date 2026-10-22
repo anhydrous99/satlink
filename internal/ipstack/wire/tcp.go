@@ -16,7 +16,7 @@ const TCPHeaderLen = 20
 
 // MaxSACKRanges is how many SACK blocks the stack keeps from, and sends in, a
 // segment: an option holding four would leave no room for timestamps, so
-// RFC 2018 expects at most three in practice, and smoltcp drops a fourth.
+// RFC 2018 expects at most three in practice, and the stack drops a fourth.
 const MaxSACKRanges = 3
 
 // tcpOptionsAlignment is the multiple of octets a TCP header length must be.
@@ -93,7 +93,7 @@ func (c TCPControl) QuashPSH() TCPControl {
 	return c
 }
 
-// String returns the variant name, as Rust's Debug does ("Syn").
+// String returns the variant name ("Syn").
 func (c TCPControl) String() string {
 	switch c {
 	case TCPControlNone:
@@ -111,7 +111,7 @@ func (c TCPControl) String() string {
 	}
 }
 
-// flagName is how smoltcp's Display shows the control flag in a segment.
+// flagName is how the control flag is shown in a segment.
 func (c TCPControl) flagName() string {
 	switch c {
 	case TCPControlSYN:
@@ -673,7 +673,7 @@ func (r TCPRepr) Equal(other TCPRepr) bool {
 	return r.headerEqual(other) && r.optionsEqual(other) && bytes.Equal(r.Payload, other.Payload)
 }
 
-// String formats the segment as smoltcp does, for logs and test failures:
+// String formats the segment for logs and test failures:
 // "TCP src=… dst=… syn seq=… ack=… win=… len=… mss=…".
 func (r TCPRepr) String() string {
 	parts := []string{fmt.Sprintf("TCP src=%d dst=%d", r.SrcPort, r.DstPort)}

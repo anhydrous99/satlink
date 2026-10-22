@@ -174,9 +174,8 @@ func TestKeepsTheBearerItIsGiven(t *testing.T) {
 	assertAnswer(t, runCommand(m, "AT+CBST?", now), "\r\n+CBST: 71,0,1\r\n\r\nOK\r\n")
 }
 
-// Go only, for a rule of Rust's that its tests leave out: ATZ restores
-// every factory setting, not echo alone, so that after it a call outlives
-// a DTR drop again until the app sends AT&D2 once more.
+// ATZ restores every factory setting, not echo alone, so that after it a
+// call outlives a DTR drop again until the app sends AT&D2 once more.
 func TestATZRestoresTheFactorySettings(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -285,10 +284,9 @@ func TestAnSMSAnnouncementWaitsForTextEntryToFinish(t *testing.T) {
 	assertAnswer(t, output(m), "\r\n+CMTI: \"SM\",1\r\n")
 }
 
-// Go only, for a rule of Rust's that its tests leave out: an announcement
-// also waits until the app has read the handset's earlier output, so that
-// a client that drops what follows a final result, as a data call's
-// hang-up does, still sees it.
+// An announcement also waits until the app has read the handset's earlier
+// output, so that a client that drops what follows a final result, as a
+// data call's hang-up does, still sees it.
 func TestAnSMSAnnouncementWaitsUntilTheEarlierOutputIsRead(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
@@ -399,10 +397,9 @@ func TestTheNetworkCanFailACallBeingSetUp(t *testing.T) {
 	}
 }
 
-// Go only, for a rule of Rust's that its tests leave out: a restart of PPP
-// while the call is being set up does nothing, as there is no circuit yet
-// whose PPP could start over, and the call connects as it would have, its
-// gateway assigning the configured address.
+// A restart of PPP while the call is being set up does nothing, as there is
+// no circuit yet whose PPP could start over, and the call connects as it
+// would have, its gateway assigning the configured address.
 func TestARestartOfPPPDuringCallSetupChangesNothing(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -465,10 +462,9 @@ func TestHangingUpInOnlineCommandModeEndsTheCall(t *testing.T) {
 	assertAnswer(t, runCommand(m, "AT+CEER", at(start, 300)), "\r\n+CEER: Normal call clearing\r\n\r\nOK\r\n")
 }
 
-// Go only, for a rule of Rust's that its tests leave out: in online-command
-// mode, data from the far end waits for ATO, so that it cannot come between
-// the answers to the commands the app sends meanwhile, such as the ATH of
-// satlink's hang-up.
+// In online-command mode, data from the far end waits for ATO, so that it
+// cannot come between the answers to the commands the app sends meanwhile,
+// such as the ATH of satlink's hang-up.
 func TestOnlineCommandModeHoldsTheFarEndsDataUntilATO(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -546,9 +542,8 @@ func TestClosingThePortEndsACallOnlyAfterATAndD2(t *testing.T) {
 	assertAnswer(t, runCommand(m, "AT+CEER", start), "\r\n+CEER: Normal call clearing\r\n\r\nOK\r\n")
 }
 
-// Go only, for a rule of Rust's that its tests leave out: after AT&D2, a
-// DTR drop ends a call still being set up too, so that an app that closes
-// its port during the setup leaves no call behind to connect.
+// After AT&D2, a DTR drop ends a call still being set up too, so that an app
+// that closes its port during the setup leaves no call behind to connect.
 func TestClosingThePortAfterATAndD2EndsACallBeingSetUp(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -644,9 +639,8 @@ func TestAnUnfinishedEscapeGoesToTheNetworkAfterTheGuardTime(t *testing.T) {
 	}
 }
 
-// Go only, for a rule of Rust's that its tests leave out: the guard of
-// silence before +++ counts from CONNECT, so that pluses sent sooner are
-// data, as they are to a real handset.
+// The guard of silence before +++ counts from CONNECT, so that pluses sent
+// sooner are data, as they are to a real handset.
 func TestPlusesSoonerThanAGuardAfterCONNECTAreData(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -658,8 +652,7 @@ func TestPlusesSoonerThanAGuardAfterCONNECTAreData(t *testing.T) {
 	assertPlusesWereData(t, m)
 }
 
-// Go only, for a rule of Rust's that its tests leave out: ATO starts the
-// guard of silence before +++ again, as CONNECT does.
+// ATO starts the guard of silence before +++ again, as CONNECT does.
 func TestPlusesSoonerThanAGuardAfterATOAreData(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -685,11 +678,10 @@ func assertPlusesWereData(t *testing.T, m *modem) {
 	}
 }
 
-// Go only, for a rule of Rust's that its tests leave out: the modem moves
-// the simulation to the time of the bytes the app writes before it takes
-// them, so that an escape whose closing guard has passed ends online-data
-// mode first, even when the app has read nothing since. Here the ATH that
-// follows the guard hangs up.
+// The modem moves the simulation to the time of the bytes the app writes
+// before it takes them, so that an escape whose closing guard has passed
+// ends online-data mode first, even when the app has read nothing since.
+// Here the ATH that follows the guard hangs up.
 func TestAnATHWrittenOnceTheEscapesGuardHasPassedHangsUp(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
@@ -705,11 +697,10 @@ func TestAnATHWrittenOnceTheEscapesGuardHasPassedHangsUp(t *testing.T) {
 	}
 }
 
-// Go only: the modem's events reach the log in Rust's texts and at Rust's
-// levels, which is what `satlink --simulate -v` shows of the simulator.
-// The test records the process-wide logger, so it does not run in
-// parallel.
-func TestTheModemLogsItsEventsAsTheRustVersionLoggedThem(t *testing.T) {
+// The modem's events reach the log with their texts and levels, which is what
+// `satlink --simulate -v` shows of the simulator. The test records the
+// process-wide logger, so it does not run in parallel.
+func TestTheModemLogsItsEvents(t *testing.T) {
 	cases := []struct {
 		name  string
 		event func(t *testing.T, now time.Time)

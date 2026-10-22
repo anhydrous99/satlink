@@ -122,9 +122,8 @@ func (pending *pendingQuery) takeRecord(response wire.DNSPacket, record wire.DNS
 		// resolve the CNAME and append the results for it.
 		//
 		// We update the query with the new name, so that we pick up the A
-		// records for the CNAME when we parse them later. smoltcp's authors
-		// believe the CNAME's results must come after it in the packet, so
-		// one linear pass over it is enough.
+		// records for the CNAME when we parse them later. The CNAME's results
+		// come after it in the packet, so one linear pass over it is enough.
 		if err := copyName(&pending.name, response.NameLabels(record.Data.Raw)); err != nil {
 			netlog.Trace("dns answer cname malformed")
 			return nil, err

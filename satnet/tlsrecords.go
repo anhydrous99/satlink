@@ -11,18 +11,16 @@ import (
 )
 
 // The record buffer between crypto/tls and the TCP connection under a TLS
-// session: the Go counterpart of the rustls session's own buffer, on which
-// the Rust stream relies. crypto/tls alone cannot keep the Rust semantics:
-// it makes every write error permanent, so a write that timed out would
-// break the session, and it takes in post-handshake messages — TLS 1.3
+// session. crypto/tls alone cannot keep the semantics a timed-out write
+// needs: it makes every write error permanent, so a write that timed out
+// would break the session, and it takes in post-handshake messages — TLS 1.3
 // session tickets — only while reading. So crypto/tls writes into this
 // buffer, which never waits; the TLSConn's calls push the records on as
 // TCP takes them, each within its own deadline; and a timed-out write
 // leaves its records here, for the next call to send.
 
-// sessionBufferLimit is the most records the session holds waiting for TCP,
-// rustls's default buffer limit: a full session makes a write wait rather
-// than fail.
+// sessionBufferLimit is the most records the session holds waiting for TCP.
+// A full session makes a write wait rather than fail.
 const sessionBufferLimit = 64 * 1024
 
 // maxPlaintextLen is the most plaintext one TLS record carries (RFC 8446
@@ -101,9 +99,8 @@ type recordBuffer struct {
 	// nonBlocking makes Read return errNothingArrived rather than wait.
 	nonBlocking atomic.Bool
 	// changes counts the changes that a Read waiting for TCP cannot see
-	// there: records a write left unsent. (Rust also counts records another
-	// call took in; here no other call takes records in while a Read waits,
-	// as the take-in is skipped while one reads.)
+	// there: records a write left unsent. Records another call takes in are
+	// not counted, as the take-in is skipped while a Read waits.
 	changes atomic.Uint64
 }
 
@@ -185,7 +182,7 @@ func (b *recordBuffer) sessionChanged() {
 
 // Close sends the records still waiting — the close_notify among them —
 // within the write deadline, and closes the transport gracefully: the
-// records that did not fit are dropped, as in Rust.
+// records that did not fit are dropped.
 func (b *recordBuffer) Close() error {
 	err := b.pushUntil(b.transport.writeUntil)
 	if closeErr := b.transport.Close(); err == nil {
@@ -248,7 +245,7 @@ func (b *recordBuffer) RemoteAddr() net.Addr {
 // SetWriteDeadline: crypto/tls calls them only to send its close_notify
 // within five seconds, while a close_notify behind a full send buffer at
 // 300 bytes per second may need far longer. It goes within the TLSConn's
-// write deadline instead, none meaning forever, as in Rust.
+// write deadline instead, none meaning forever.
 func (b *recordBuffer) SetDeadline(time.Time) error { return nil }
 
 // SetReadDeadline does nothing; see SetDeadline.

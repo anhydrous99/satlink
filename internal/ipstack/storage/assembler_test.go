@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// assemblerOf builds an assembler from (hole, data) pairs, as smoltcp's
-// contigs! macro does.
+// assemblerOf builds an assembler from (hole, data) pairs.
 func assemblerOf(contigs ...contig) Assembler {
 	var assembler Assembler
 	copy(assembler.contigs[:], contigs)
@@ -84,13 +83,13 @@ func TestAssemblerAddToEmpty(t *testing.T) {
 		offset, size int
 		want         contig
 	}{
-		"test_empty_add_full":  {offset: 0, size: 16, want: contig{0, 16}},
-		"test_empty_add_front": {offset: 0, size: 4, want: contig{0, 4}},
-		"test_empty_add_back":  {offset: 12, size: 4, want: contig{12, 4}},
-		"test_empty_add_mid":   {offset: 4, size: 8, want: contig{4, 8}},
+		"empty_add_full":  {offset: 0, size: 16, want: contig{0, 16}},
+		"empty_add_front": {offset: 0, size: 4, want: contig{0, 4}},
+		"empty_add_back":  {offset: 12, size: 4, want: contig{12, 4}},
+		"empty_add_mid":   {offset: 4, size: 8, want: contig{4, 8}},
 	}
-	for smoltcpName, c := range cases {
-		t.Run(smoltcpName, func(t *testing.T) {
+	for caseName, c := range cases {
+		t.Run(caseName, func(t *testing.T) {
 			t.Parallel()
 			assertAssembler(t, addToEmpty(t, c.offset, c.size), c.want)
 		})
@@ -103,17 +102,17 @@ func TestAssemblerAddToPartial(t *testing.T) {
 		offset, size int
 		want         contig
 	}{
-		"test_partial_add_front":               {offset: 0, size: 4, want: contig{0, 12}},
-		"test_partial_add_back":                {offset: 12, size: 4, want: contig{4, 12}},
-		"test_partial_add_front_overlap":       {offset: 0, size: 8, want: contig{0, 12}},
-		"test_partial_add_front_overlap_split": {offset: 2, size: 6, want: contig{2, 10}},
-		"test_partial_add_back_overlap":        {offset: 8, size: 8, want: contig{4, 12}},
-		"test_partial_add_back_overlap_split":  {offset: 10, size: 4, want: contig{4, 10}},
-		"test_partial_add_both_overlap":        {offset: 0, size: 16, want: contig{0, 16}},
-		"test_partial_add_both_overlap_split":  {offset: 2, size: 12, want: contig{2, 12}},
+		"partial_add_front":               {offset: 0, size: 4, want: contig{0, 12}},
+		"partial_add_back":                {offset: 12, size: 4, want: contig{4, 12}},
+		"partial_add_front_overlap":       {offset: 0, size: 8, want: contig{0, 12}},
+		"partial_add_front_overlap_split": {offset: 2, size: 6, want: contig{2, 10}},
+		"partial_add_back_overlap":        {offset: 8, size: 8, want: contig{4, 12}},
+		"partial_add_back_overlap_split":  {offset: 10, size: 4, want: contig{4, 10}},
+		"partial_add_both_overlap":        {offset: 0, size: 16, want: contig{0, 16}},
+		"partial_add_both_overlap_split":  {offset: 2, size: 12, want: contig{2, 12}},
 	}
-	for smoltcpName, c := range cases {
-		t.Run(smoltcpName, func(t *testing.T) {
+	for caseName, c := range cases {
+		t.Run(caseName, func(t *testing.T) {
 			t.Parallel()
 			assertAssembler(t, addTo(t, []contig{{4, 8}}, c.offset, c.size), c.want)
 		})
@@ -260,8 +259,8 @@ func TestAssemblerIterThreeSplit(t *testing.T) {
 		[2]int{2, 8}, [2]int{10, 11}, [2]int{13, 15})
 }
 
-// A run that fills the hole between two others (smoltcp issue 694).
-func TestAssemblerIssue694(t *testing.T) {
+// A run that fills the hole between two others.
+func TestAssemblerFillsTheHoleBetweenTwoRuns(t *testing.T) {
 	t.Parallel()
 	var assembler Assembler
 	mustAdd(t, &assembler, 0, 1)
@@ -380,8 +379,8 @@ func bitmapContigs(filled []bool) []contig {
 	return contigs
 }
 
-// Ported from smoltcp's test_random: random additions, checked against an
-// obviously correct bitmap. The seed is fixed, so that the test repeats.
+// Random additions, checked against an obviously correct bitmap. The seed is
+// fixed, so that the test repeats.
 func TestAssemblerRandom(t *testing.T) {
 	t.Parallel()
 	const bitmapSize = 256

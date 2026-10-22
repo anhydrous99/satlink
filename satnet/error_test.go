@@ -15,7 +15,7 @@ import (
 	"github.com/anhydrous99/satlink/ppp"
 )
 
-func TestErrorsAreWordedAsInRust(t *testing.T) {
+func TestErrorMessages(t *testing.T) {
 	coreErr := &satlink.Error{Kind: satlink.ErrBusy}
 	for _, c := range []struct {
 		err  *Error
@@ -25,7 +25,8 @@ func TestErrorsAreWordedAsInRust(t *testing.T) {
 		{&Error{Kind: ErrInvalidConfig, Message: "MTU too large"}, "invalid configuration: MTU too large"},
 		{&Error{Kind: ErrPolicyDenied, Destination: "echo.test:80"}, "echo.test:80 is not allowed by the link policy"},
 		{&Error{Kind: ErrInvalidHost, Host: "bad name"}, `"bad name" is not a valid host name`},
-		// Rust's {:?} of a str, where Go's %q would write "a\x1bb".
+		// Control characters are escaped as \u{..}, where Go's %q would write
+		// "a\x1bb".
 		{&Error{Kind: ErrInvalidHost, Host: "a\x1bb"}, `"a\u{1b}b" is not a valid host name`},
 		{&Error{Kind: ErrNameNotFound, Host: "missing.test"}, "no address found for missing.test"},
 		{&Error{Kind: ErrNoDNSServer}, "the link has no DNS server"},

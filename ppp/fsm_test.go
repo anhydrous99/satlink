@@ -99,7 +99,7 @@ func TestIgnoresDuplicateAndMismatchedAcks(t *testing.T) {
 
 	wrongData := ackFor(request)
 	wrongData.data = append(slices.Clone(wrongData.data), 0)
-	// Go only: an Ack as long as the request, but with another value.
+	// An Ack as long as the request, but with another value.
 	wrongValue := ackFor(request)
 	wrongValue.data = encodeOptionList([]configOption{option(1, 2)})
 	for _, mismatched := range []packet{wrongData, wrongValue} {

@@ -1,7 +1,6 @@
 package tcp
 
-// Go-specific tests (PORTING-ipstack.md, section 6) of the application's side
-// of the stream: receiving and sending (stream.go).
+// Tests of the application's side of the stream: receiving and sending.
 
 import (
 	"errors"

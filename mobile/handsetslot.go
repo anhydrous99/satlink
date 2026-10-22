@@ -9,16 +9,13 @@ import (
 )
 
 // Where an IridiumHandset's handset is: here, lent to a link, or stranded
-// by a data call that could not be ended, as the Rust bindings' Slot says.
-// The handset itself never leaves the IridiumHandset — while a link has
-// it, its own methods fail with satlink.ErrBusy — so, unlike in Rust, it
-// cannot be lost with its link, and needs no transport opened again to be
-// reached. What the Rust bindings had for free is kept here by hand: an
-// IridiumHandset closed while a link has its handset leaves the port open
-// for that link, which hangs up through it, until the call has ended, as
-// the Rust link owned the handset; and once closed, it refuses to work,
-// wherever its handset is, as UniFFI refuses every call on a destroyed
-// object.
+// by a data call that could not be ended. The handset itself never leaves
+// the IridiumHandset: while a link has it, its own methods fail with
+// satlink.ErrBusy. It therefore cannot be lost with its link, and needs no
+// transport opened again to be reached. An IridiumHandset closed while a
+// link has its handset leaves the port open for that link, which hangs up
+// through it, until the call has ended; and once closed, it refuses to work,
+// wherever its handset is.
 
 // handsetSlot is where an IridiumHandset's handset is.
 type handsetSlot int
@@ -36,8 +33,7 @@ const (
 	slotLent
 )
 
-// slotNames are the slots' names, those of the Rust bindings' Slot
-// variants, indexed by slot.
+// slotNames are the slots' names, indexed by slot.
 var slotNames = [...]string{
 	slotHere:     "Here",
 	slotStranded: "Stranded",
@@ -55,8 +51,7 @@ func (s handsetSlot) String() string {
 
 // reclaim takes the handset back from a lent link whose call has ended,
 // learning so from the link's status: stranded if the link could not hang
-// up, otherwise ready. The methods call it with h.mu held, before anything
-// else, as the Rust bindings' lock does.
+// up, otherwise ready. The methods call it with h.mu held, before anything else.
 func (h *IridiumHandset) reclaim() {
 	h.slotMu.Lock()
 	defer h.slotMu.Unlock()
@@ -163,8 +158,8 @@ func (h *IridiumHandset) lend() (*handsetLoan, error) {
 }
 
 // handsetLoan is an IridiumHandset's handset lent to a link being set up.
-// The setup settles where the handset goes exactly once, as the Rust
-// bindings' establish_with_handset does: on to its link (lentTo), or back
+// The setup settles where the handset goes exactly once: on to its link
+// (lentTo), or back
 // to the IridiumHandset (returnedAfter). Only the goroutine that sets the
 // link up uses the loan.
 type handsetLoan struct {

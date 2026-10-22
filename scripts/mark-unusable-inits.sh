@@ -6,10 +6,10 @@
 # for a Go implementation of an interface (ByteTransport, LinkListener,
 # LogSink). An object made with the init a class inherits has
 # no Go side, and its first use raises an Objective-C exception that ends
-# the app; marked unavailable, the compiler refuses it, as Rust's Swift
-# bindings had no such initializer. build-bindings.sh runs this on the
-# framework's headers after gomobile has compiled the bindings: the mark
-# changes what apps may write, not the compiled code.
+# the app; marked unavailable, the compiler refuses it, so Swift code cannot
+# call an initializer that has no Go constructor behind it. build-bindings.sh
+# runs this on the framework's headers after gomobile has compiled the
+# bindings: the mark changes what apps may write, not the compiled code.
 #
 # Usage: scripts/mark-unusable-inits.sh HEADER...
 set -euo pipefail

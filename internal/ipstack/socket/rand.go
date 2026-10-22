@@ -1,7 +1,7 @@
 package socket
 
 // Rand is the pseudo-random generator behind TCP initial sequence numbers and
-// DNS query ids and source ports: smoltcp's sPCG32. The interface's random
+// DNS query ids and source ports: an sPCG32. The interface's random
 // seed makes its values differ between runs, but it is not
 // cryptographically secure, and its values are predictable: every peer of a
 // TCP connection sees its initial sequence number, a few of those reveal the
@@ -14,7 +14,7 @@ type Rand struct {
 }
 
 // The constants of sPCG32 (https://www.pcg-random.org/paper.html; see also
-// https://nullprogram.com/blog/2017/09/21/), as smoltcp has them.
+// https://nullprogram.com/blog/2017/09/21/).
 const (
 	// pcgMultiplier and pcgIncrement advance the 64-bit state, a linear
 	// congruential generator.
@@ -29,8 +29,7 @@ const (
 )
 
 // highestExcludedPort is the largest port SourcePort never returns: the
-// well-known ports below 1024, where servers listen, and 1024 itself, as
-// smoltcp has it.
+// well-known ports below 1024, where servers listen, and 1024 itself.
 const highestExcludedPort = 1024
 
 // Uint32 returns the next 32 random bits.

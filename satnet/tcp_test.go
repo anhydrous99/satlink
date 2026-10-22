@@ -368,8 +368,8 @@ func holdsSocket(sharedEngine *shared, conn *TCPConn) bool {
 	return e.stack.outbox(conn.conn.handle) != nil
 }
 
-// TestAnAbortedConnectionKeepsItsSocketUntilClosed is Go only. Abort resets
-// the connection but keeps its socket, as the Rust version's abort does,
+// TestAnAbortedConnectionKeepsItsSocketUntilClosed checks that Abort resets
+// the connection and keeps its socket,
 // rather than letting it go once the reset has left, as the stack's abortTCP
 // does: the TCPConn's handle must name its own socket until Close, not none,
 // on which its calls would panic, nor a new connection's that took the slot.

@@ -10,7 +10,7 @@ import (
 // constant here are valid on the wire.
 type DNSOpcode uint8
 
-// The opcodes smoltcp names (RFC 1035 § 4.1.1).
+// The DNS opcodes (RFC 1035 § 4.1.1).
 const (
 	// DNSOpcodeQuery is a standard query, the only kind the stack sends
 	// and accepts answers to.
@@ -19,8 +19,7 @@ const (
 	DNSOpcodeStatus DNSOpcode = 1
 )
 
-// String returns the variant name, as Rust's Debug does ("Query",
-// "Unknown(4)").
+// String returns the variant name ("Query", "Unknown(4)").
 func (o DNSOpcode) String() string {
 	switch o {
 	case DNSOpcodeQuery:
@@ -36,7 +35,7 @@ func (o DNSOpcode) String() string {
 // here are valid on the wire.
 type DNSRcode uint8
 
-// The response codes smoltcp names (RFC 1035 § 4.1.1, RFC 2136 § 2.2).
+// The response codes (RFC 1035 § 4.1.1, RFC 2136 § 2.2).
 const (
 	// DNSRcodeNoError reports success.
 	DNSRcodeNoError DNSRcode = 0x00
@@ -81,8 +80,7 @@ var dnsRcodeNames = map[DNSRcode]string{
 	DNSRcodeNotZone:  "NotZone",
 }
 
-// String returns the variant name, as Rust's Debug does ("NXDomain",
-// "Unknown(12)").
+// String returns the variant name ("NXDomain", "Unknown(12)").
 func (r DNSRcode) String() string {
 	if name, ok := dnsRcodeNames[r]; ok {
 		return name
@@ -90,11 +88,10 @@ func (r DNSRcode) String() string {
 	return unknownVariant(int(r))
 }
 
-// DNSType is the type of a DNS question or record (smoltcp's
-// DnsQueryType). Values without a constant here are valid on the wire.
+// DNSType is the type of a DNS question or record. Values without a constant here are valid on the wire.
 type DNSType uint16
 
-// The record types smoltcp names (RFC 1035 § 3.2.2, RFC 3596).
+// The record types (RFC 1035 § 3.2.2, RFC 3596).
 const (
 	// DNSTypeA is an IPv4 address, the only type the stack asks for.
 	DNSTypeA DNSType = 0x0001
@@ -117,8 +114,7 @@ var dnsTypeNames = map[DNSType]string{
 	DNSTypeAAAA:  "Aaaa",
 }
 
-// String returns the variant name, as Rust's Debug does ("A", "Cname",
-// "Unknown(16)").
+// String returns the variant name ("A", "Cname", "Unknown(16)").
 func (t DNSType) String() string {
 	if name, ok := dnsTypeNames[t]; ok {
 		return name
@@ -177,9 +173,8 @@ const (
 const (
 	dnsOpcodeShift        = 11
 	dnsOpcodeMask  uint16 = 0xf // after the shift
-	// dnsOpcodeSetMask is the part of the field SetOpcode replaces: like
-	// smoltcp, the opcode's low three bits, which hold every opcode the
-	// stack sends.
+	// dnsOpcodeSetMask is the part of the field SetOpcode replaces: the
+	// opcode's low three bits, which hold every opcode the stack sends.
 	dnsOpcodeSetMask uint16 = 0x3800
 	dnsRcodeMask     uint16 = 0xf
 )
@@ -407,7 +402,7 @@ func ParseDNSRecord(buffer []byte) (record DNSRecord, rest []byte, err error) {
 // DNSRecordData is the data of a resource record. Type says which kind of
 // record it is: an A record has its Address; every other type, CNAME
 // included, has its data in Raw. With IPv4 only, AAAA records are "other"
-// records, as in smoltcp without proto-ipv6.
+// records.
 type DNSRecordData struct {
 	// Type is the record's type.
 	Type DNSType
@@ -454,9 +449,9 @@ func (r DNSRepr) BufferLen() int {
 // long: the header with one question and no records, then the question.
 func (r DNSRepr) Emit(packet DNSPacket) {
 	packet.SetTransactionID(r.TransactionID)
-	// smoltcp sets the flags and the opcode into what the field held;
-	// clearing it first gives the query the response code and reserved bits
-	// it has in smoltcp's zeroed buffers, zero, whatever the buffer held.
+	// Setting the flags and the opcode keeps what the field held; clearing it
+	// first gives the response code and reserved bits the zero they have in a
+	// fresh buffer, whatever the buffer held.
 	packet.setFlagsField(0)
 	packet.SetFlags(r.Flags)
 	packet.SetOpcode(r.Opcode)
@@ -467,8 +462,7 @@ func (r DNSRepr) Emit(packet DNSPacket) {
 	r.Question.Emit(packet.Payload())
 }
 
-// unknownVariant formats a value without a name as Rust's Debug formats an
-// enum_with_unknown's Unknown variant.
+// unknownVariant formats a value without a name as Unknown(value).
 func unknownVariant(value int) string {
 	return "Unknown(" + strconv.Itoa(value) + ")"
 }
