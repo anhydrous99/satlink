@@ -6,7 +6,8 @@ itself (status, SMS, calls) and gives your app an IP link that **only your app
 can use**.
 
 > [!WARNING]
-> satlink has not yet been tested against real hardware. See [Status](#status).
+> satlink has been tested on a real 9555A, but not yet with a satellite signal.
+> See [Status](#status).
 
 ## Why satlink
 
@@ -163,12 +164,23 @@ supported: iPhones don't expose USB CDC devices to apps.
 
 ## Status
 
-- **Not yet tested against real hardware.** satlink uses the standard
-  3GPP 27.005/27.007 subset Iridium handsets document. Response formats may need
-  small fixes once checked against a real 9555 or 9575.
+- **Tested on a 9555A without a signal.** On firmware HT19002, from macOS,
+  these work: discovery, identity, status, reading stored SMS, hanging up,
+  and recovery from a session that died mid-command. Data calls, voice calls
+  and SMS go as far as the network, which refuses them for want of a signal.
+  The tests found four faults, now fixed:
+  - Commands sent the instant the previous answer arrived were lost.
+  - The battery's bars were read as its percentage.
+  - A signal reading's late answer could pass for the next command's.
+  - SMS needs PDU mode, the only mode Iridium handsets have.
+- **Not yet tested with a signal.** No call has connected over the satellite
+  and no SMS has been delivered. Cancelling a dial during call setup is
+  unverified too: without a signal, the dial fails first.
+- **The 9575 and the ROC service port are untested.**
 - **DTR over USB is unverified.** If an app dies, the operating system drops
-  DTR, which should end the call. That the handsets honour this over USB has
-  not been checked on hardware.
+  DTR, which should end the call. A 9555A accepts AT&D2, and still takes
+  commands while DTR is low. That dropping DTR ends a call needs a call up to
+  check.
 - **The gateway defaults are second-hand.** The number, bearer, lack of
   authentication and DNS over IPCP come from Iridium's manuals and published
   logs. That `008816000025` still answers in 2026 has not been confirmed.

@@ -348,10 +348,10 @@ func TestConcurrentCallsTakeTurns(t *testing.T) {
 	// that did not take turns would read each other's.
 	transport := newAnswering(map[string]string{
 		"AT+CSQ\r": "\r\n+CSQ:4\r\n\r\nOK\r\n",
-		"AT+CBC\r": "\r\n+CBC: 1,080\r\n\r\nOK\r\n",
+		"AT+CBC\r": "\r\n+CBC: 1,3\r\n\r\nOK\r\n",
 	})
 	handset := iridium.NewHandset(transport)
-	wantBattery := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Level: 80}
+	wantBattery := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Bars: 3}
 
 	var callers sync.WaitGroup
 	for range concurrentCallers {

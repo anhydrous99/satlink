@@ -56,7 +56,7 @@ func handsetCases() []goldenCase {
 		{name: "commands/info-unplugged", args: []string{instant, "info"}, world: world{handset: unplugged}},
 		{name: "commands/status", args: []string{instant, "status"}},
 		{name: "commands/status-with-event", args: []string{instant, "status"},
-			world: world{handset: smsArrivingOn("AT+CSQ")}},
+			world: world{handset: smsArrivingOn("AT+CSQF")}},
 		{name: "commands/sms-send", args: []string{instant, "sms", "send", "+881631234567", "hello from the field"}},
 		{name: "commands/sms-list", args: []string{instant, "sms", "list"}, world: twoMessages},
 		{name: "commands/sms-list-read", args: []string{instant, "sms", "list", "read"}, world: twoMessages},
@@ -122,7 +122,7 @@ func TestMonitorPrintsEventsUntilInterrupted(t *testing.T) {
 	args := []string{instant, "monitor"}
 	// The last of the handset's initialisation, so that the SMS arrives
 	// before the monitoring starts.
-	env, _, stderr := world{handset: smsArrivingOn("AT+CMGF=1")}.environment(t, args)
+	env, _, stderr := world{handset: smsArrivingOn("AT+CMGF=0")}.environment(t, args)
 	// Long enough to see the event, and the end of a test that hangs.
 	ctx, giveUp := context.WithTimeout(context.Background(), 10*time.Second)
 	defer giveUp()
@@ -299,7 +299,7 @@ func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 		{"at", []string{instant, "at", "AT+CSQ"}, world{}},
 		// The last of the handset's initialisation, so that the SMS arrives
 		// before the monitoring starts.
-		{"monitor", []string{instant, "monitor"}, world{handset: smsArrivingOn("AT+CMGF=1")}},
+		{"monitor", []string{instant, "monitor"}, world{handset: smsArrivingOn("AT+CMGF=0")}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -323,7 +323,7 @@ func TestAHandsetCommandWhoseOutputCannotBeWrittenFails(t *testing.T) {
 // The "(event)" lines are not best effort either: an event that standard error
 // cannot take fails the command.
 func TestAnEventThatCannotBeReportedFailsTheCommand(t *testing.T) {
-	env, stdout, _ := world{handset: smsArrivingOn("AT+CSQ")}.environment(t, []string{instant, "status"})
+	env, stdout, _ := world{handset: smsArrivingOn("AT+CSQF")}.environment(t, []string{instant, "status"})
 	env.stderr = brokenWriter{}
 
 	status := run(context.Background(), env)

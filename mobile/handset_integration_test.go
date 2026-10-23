@@ -47,6 +47,7 @@ func TestAHandsetReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 	handset, _ := simulatedHandset(t)
 
 	bars, barsErr := handset.SignalQuality()
+	lastBars, lastBarsErr := handset.LastSignalQuality()
 	battery, batteryErr := handset.Battery()
 	registration, registrationErr := handset.Registration()
 	clock, clockErr := handset.Clock()
@@ -54,7 +55,11 @@ func TestAHandsetReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 	if barsErr != nil || bars != 4 {
 		t.Errorf("SignalQuality() = %d, %v, want 4", bars, barsErr)
 	}
-	if want := (mobile.Battery{Status: mobile.ChargeStatusExternalPower, Level: 80}); batteryErr != nil || *battery != want {
+	if lastBarsErr != nil || lastBars != 4 {
+		t.Errorf("LastSignalQuality() = %d, %v, want 4", lastBars, lastBarsErr)
+	}
+	if want := (mobile.Battery{Status: mobile.ChargeStatusExternalPower, Bars: 3, Charger: mobile.ChargerStatusCharging,
+		Level: 80, LevelReported: true}); batteryErr != nil || *battery != want {
 		t.Errorf("Battery() = %+v, %v, want %+v", battery, batteryErr, want)
 	}
 	if want := (mobile.Registration{Status: mobile.RegistrationStatusHome}); registrationErr != nil || *registration != want {
@@ -95,7 +100,7 @@ func TestAnIncomingSMSIsAnnouncedReadAndDeleted(t *testing.T) {
 	handset, control := simulatedHandset(t)
 	want := mobile.SMSMessage{Index: 1, Status: "REC UNREAD", Address: "+881600000000", Text: "are you there?"}
 
-	control.ReceiveSMS(want.Address, want.Text)
+	simtest.ReceiveSMS(t, control, want.Address, want.Text)
 	events, err := handset.PollEvents(eventTimeoutMillis)
 	if err != nil {
 		t.Fatalf("PollEvents: %v", err)
@@ -148,7 +153,7 @@ func assertSMS(t *testing.T, got *mobile.SMSMessage, want mobile.SMSMessage) {
 func TestTakeEventsReturnsTheQueuedEventsOnce(t *testing.T) {
 	t.Parallel()
 	handset, control := simulatedHandset(t)
-	control.ReceiveSMS("+881600000000", "hello")
+	simtest.ReceiveSMS(t, control, "+881600000000", "hello")
 
 	var events *mobile.StringList
 	simtest.Eventually(t, patience, "the announcement is queued", func() bool {

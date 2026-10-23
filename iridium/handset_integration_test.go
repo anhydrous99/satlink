@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,20 +54,20 @@ const (
 func keepsListing(transport *scripted) *scripted {
 	storedMessages := int(lateListingLasts/lateListingPause) - 1
 	for index := 1; index <= storedMessages; index++ {
-		message := fmt.Sprintf("\r\n+CMGL: %d,\"REC READ\",\"+881631111111\",,\r\nhello\r\n", index)
+		message := fmt.Sprintf("\r\n+CMGL: %d,1,,24\r\n%s\r\n", index, ucs2DeliverPDU)
 		transport.unsolicitedAfter(time.Duration(index)*lateListingPause, message)
 	}
 	return transport.unsolicitedAfter(lateListingLasts, okReply)
 }
 
 // configuration are the steps with which Initialize ends: echo off,
-// verbose results, verbose +CME ERROR, SMS text mode.
+// verbose results, verbose +CME ERROR, SMS PDU mode.
 func configuration() []step {
 	return []step{
 		{"ATE0\r", okReply},
 		{"ATV1\r", okReply},
 		{"AT+CMEE=2\r", okReply},
-		{"AT+CMGF=1\r", okReply},
+		{"AT+CMGF=0\r", okReply},
 	}
 }
 
@@ -77,7 +78,7 @@ func TestInitializeHandlesEcho(t *testing.T) {
 		step{"ATE0\r", "ATE0\r\r\nOK\r\n"},
 		step{"ATV1\r", okReply},
 		step{"AT+CMEE=2\r", okReply},
-		step{"AT+CMGF=1\r", okReply},
+		step{"AT+CMGF=0\r", okReply},
 	)
 	handset := newTestHandset(transport)
 
@@ -114,10 +115,39 @@ func TestDeviceInfo(t *testing.T) {
 	}
 }
 
+// handsetSettle is how long a command line waits after the handset last
+// sent something: a 9555A drops a command written straight after its
+// previous answer.
+const handsetSettle = 20 * time.Millisecond
+
+func TestACommandWaitsForTheHandsetToSettleAfterItsLastAnswer(t *testing.T) {
+	transport := newScripted(
+		step{"AT+CGMI\r", "\r\nIridium\r\n\r\nOK\r\n"},
+		// A 9555A's OK after AT+CGMM comes without a line break of its own.
+		step{"AT+CGMM\r", "\r\n9555A\r\nOK\r\n"},
+	)
+	handset := newTestHandset(transport)
+
+	_, firstErr := handset.Command("AT+CGMI")
+	model, secondErr := handset.Command("AT+CGMM")
+
+	if firstErr != nil || secondErr != nil {
+		t.Fatalf("Command = %v, %v", firstErr, secondErr)
+	}
+	if !slices.Equal(model.Lines, []string{"9555A"}) {
+		t.Errorf("AT+CGMM answered %q, want 9555A", model.Lines)
+	}
+	first, _ := transport.writtenAt("AT+CGMI\r")
+	second, _ := transport.writtenAt("AT+CGMM\r")
+	if gap := second.Sub(first); gap < handsetSettle {
+		t.Errorf("AT+CGMM written %v after AT+CGMI, which was answered at once; want at least %v", gap, handsetSettle)
+	}
+}
+
 func TestSignalBatteryRegistration(t *testing.T) {
 	handset := newTestHandset(newScripted(
 		step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"},
-		step{"AT+CBC\r", "\r\n+CBC: 1,080\r\n\r\nOK\r\n"},
+		step{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK\r\n"},
 		step{"AT+CREG?\r", "\r\n+CREG: 0,1\r\n\r\nOK\r\n"},
 	))
 
@@ -126,7 +156,7 @@ func TestSignalBatteryRegistration(t *testing.T) {
 		t.Errorf("SignalQuality = %d, %v; want 4", bars, err)
 	}
 	battery, err := handset.Battery()
-	want := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Level: 80}
+	want := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Bars: 3}
 	if err != nil || battery != want {
 		t.Errorf("Battery = %+v, %v; want %+v", battery, err, want)
 	}
@@ -136,10 +166,81 @@ func TestSignalBatteryRegistration(t *testing.T) {
 	}
 }
 
-func TestSendSMSWaitsForPrompt(t *testing.T) {
+func TestASignalReadingWaitsLongerThanTheCommandTimeout(t *testing.T) {
+	// AT+CSQ is answered once the handset has a new reading, which can take
+	// seconds.
+	transport := newScripted(step{"AT+CSQ\r", "\r\n+CSQ:3\r\n\r\nOK\r\n"}).answersLate("AT+CSQ\r", 4*commandTimeout)
+	handset := newTestHandset(transport)
+
+	bars, err := handset.SignalQuality()
+
+	if err != nil || bars != 3 {
+		t.Errorf("SignalQuality = %d, %v; want 3", bars, err)
+	}
+}
+
+func TestTheLastSignalReadingIsAskedForWithCSQF(t *testing.T) {
+	handset := newTestHandset(newScripted(step{"AT+CSQF\r", "\r\n+CSQF:2\r\n\r\nOK\r\n"}))
+
+	bars, err := handset.LastSignalQuality()
+
+	if err != nil || bars != 2 {
+		t.Errorf("LastSignalQuality = %d, %v; want 2", bars, err)
+	}
+}
+
+func TestA9555ABatteryReportGivesTheBarsTheChargerAndThePercentage(t *testing.T) {
+	// What a 9555A on its battery, 94% charged, answers.
+	handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n+CBC:000,004,003,094\r\n\r\nOK\r\n"}))
+
+	battery, err := handset.Battery()
+
+	want := iridium.Battery{
+		Status:        iridium.ChargeStatusOnBattery,
+		Bars:          4,
+		Charger:       iridium.ChargerStatusNotConnected,
+		Level:         94,
+		LevelReported: true,
+	}
+	if err != nil || battery != want {
+		t.Errorf("Battery = %+v, %v; want %+v", battery, err, want)
+	}
+}
+
+func TestABatteryReportWithABadFieldIsRefused(t *testing.T) {
+	for _, report := range []string{"+CBC: 0", "+CBC: 0,x", "+CBC: 0,4,x,94", "+CBC: 0,4,3,-1"} {
+		handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n" + report + "\r\n\r\nOK\r\n"}))
+
+		_, err := handset.Battery()
+
+		if !errors.Is(err, iridium.ErrParse) {
+			t.Errorf("Battery for %q: %v, want ErrParse", report, err)
+		}
+	}
+}
+
+// PDUs as handsets write them, in hexadecimal.
+const (
+	// iridiumCentre is Iridium's SMS centre, +881662900005, as the
+	// address that starts a PDU.
+	iridiumCentre = "0791886126090050"
+	// helloSubmitTPDU sends "hello" to +881631234567, in the GSM 7-bit
+	// alphabet, valid for a week: 19 octets.
+	helloSubmitTPDU = "11000C918861133254760000AD05E8329BFD06"
+	// helloDeliverPDU is "hellohello" from 27838890001, by way of centre
+	// +27381000015, at 99/03/29,15:16:59+08: a widely published example.
+	helloDeliverPDU = "07917283010010F5040BC87238880900F10000993092516195800AE8329BFD4697D9EC37"
+	// ucs2DeliverPDU is "hi" in UCS-2 from +12025550100 at
+	// 24/10/18,13:30:00+00, with an empty centre's address: 24 octets of
+	// TPDU.
+	ucs2DeliverPDU = "00040B912120550501F00008420181310300000400680069"
+)
+
+func TestSendSMSEntersThePDUAtThePrompt(t *testing.T) {
 	handset := newTestHandset(newScripted(
-		step{"AT+CMGS=\"+881631234567\"\r", "\r\n> "},
-		step{"hello\x1a", "\r\n+CMGS: 17\r\n\r\nOK\r\n"},
+		step{"AT+CSCA?\r", "\r\n+CSCA: \"+881662900005\",145\r\n\r\nOK\r\n"},
+		step{"AT+CMGS=19\r", "\r\n> "},
+		step{iridiumCentre + helloSubmitTPDU + "\x1a", "\r\n+CMGS: 17\r\n\r\nOK\r\n"},
 	))
 
 	reference, err := handset.SendSMS("+881631234567", "hello")
@@ -149,13 +250,44 @@ func TestSendSMSWaitsForPrompt(t *testing.T) {
 	}
 }
 
-func TestListSMSMultiline(t *testing.T) {
+func TestSendSMSGoesThroughTheCentreTheSIMNames(t *testing.T) {
+	transport := newScripted(
+		step{"AT+CSCA?\r", "\r\n+CSCA: \"+12025550199\",145\r\n\r\nOK\r\n"},
+		step{"AT+CMGS=19\r", "\r\n> "},
+		step{"07912120550591F9" + helloSubmitTPDU + "\x1a", "\r\n+CMGS: 18\r\n\r\nOK\r\n"},
+	)
+
+	_, err := newTestHandset(transport).SendSMS("+881631234567", "hello")
+
+	if err != nil {
+		t.Errorf("SendSMS: %v", err)
+	}
+	assertAllPlayed(t, transport)
+}
+
+func TestSendSMSGoesThroughIridiumsCentreWhenTheSIMNamesNone(t *testing.T) {
+	// What a 9555A whose SIM names no centre answers.
+	transport := newScripted(
+		step{"AT+CSCA?\r", "\r\n+CMS ERROR:330\r\n"},
+		step{"AT+CMGS=19\r", "\r\n> "},
+		step{iridiumCentre + helloSubmitTPDU + "\x1a", "\r\n+CMGS: 19\r\n\r\nOK\r\n"},
+	)
+
+	_, err := newTestHandset(transport).SendSMS("+881631234567", "hello")
+
+	if err != nil {
+		t.Errorf("SendSMS: %v", err)
+	}
+	assertAllPlayed(t, transport)
+}
+
+func TestListSMSDecodesEachMessagesPDU(t *testing.T) {
+	// The second header is a 9555A's: zero-padded, with a <length> one
+	// more than TS 27.005 says, which goes unread.
 	handset := newTestHandset(newScripted(step{
-		"AT+CMGL=\"ALL\"\r",
-		"\r\n+CMGL: 1,\"REC READ\",\"+881631111111\",,\"24/10/18,12:00:00+00\"\r\n" +
-			"first line\r\nsecond line\r\n" +
-			"+CMGL: 4,\"REC UNREAD\",\"+12025550100\",,\"24/10/18,13:30:00+00\"\r\n" +
-			"hi\r\n\r\nOK\r\n",
+		"AT+CMGL=4\r",
+		"\r\n+CMGL: 1,1,,35\r\n" + helloDeliverPDU + "\r\n" +
+			"+CMGL:004,000,,025\r\n" + ucs2DeliverPDU + "\r\n\r\nOK\r\n",
 	}))
 
 	messages, err := handset.ListSMS(iridium.SMSFilterAll)
@@ -164,11 +296,71 @@ func TestListSMSMultiline(t *testing.T) {
 		t.Fatalf("ListSMS: %v", err)
 	}
 	want := []iridium.SMSMessage{
-		{Index: 1, Status: "REC READ", Address: "+881631111111", Timestamp: "24/10/18,12:00:00+00", Text: "first line\nsecond line"},
+		{Index: 1, Status: "REC READ", Address: "27838890001", Timestamp: "99/03/29,15:16:59+08", Text: "hellohello"},
 		{Index: 4, Status: "REC UNREAD", Address: "+12025550100", Timestamp: "24/10/18,13:30:00+00", Text: "hi"},
 	}
 	if !slices.Equal(messages, want) {
 		t.Errorf("ListSMS = %+v, want %+v", messages, want)
+	}
+}
+
+func TestAListingMayTakeLongerThanTheCommandTimeout(t *testing.T) {
+	// A handset takes about a third of a second for each message it lists.
+	transport := newScripted(step{"AT+CMGL=4\r", "\r\n+CMGL: 1,1,,35\r\n" + helloDeliverPDU + "\r\n\r\nOK\r\n"}).
+		answersLate("AT+CMGL=4\r", 4*commandTimeout)
+
+	messages, err := newTestHandset(transport).ListSMS(iridium.SMSFilterAll)
+
+	if err != nil || len(messages) != 1 {
+		t.Errorf("ListSMS = %+v, %v; want one message", messages, err)
+	}
+}
+
+func TestAStoredMessageToSendHasNoTimestamp(t *testing.T) {
+	handset := newTestHandset(newScripted(step{
+		"AT+CMGL=4\r", "\r\n+CMGL: 2,3,,19\r\n00" + helloSubmitTPDU + "\r\n\r\nOK\r\n",
+	}))
+
+	messages, err := handset.ListSMS(iridium.SMSFilterAll)
+
+	want := []iridium.SMSMessage{{Index: 2, Status: "STO SENT", Address: "+881631234567", Text: "hello"}}
+	if err != nil || !slices.Equal(messages, want) {
+		t.Errorf("ListSMS = %+v, %v; want %+v", messages, err, want)
+	}
+}
+
+func TestAListingThatDoesNotHoldTogetherIsAParseError(t *testing.T) {
+	tests := map[string]struct {
+		listing string
+		want    string
+	}{
+		"a line that is no header": {"\r\nhello\r\n", `no +CMGL header in "hello"`},
+		"a header without its PDU": {"\r\n+CMGL: 1,1,,35\r\n", "+CMGL: message 1 has no PDU"},
+		"a PDU that is not hex":    {"\r\n+CMGL: 1,1,,35\r\nhello\r\n", "+CMGL: message 1: the PDU is not hexadecimal"},
+		"a PDU cut short":          {"\r\n+CMGL: 1,1,,35\r\n0004\r\n", "+CMGL: message 1: the PDU ends early"},
+		"a bad index":              {"\r\n+CMGL: x,1,,35\r\n" + helloDeliverPDU + "\r\n", `+CMGL: bad field 0 in ["x", "1", "", "35"]`},
+		"a bad status":             {"\r\n+CMGL: 1,x,,35\r\n" + helloDeliverPDU + "\r\n", `+CMGL: bad field 0 in ["x", "", "35"]`},
+	}
+	for name, test := range tests {
+		handset := newTestHandset(newScripted(step{"AT+CMGL=4\r", test.listing + "\r\nOK\r\n"}))
+
+		_, err := handset.ListSMS(iridium.SMSFilterAll)
+
+		if want := (&iridium.Error{Kind: iridium.ErrParse, Message: test.want}); !errors.Is(err, iridium.ErrParse) || err.Error() != want.Error() {
+			t.Errorf("%s: %v, want %v", name, err, want)
+		}
+	}
+}
+
+func TestAStatusWithoutANameIsShownByItsCode(t *testing.T) {
+	handset := newTestHandset(newScripted(step{
+		"AT+CMGL=4\r", "\r\n+CMGL: 1,7,,35\r\n" + helloDeliverPDU + "\r\n\r\nOK\r\n",
+	}))
+
+	messages, err := handset.ListSMS(iridium.SMSFilterAll)
+
+	if err != nil || len(messages) != 1 || messages[0].Status != "Unknown(7)" {
+		t.Errorf("ListSMS = %+v, %v; want status Unknown(7)", messages, err)
 	}
 }
 
@@ -235,7 +427,7 @@ func TestAnOKLineFromACallLeftUpDoesNotPassForTheHandsets(t *testing.T) {
 		step{"ATE0\r", okReply},
 		step{"ATV1\r", okReply},
 		step{"AT+CMEE=2\r", okReply},
-		step{"AT+CMGF=1\r", okReply},
+		step{"AT+CMGF=0\r", okReply},
 	)
 	handset := newTestHandset(transport)
 
@@ -422,12 +614,12 @@ func TestTimeoutAndValidation(t *testing.T) {
 
 	_, commandErr := handset.Command("AT")
 	dialErr := handset.Dial("123; ATH")
-	_, smsErr := handset.SendSMS("+1", "bad\x1a")
+	_, smsErr := handset.SendSMS("+1", strings.Repeat("a", 161))
 	_, injectionErr := handset.Command("AT\rATH")
 
 	assertError(t, commandErr, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT"})
 	assertError(t, dialErr, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: `"123; ATH" is not a dialable number`})
-	assertError(t, smsErr, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: "SMS text must not contain Ctrl-Z or ESC"})
+	assertError(t, smsErr, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: "the text is too long for one SMS: 161 GSM characters, of 160"})
 	assertError(t, injectionErr, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: "command must not contain CR or LF"})
 	if written := string(transport.history()); written != "AT\r" {
 		t.Errorf("written %q, want only the AT that timed out", written)
@@ -484,7 +676,7 @@ func TestFirmwareRefusingTheOptionalSettingsIsStillInitialised(t *testing.T) {
 		step{"ATE0\r", okReply},
 		step{"ATV1\r", okReply},
 		step{"AT+CMEE=2\r", "\r\nERROR\r\n"},
-		step{"AT+CMGF=1\r", "\r\nERROR\r\n"},
+		step{"AT+CMGF=0\r", "\r\nERROR\r\n"},
 	)
 
 	if err := newTestHandset(transport).Initialize(); err != nil {
@@ -536,18 +728,18 @@ func TestALateAnswerArrivingDuringInitializeDoesNotHideAHeldCall(t *testing.T) {
 }
 
 func TestAPartialAnswerLeftBeforeInitializeDoesNotHideAHeldCall(t *testing.T) {
-	// AT+CSQ timed out before the line end of its answer's OK came: what it
+	// AT+CBC timed out before the line end of its answer's OK came: what it
 	// left in the line buffer must not run into AT+CPAS's answer and pass
 	// for it, leaving the call held in online-command mode unseen.
 	transport := newScripted(slices.Concat([]step{
-		{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK"},
+		{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK"},
 		{"AT\r", okReply},
 		{"AT+CPAS\r", dataCallStatusReply},
 		{"ATH\r", okReply},
 	}, configuration())...)
 	handset := newTestHandset(transport)
-	if _, err := handset.SignalQuality(); !errors.Is(err, iridium.ErrTimeout) {
-		t.Fatalf("SignalQuality = %v, want a timeout: its answer never ended", err)
+	if _, err := handset.Battery(); !errors.Is(err, iridium.ErrTimeout) {
+		t.Fatalf("Battery = %v, want a timeout: its answer never ended", err)
 	}
 
 	if err := handset.Initialize(); err != nil {
@@ -610,12 +802,12 @@ func TestAnATAnsweredASecondLateStillSynchronises(t *testing.T) {
 func TestAZeroTimeoutFailsACommandWithoutWaitingForItsAnswer(t *testing.T) {
 	// As SetTimeout says: the command is sent, and nothing
 	// is read for it, not even an answer that has arrived.
-	handset := newTestHandset(newScripted(step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK\r\n"}))
+	handset := newTestHandset(newScripted(step{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK\r\n"}))
 	handset.SetTimeout(0)
 
-	_, err := handset.SignalQuality()
+	_, err := handset.Battery()
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CSQ"})
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CBC"})
 }
 
 // longestPromisedRead is the longest a read of a handset waits for data at a
@@ -703,10 +895,9 @@ func TestPollURCsReturnsAsSoonAsOneArrives(t *testing.T) {
 	}
 }
 
-func TestReadSMSReadsTheHeaderAndTheText(t *testing.T) {
+func TestReadSMSReadsTheHeaderAndThePDU(t *testing.T) {
 	handset := newTestHandset(newScripted(step{
-		"AT+CMGR=3\r",
-		"\r\n+CMGR: \"REC UNREAD\",\"+881631111111\",,\"24/10/18,12:00:00+00\"\r\nline one\r\nline two\r\n\r\nOK\r\n",
+		"AT+CMGR=3\r", "\r\n+CMGR: 0,,24\r\n" + ucs2DeliverPDU + "\r\n\r\nOK\r\n",
 	}))
 
 	message, err := handset.ReadSMS(3)
@@ -715,8 +906,7 @@ func TestReadSMSReadsTheHeaderAndTheText(t *testing.T) {
 		t.Fatalf("ReadSMS: %v", err)
 	}
 	want := iridium.SMSMessage{
-		Index: 3, Status: "REC UNREAD", Address: "+881631111111",
-		Timestamp: "24/10/18,12:00:00+00", Text: "line one\nline two",
+		Index: 3, Status: "REC UNREAD", Address: "+12025550100", Timestamp: "24/10/18,13:30:00+00", Text: "hi",
 	}
 	if message != want {
 		t.Errorf("ReadSMS = %+v, want %+v", message, want)
@@ -728,7 +918,7 @@ func TestReadSMSWithoutAHeaderIsAParseError(t *testing.T) {
 
 	_, err := handset.ReadSMS(3)
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrParse, Message: `no +CMGR header in ["hello"]`})
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrParse, Message: `no +CMGR header and PDU in ["hello"]`})
 }
 
 func TestMessageIndicesAndFiltersAreCheckedBeforeAnythingIsSent(t *testing.T) {
@@ -749,14 +939,14 @@ func TestMessageIndicesAndFiltersAreCheckedBeforeAnythingIsSent(t *testing.T) {
 
 func TestListSMSSelectsWithTheFiltersStorageStatus(t *testing.T) {
 	filters := map[iridium.SMSFilter]string{
-		iridium.SMSFilterUnread: "REC UNREAD",
-		iridium.SMSFilterRead:   "REC READ",
-		iridium.SMSFilterUnsent: "STO UNSENT",
-		iridium.SMSFilterSent:   "STO SENT",
+		iridium.SMSFilterUnread: "0",
+		iridium.SMSFilterRead:   "1",
+		iridium.SMSFilterUnsent: "2",
+		iridium.SMSFilterSent:   "3",
 	}
 	for filter, status := range filters {
 		t.Run(filter.String(), func(t *testing.T) {
-			handset := newTestHandset(newScripted(step{"AT+CMGL=\"" + status + "\"\r", okReply}))
+			handset := newTestHandset(newScripted(step{"AT+CMGL=" + status + "\r", okReply}))
 
 			messages, err := handset.ListSMS(filter)
 

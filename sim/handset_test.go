@@ -181,7 +181,9 @@ func TestTheControlKeepsWorkingAfterClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	control.ReceiveSMS("+1", "after the port closed")
+	if err := control.ReceiveSMS("+1", "after the port closed"); err != nil {
+		t.Fatalf("ReceiveSMS: %v", err)
+	}
 	control.DropCall()
 	stats := control.Stats()
 
@@ -194,7 +196,7 @@ func TestStatsAreACopyForTheCallerToKeep(t *testing.T) {
 	t.Parallel()
 	handset := New(DefaultConfig())
 	control := handset.Control()
-	if err := handset.WriteAll([]byte("ATE0\rAT+CMGS=\"+1\"\rhi\x1a")); err != nil {
+	if err := handset.WriteAll([]byte("ATE0\rAT+CMGS=11\r" + hiSubmitPDU + "\x1a")); err != nil {
 		t.Fatal(err)
 	}
 	readUntilQuiet(t, handset)

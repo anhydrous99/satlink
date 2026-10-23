@@ -160,8 +160,10 @@ func TestReportsTheOtherQueries(t *testing.T) {
 	assertAnswer(t, runCommand(m, "AT+CSQ", now), "\r\n+CSQ:0\r\n\r\nOK\r\n")
 	assertAnswer(t, runCommand(m, "AT+CGMR", now), "\r\nCall Processor Version: SIM-1.0\r\n\r\nOK\r\n")
 	assertAnswer(t, runCommand(m, "AT+CIMI", now), "\r\n901039999999999\r\n\r\nOK\r\n")
-	assertAnswer(t, runCommand(m, "AT+CBC", now), "\r\n+CBC: 1,080\r\n\r\nOK\r\n")
-	assertAnswer(t, runCommand(m, "AT+CMGF=1", now), "\r\nOK\r\n")
+	assertAnswer(t, runCommand(m, "AT+CBC", now), "\r\n+CBC: 001,003,001,080\r\n\r\nOK\r\n")
+	assertAnswer(t, runCommand(m, "AT+CMGF=0", now), "\r\nOK\r\n")
+	assertAnswer(t, runCommand(m, "AT+CMGF=1", now), "\r\nERROR\r\n")
+	assertAnswer(t, runCommand(m, "AT+CSCA?", now), "\r\n+CSCA: \"+881662900005\",145\r\n\r\nOK\r\n")
 }
 
 func TestKeepsTheBearerItIsGiven(t *testing.T) {
@@ -200,14 +202,14 @@ func TestSendsAnSMSTypedAfterThePrompt(t *testing.T) {
 	now := time.Now()
 	m := quietModem(modemConfig(), now)
 
-	assertAnswer(t, runCommand(m, `AT+CMGS="+881631234567"`, now), "\r\n> ")
-	m.receive([]byte("hello\x1a"), now)
+	assertAnswer(t, runCommand(m, "AT+CMGS=19", now), "\r\n> ")
+	m.receive([]byte(helloSubmitPDU+"\x1a"), now)
 	assertAnswer(t, output(m), "\r\n+CMGS: 1\r\n\r\nOK\r\n")
-	runCommand(m, `AT+CMGS="+1"`, now)
-	m.receive([]byte("second\x1a"), now)
+	runCommand(m, "AT+CMGS=11", now)
+	m.receive([]byte(hiSubmitPDU+"\x1a"), now)
 	assertAnswer(t, output(m), "\r\n+CMGS: 2\r\n\r\nOK\r\n")
 
-	want := []SentSMS{{Number: "+881631234567", Text: "hello"}, {Number: "+1", Text: "second"}}
+	want := []SentSMS{{Number: "+881631234567", Text: "hello"}, {Number: "+1", Text: "hi"}}
 	if !slices.Equal(m.stats.SMSSent, want) {
 		t.Errorf("sent %+v; want %+v", m.stats.SMSSent, want)
 	}
@@ -217,9 +219,9 @@ func TestEscapeAbandonsAnSMS(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
 	m := quietModem(modemConfig(), now)
-	runCommand(m, `AT+CMGS="+1"`, now)
+	runCommand(m, "AT+CMGS=11", now)
 
-	m.receive([]byte("never mind\x1b"), now)
+	m.receive([]byte("0011\x1b"), now)
 
 	assertAnswer(t, output(m), "\r\nOK\r\n")
 	if len(m.stats.SMSSent) != 0 {
@@ -227,15 +229,15 @@ func TestEscapeAbandonsAnSMS(t *testing.T) {
 	}
 }
 
-func TestAnOverlongSMSIsRefused(t *testing.T) {
+func TestAPDUTheHandsetCannotSendIsRefused(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
 	m := quietModem(modemConfig(), now)
-	runCommand(m, `AT+CMGS="+1"`, now)
+	runCommand(m, "AT+CMGS=12", now)
 
-	m.receive([]byte(strings.Repeat("x", maxTextLen+1)+"\x1a"), now)
+	m.receive([]byte(hiSubmitPDU+"\x1a"), now)
 
-	assertAnswer(t, output(m), "\r\n+CMS ERROR: 305\r\n")
+	assertAnswer(t, output(m), "\r\n+CMS ERROR: 304\r\n")
 	assertAnswer(t, runCommand(m, "AT", now), "\r\nOK\r\n")
 }
 
@@ -244,9 +246,9 @@ func TestEchoesSMSTextWhileEchoIsOn(t *testing.T) {
 	now := time.Now()
 	m := newModem(modemConfig())
 
-	m.receive([]byte("AT+CMGS=\"+1\"\rhi\x1a"), now)
+	m.receive([]byte("AT+CMGS=11\r"+hiSubmitPDU+"\x1a"), now)
 
-	assertAnswer(t, output(m), "AT+CMGS=\"+1\"\r\r\n> hi\r\n+CMGS: 1\r\n\r\nOK\r\n")
+	assertAnswer(t, output(m), "AT+CMGS=11\r\r\n> "+hiSubmitPDU+"\r\n+CMGS: 1\r\n\r\nOK\r\n")
 }
 
 func TestAnnouncesStoresAndDeletesReceivedSMS(t *testing.T) {
@@ -254,15 +256,19 @@ func TestAnnouncesStoresAndDeletesReceivedSMS(t *testing.T) {
 	now := time.Now()
 	m := quietModem(modemConfig(), now)
 
-	m.receiveSMS("+12025550100", "hi there", now)
+	if err := m.receiveSMS("+12025550100", "hi there", now); err != nil {
+		t.Fatalf("receiveSMS: %v", err)
+	}
 
 	assertAnswer(t, output(m), "\r\n+CMTI: \"SM\",1\r\n")
-	listing := runCommand(m, `AT+CMGL="ALL"`, now)
-	if !strings.HasPrefix(listing, "\r\n+CMGL: 1,\"REC UNREAD\",\"+12025550100\",,\"") ||
-		!strings.HasSuffix(listing, "\r\nhi there\r\n\r\nOK\r\n") {
-		t.Errorf("listed %q", listing)
+	listing := strings.Split(strings.TrimSpace(runCommand(m, "AT+CMGL=4", now)), "\r\n")
+	if len(listing) != 4 || !strings.HasPrefix(listing[0], "+CMGL: 1,0,,") || listing[3] != "OK" {
+		t.Fatalf("listed %q", listing)
 	}
-	if read := runCommand(m, "AT+CMGR=1", now); !strings.HasPrefix(read, "\r\n+CMGR: \"REC READ\",") {
+	if message := decodedPDU(t, listing[1]); message.Address != "+12025550100" || message.Text != "hi there" {
+		t.Errorf("listed %+v", message)
+	}
+	if read := runCommand(m, "AT+CMGR=1", now); !strings.HasPrefix(read, "\r\n+CMGR: 1,,") {
 		t.Errorf("read %q", read)
 	}
 	assertAnswer(t, runCommand(m, "AT+CMGR=2", now), "\r\n+CMS ERROR: 321\r\n")
@@ -274,12 +280,12 @@ func TestAnSMSAnnouncementWaitsForTextEntryToFinish(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
 	m := quietModem(modemConfig(), now)
-	runCommand(m, `AT+CMGS="+1"`, now)
+	runCommand(m, "AT+CMGS=11", now)
 
-	m.receiveSMS("+2", "incoming", now)
+	receivedSMS(t, m, "+2", "incoming", now)
 
 	assertAnswer(t, output(m), "")
-	m.receive([]byte("outgoing\x1a"), now)
+	m.receive([]byte(hiSubmitPDU+"\x1a"), now)
 	assertAnswer(t, output(m), "\r\n+CMGS: 1\r\n\r\nOK\r\n")
 	assertAnswer(t, output(m), "\r\n+CMTI: \"SM\",1\r\n")
 }
@@ -293,7 +299,7 @@ func TestAnSMSAnnouncementWaitsUntilTheEarlierOutputIsRead(t *testing.T) {
 	m := quietModem(modemConfig(), now)
 	m.receive([]byte("AT\r"), now)
 
-	m.receiveSMS("+2", "incoming", now)
+	receivedSMS(t, m, "+2", "incoming", now)
 
 	assertAnswer(t, output(m), "\r\nOK\r\n")
 	assertAnswer(t, output(m), "\r\n+CMTI: \"SM\",1\r\n")
@@ -506,7 +512,7 @@ func TestTheNetworkCanDropTheCall(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
 	m := connectedModem(t, start)
-	m.receiveSMS("+2", "sent during the call", start)
+	receivedSMS(t, m, "+2", "sent during the call", start)
 
 	m.dropCall()
 
@@ -600,7 +606,7 @@ func TestSurvivesArbitraryInputInEveryMode(t *testing.T) {
 	t.Parallel()
 	random := newXorShift(0x9E37_79B9_7F4A_7C15)
 	// Fragments that steer the modem into its other modes now and then.
-	steering := []string{"ATD123\r", "+++", "ATO\r", `AT+CMGS="1"` + "\r", "\x1a", "ATH\r"}
+	steering := []string{"ATD123\r", "+++", "ATO\r", "AT+CMGS=11\r", "\x1a", "ATH\r"}
 	now := time.Now()
 	m := newModem(modemConfig())
 
@@ -744,7 +750,7 @@ func placeAVoiceCall(_ *testing.T, now time.Time) {
 }
 
 func sendAnSMS(_ *testing.T, now time.Time) {
-	quietModem(modemConfig(), now).receive([]byte(`AT+CMGS="+1"`+"\rhi\x1a"), now)
+	quietModem(modemConfig(), now).receive([]byte("AT+CMGS=11\r"+hiSubmitPDU+"\x1a"), now)
 }
 
 func hangUpInOnlineCommandMode(t *testing.T, start time.Time) {

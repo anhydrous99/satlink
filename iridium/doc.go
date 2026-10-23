@@ -10,7 +10,7 @@
 // a TCP bridge, need only implement Transport.
 //
 // A [Handset] covers the handset itself: identity, signal, battery,
-// registration, the clock, SMS in text mode, voice calls and raw commands.
+// registration, the clock, SMS, voice calls and raw commands.
 // Each method's documentation names the AT commands it sends. Unsolicited
 // result codes (incoming SMS, RING, …) seen while waiting for responses are
 // queued. Fetch them with [Handset.TakeURCs], or wait for new ones with
@@ -29,9 +29,16 @@
 // passed:
 //   - ordinary commands wait five seconds by default ([Handset.SetTimeout]
 //     changes that);
+//   - a signal reading waits up to a minute, as the handset answers AT+CSQ
+//     only once it has a new one;
+//   - listing stored SMS waits up to a minute, as the handset takes a while
+//     for each message;
 //   - SMS submission waits up to two minutes, as it goes over the satellite
 //     link;
 //   - dialling waits up to ninety seconds.
+//
+// A command waits 20 ms after the handset last sent something, as a 9555A
+// silently drops one written straight after its previous answer.
 //
 // A timeout too long for the clock, such as math.MaxInt64, means no
 // deadline. While waiting, the handset reads for at most a second at a

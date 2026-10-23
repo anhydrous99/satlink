@@ -9,6 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -34,7 +35,7 @@ func TestTheHandsetAndItsControlCanBeUsedFromSeveralGoroutines(t *testing.T) {
 	var wait sync.WaitGroup
 	for range senders {
 		wait.Go(func() {
-			control.ReceiveSMS("+881631234567", "from another goroutine")
+			simtest.ReceiveSMS(t, control, "+881631234567", "from another goroutine")
 			_ = control.Stats() // Only the race detector looks at this.
 		})
 	}
@@ -94,8 +95,10 @@ func TestReportsSignalBatteryRegistrationAndClock(t *testing.T) {
 		t.Errorf("SignalQuality() = %d; want 2", bars)
 	}
 	assertLines(t, handset, "AT+CSQF", "+CSQF:2")
-	if battery.Status != iridium.ChargeStatusExternalPower || battery.Level != 80 {
-		t.Errorf("Battery() = %+v; want external power at 80", battery)
+	wantBattery := iridium.Battery{Status: iridium.ChargeStatusExternalPower, Bars: 3,
+		Charger: iridium.ChargerStatusCharging, Level: 80, LevelReported: true}
+	if battery != wantBattery {
+		t.Errorf("Battery() = %+v; want %+v", battery, wantBattery)
 	}
 	if registration.Status != iridium.RegistrationStatusHome {
 		t.Errorf("Registration() = %+v; want Home", registration)
@@ -143,11 +146,11 @@ func TestAnnouncesIncomingSMSAndKeepsThemUntilDeleted(t *testing.T) {
 	t.Parallel()
 	handset, control := readyHandset(t, fastConfig())
 
-	control.ReceiveSMS("+881631111111", "first line\nsecond line")
+	simtest.ReceiveSMS(t, control, "+881631111111", "first line\nsecond line")
 	if urcs, err := handset.PollURCs(2 * time.Second); err != nil || !slices.Equal(urcs, []string{`+CMTI: "SM",1`}) {
 		t.Fatalf("PollURCs = %q, %v", urcs, err)
 	}
-	control.ReceiveSMS("+12025550100", "hi")
+	simtest.ReceiveSMS(t, control, "+12025550100", "hi")
 
 	unread := mustListSMS(t, handset, iridium.SMSFilterUnread, 2)
 	assertMessage(t, unread[0], iridium.SMSMessage{Index: 1, Status: "REC UNREAD", Address: "+881631111111", Text: "first line\nsecond line"})
@@ -212,7 +215,7 @@ func TestAnSMSFromAnotherGoroutineReachesAWaitingApp(t *testing.T) {
 		}()
 		synctest.Wait()
 
-		control.ReceiveSMS("+881631234567", "ping")
+		simtest.ReceiveSMS(t, control, "+881631234567", "ping")
 
 		if result := <-results; result.err != nil || !slices.Equal(result.urcs, []string{`+CMTI: "SM",1`}) {
 			t.Errorf("PollURCs = %q, %v", result.urcs, result.err)

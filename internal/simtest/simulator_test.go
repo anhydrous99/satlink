@@ -82,6 +82,29 @@ func TestNewHandsetIsInitialisedOverASimulator(t *testing.T) {
 	}
 }
 
+func TestReceiveSMSDeliversAMessage(t *testing.T) {
+	t.Parallel()
+	handset, control := NewHandset(t, SimulatorConfig())
+
+	ReceiveSMS(t, control, "+881631234567", "hello")
+
+	if messages, err := handset.ListSMS(iridium.SMSFilterAll); err != nil || len(messages) != 1 || messages[0].Text != "hello" {
+		t.Errorf("ListSMS = %+v, %v; want the message", messages, err)
+	}
+}
+
+func TestReceiveSMSFailsTheTestForAMessageWithoutAPDU(t *testing.T) {
+	t.Parallel()
+	recorder := &failureRecorder{TB: t}
+
+	// A name is no number, and simulated handsets store PDUs.
+	ReceiveSMS(recorder, NewSimulator(t, SimulatorConfig()).Control(), "Mission Control", "hello")
+
+	if len(recorder.failures) != 1 || !strings.HasPrefix(recorder.failures[0], `receiving an SMS from "Mission Control": `) {
+		t.Errorf("failures %q; want one about the SMS", recorder.failures)
+	}
+}
+
 func TestInitializedHandsetFailsTheTestWhenTheHandsetCannotBeInitialised(t *testing.T) {
 	t.Parallel()
 	unplugged := NewFaultyTransport(NewSimulator(t, SimulatorConfig()))

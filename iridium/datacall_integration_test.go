@@ -1126,18 +1126,18 @@ func TestALateAnswerArrivingDuringAnswerDoesNotPassForATAs(t *testing.T) {
 func TestAPartialAnswerLeftBeforeAnswerDoesNotPassForATAs(t *testing.T) {
 	// Slow — an escape with the default guard — but timing-insensitive.
 	t.Parallel()
-	// AT+CSQ timed out before the line end of its answer's OK came: what it
+	// AT+CBC timed out before the line end of its answer's OK came: what it
 	// left in the line buffer must not run into ATA's answer, where it would
 	// pass for a voice call's OK and leave the data call ATA answered up.
 	transport := newScripted(
-		step{"AT+CSQ\r", "\r\n+CSQ:4\r\n\r\nOK"},
+		step{"AT+CBC\r", "\r\n+CBC: 1,3\r\n\r\nOK"},
 		step{"ATA\r", connectReply},
 		step{"+++", okReply},
 		step{"ATH\r", okReply},
 	)
 	handset := newTestHandset(transport)
-	if _, err := handset.SignalQuality(); !errors.Is(err, iridium.ErrTimeout) {
-		t.Fatalf("SignalQuality = %v, want a timeout: its answer never ended", err)
+	if _, err := handset.Battery(); !errors.Is(err, iridium.ErrTimeout) {
+		t.Fatalf("Battery = %v, want a timeout: its answer never ended", err)
 	}
 
 	err := handset.Answer()

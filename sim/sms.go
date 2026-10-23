@@ -1,38 +1,48 @@
 package sim
 
 import (
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
-	"github.com/anhydrous99/satlink/internal/utf8lossy"
+	"github.com/anhydrous99/satlink/internal/smspdu"
 )
 
-// Text-mode SMS (3GPP TS 27.005): the SIM's message storage behind
-// AT+CMGL, AT+CMGR and AT+CMGD, and the text entry after AT+CMGS.
+// SMS in PDU mode (3GPP TS 27.005 §3), the only mode Iridium handsets
+// have: the SIM's message storage behind AT+CMGL, AT+CMGR and AT+CMGD, and
+// the PDU entry after AT+CMGS.
 
 const (
-	// ctrlZ ends the text and sends the message.
+	// ctrlZ ends the PDU and sends the message.
 	ctrlZ = 0x1A
 	// escapeKey abandons the message.
 	escapeKey = 0x1B
-	// maxTextLen is the longest text accepted, in bytes. An SMS holds 160
-	// characters; the cap only stops a runaway writer from growing a draft
-	// without end.
-	maxTextLen = 1024
+	// maxEntryLen is the longest entry accepted, in bytes. A PDU in
+	// hexadecimal takes at most 352; the cap only stops a runaway writer
+	// from growing a draft without end.
+	maxEntryLen = 1024
 	// firstIndex is where storage indices start; freed ones are reused.
 	firstIndex = 1
 )
 
-// headerBreakingRemover drops the characters that would break the quoted,
-// line-based +CMGL and +CMGR headers if a sender's number contained them.
-var headerBreakingRemover = strings.NewReplacer(`"`, "", "\r", "", "\n", "")
+// serviceCentre is the SMS centre the simulated SIM names: Iridium's.
+const serviceCentre = "+881662900005"
 
-// The statuses of stored messages, as +CMGL and +CMGR name them.
+// internationalNumber is the type of address +CSCA reports for a number
+// with a '+' (TS 24.008 §10.5.4.7).
+const internationalNumber = 145
+
+// The storage statuses of PDU mode, as +CMGL and +CMGR report them and
+// +CMGL selects by.
 const (
-	statusUnread = "REC UNREAD"
-	statusRead   = "REC READ"
+	statusUnread = 0
+	statusRead   = 1
+	statusUnsent = 2
+	statusSent   = 3
+	statusAll    = 4
 )
 
 // smsFilter is which stored messages AT+CMGL lists.
@@ -46,17 +56,17 @@ const (
 	smsFilterSent
 )
 
-// smsFilterStatuses are the status texts AT+CMGL names its filters by, in
-// upper case.
+// smsFilterStatuses are the filters by the storage status AT+CMGL names
+// them with.
 var smsFilterStatuses = map[string]smsFilter{
-	"ALL":        smsFilterAll,
-	statusUnread: smsFilterUnread,
-	statusRead:   smsFilterRead,
-	"STO UNSENT": smsFilterUnsent,
-	"STO SENT":   smsFilterSent,
+	fmt.Sprint(statusUnread): smsFilterUnread,
+	fmt.Sprint(statusRead):   smsFilterRead,
+	fmt.Sprint(statusUnsent): smsFilterUnsent,
+	fmt.Sprint(statusSent):   smsFilterSent,
+	fmt.Sprint(statusAll):    smsFilterAll,
 }
 
-// parseSMSFilter returns the filter AT+CMGL names by status, in upper case.
+// parseSMSFilter returns the filter AT+CMGL names by status.
 func parseSMSFilter(status string) (smsFilter, bool) {
 	filter, ok := smsFilterStatuses[status]
 	return filter, ok
@@ -79,13 +89,15 @@ func (f smsFilter) admits(message *storedMessage) bool {
 
 // storedMessage is a received message in the SIM's storage.
 type storedMessage struct {
-	sender   string
-	text     string
-	received timestamp
-	unread   bool
+	// pdu is the message as +CMGL and +CMGR give it, in hexadecimal: the
+	// service centre's address, then the SMS-DELIVER.
+	pdu string
+	// tpduLength is the length of the SMS-DELIVER, in octets.
+	tpduLength int
+	unread     bool
 }
 
-func (m *storedMessage) status() string {
+func (m *storedMessage) status() int {
 	if m.unread {
 		return statusUnread
 	}
@@ -97,25 +109,36 @@ type inbox struct {
 	messages map[uint32]*storedMessage
 }
 
-// store stores a received message in the lowest free slot and returns its
-// index.
-func (b *inbox) store(sender, text string, received timestamp) uint32 {
+// store stores a message from sender, received at moment, in the lowest
+// free slot and returns its index. It fails, storing nothing, if sender is
+// not a dialable number or text does not fit one message.
+func (b *inbox) store(sender, text string, moment time.Time) (uint32, error) {
+	centre, err := smspdu.EncodeServiceCentre(serviceCentre)
+	if err != nil {
+		return 0, err
+	}
+	// Received to the second, and never before the epoch, as the clock
+	// reports it.
+	tpdu, err := smspdu.EncodeDeliver(sender, text, time.Unix(max(moment.Unix(), 0), 0).UTC())
+	if err != nil {
+		return 0, err
+	}
 	if b.messages == nil {
 		b.messages = map[uint32]*storedMessage{}
 	}
 	index := b.lowestFreeIndex()
 	b.messages[index] = &storedMessage{
-		sender:   headerBreakingRemover.Replace(sender),
-		text:     text,
-		received: received,
-		unread:   true,
+		pdu:        strings.ToUpper(hex.EncodeToString(append(centre, tpdu...))),
+		tpduLength: len(tpdu),
+		unread:     true,
 	}
-	return index
+	return index, nil
 }
 
 // list returns the +CMGL lines for the messages filter admits, each header
-// followed by its text. Unread messages are marked read once listed, as TS
-// 27.005 §3.4.2 specifies.
+// followed by its PDU. Unread messages are marked read once listed, as TS
+// 27.005 §3.4.2 specifies. The headers carry TS 27.005's <length>; a
+// 9555A's are one more.
 func (b *inbox) list(filter smsFilter) []string {
 	var lines []string
 	for _, index := range b.indices() {
@@ -123,24 +146,22 @@ func (b *inbox) list(filter smsFilter) []string {
 		if !filter.admits(message) {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf(`+CMGL: %d,"%s","%s",,"%s"`,
-			index, message.status(), message.sender, message.received))
-		lines = append(lines, textLines(message.text)...)
+		lines = append(lines, fmt.Sprintf("+CMGL: %d,%d,,%d", index, message.status(), message.tpduLength), message.pdu)
 		message.unread = false
 	}
 	return lines
 }
 
 // read returns the +CMGR lines for the message at index, which is marked
-// read first, and false if there is none.
+// read once its status has been reported, and false if there is none.
 func (b *inbox) read(index uint32) ([]string, bool) {
 	message, ok := b.messages[index]
 	if !ok {
 		return nil, false
 	}
+	header := fmt.Sprintf("+CMGR: %d,,%d", message.status(), message.tpduLength)
 	message.unread = false
-	header := fmt.Sprintf(`+CMGR: "%s","%s",,"%s"`, message.status(), message.sender, message.received)
-	return append([]string{header}, textLines(message.text)...), true
+	return []string{header, message.pdu}, true
 }
 
 // remove deletes the message at index, and reports whether there was one.
@@ -166,16 +187,6 @@ func (b *inbox) lowestFreeIndex() uint32 {
 	return candidate
 }
 
-// textLines returns a message text as response lines; the client joins
-// them with "\n" again.
-func textLines(text string) []string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, "\r")
-	}
-	return lines
-}
-
 // outgoingSMS is a message submitted with AT+CMGS.
 type outgoingSMS struct {
 	number string
@@ -186,14 +197,14 @@ type outgoingSMS struct {
 type entryKind int
 
 const (
-	// entryContinues means it became part of the text.
+	// entryContinues means it became part of the PDU.
 	entryContinues entryKind = iota
-	// entrySubmitted means Ctrl-Z: send the message.
+	// entrySubmitted means Ctrl-Z after a PDU the handset can send.
 	entrySubmitted
 	// entryCancelled means ESC: forget the message.
 	entryCancelled
-	// entryTooLong means Ctrl-Z after more text than the handset accepts.
-	entryTooLong
+	// entryRefused means Ctrl-Z after a PDU the handset cannot send.
+	entryRefused
 )
 
 // entry is what [smsDraft.typeByte] did.
@@ -203,31 +214,51 @@ type entry struct {
 	message outgoingSMS
 }
 
-// smsDraft is a message being typed after AT+CMGS.
+// smsDraft is a PDU being typed after AT+CMGS=<length>.
 type smsDraft struct {
-	number     string
-	text       []byte
+	// length is the length of the TPDU AT+CMGS announced.
+	length     int
+	pdu        []byte
 	overflowed bool
 }
 
-// newSMSDraft returns a draft to number, with no text yet.
-func newSMSDraft(number string) *smsDraft {
-	return &smsDraft{number: number}
+// newSMSDraft returns a draft of a TPDU of length octets, with nothing
+// typed yet.
+func newSMSDraft(length int) *smsDraft {
+	return &smsDraft{length: length}
 }
 
 // typeByte takes one typed byte.
 func (d *smsDraft) typeByte(b byte) entry {
 	switch {
-	case b == ctrlZ && d.overflowed:
-		return entry{kind: entryTooLong}
 	case b == ctrlZ:
-		return entry{kind: entrySubmitted, message: outgoingSMS{number: d.number, text: utf8lossy.String(d.text)}}
+		return d.submitted()
 	case b == escapeKey:
 		return entry{kind: entryCancelled}
-	case len(d.text) < maxTextLen:
-		d.text = append(d.text, b)
+	case len(d.pdu) < maxEntryLen:
+		d.pdu = append(d.pdu, b)
 	default:
 		d.overflowed = true
 	}
 	return entry{kind: entryContinues}
+}
+
+// submitted is what Ctrl-Z does: the message to send, or a refusal of a
+// PDU that is no SMS-SUBMIT of the length announced. Real handsets do not
+// check the length; the simulated one does, so that a wrong one shows in
+// tests.
+func (d *smsDraft) submitted() entry {
+	refused := entry{kind: entryRefused}
+	octets, err := hex.DecodeString(string(d.pdu))
+	if d.overflowed || err != nil || len(octets) == 0 {
+		return refused
+	}
+	if tpduLength := len(octets) - 1 - int(octets[0]); tpduLength != d.length {
+		return refused
+	}
+	message, err := smspdu.Decode(octets)
+	if err != nil || message.Kind != smspdu.KindSubmit {
+		return refused
+	}
+	return entry{kind: entrySubmitted, message: outgoingSMS{number: message.Address, text: message.Text}}
 }

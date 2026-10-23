@@ -24,11 +24,6 @@ const (
 	escapeAttemptsAfterNoCarrier = 1
 )
 
-// rawHangUp is ATH as it is written while the handset may still be online:
-// raw, not through exec, as only the handset's own result code may confirm
-// it.
-const rawHangUp = hangUpCommand + commandEnd
-
 // dtrDrop is long enough for the handset to notice DTR dropping: above its
 // S25 debounce time of 50 ms.
 const dtrDrop = 150 * time.Millisecond
@@ -146,7 +141,9 @@ func (h *Handset) pulseDTRUnless(returned *bool) {
 // handset's own OK or NO CARRIER, within the hang-up timeout, counts as its
 // answer.
 func (h *Handset) hangUpWhileMaybeOnline() error {
-	if err := h.write([]byte(rawHangUp)); err != nil {
+	// Written raw, not through exec: only the handset's own result code may
+	// confirm it.
+	if err := h.writeCommandLine(hangUpCommand); err != nil {
 		return err
 	}
 	confirmed, err := h.awaitOwnResult(deadlineAfter(h.hangUpTimeout()))

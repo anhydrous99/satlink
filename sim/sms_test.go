@@ -2,74 +2,140 @@ package sim
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/anhydrous99/satlink/internal/smspdu"
 )
 
-// receivedAtTheEpoch is the reception time of the stored messages in these
-// tests.
-func receivedAtTheEpoch() timestamp {
-	return timestampAt(time.Unix(0, 0))
+// PDUs as the app types them after AT+CMGS, in hexadecimal.
+const (
+	// helloSubmitPDU sends "hello" to +881631234567 through Iridium's
+	// centre: a TPDU of 19 octets after the centre's eight.
+	helloSubmitPDU = "0791886126090050" + "11000C918861133254760000AD05E8329BFD06"
+	// hiSubmitPDU sends "hi" to +1, leaving the centre to the handset: a
+	// TPDU of 11 octets after the empty centre's one.
+	hiSubmitPDU = "00" + "11000191F10000AD02E834"
+)
+
+// theEpoch is the reception time of the stored messages in these tests.
+func theEpoch() time.Time {
+	return time.Unix(0, 0)
+}
+
+// storeAll stores a message from +1 for each text, and returns their
+// indices.
+func storeAll(t *testing.T, box *inbox, texts ...string) []uint32 {
+	t.Helper()
+	var indices []uint32
+	for _, text := range texts {
+		index, err := box.store("+1", text, theEpoch())
+		if err != nil {
+			t.Fatalf("store %q: %v", text, err)
+		}
+		indices = append(indices, index)
+	}
+	return indices
+}
+
+// receivedSMS has m receive a message from from, failing the test if it
+// cannot.
+func receivedSMS(t *testing.T, m *modem, from, text string, now time.Time) {
+	t.Helper()
+	if err := m.receiveSMS(from, text, now); err != nil {
+		t.Fatalf("receiveSMS(%q, %q): %v", from, text, err)
+	}
+}
+
+// decodedPDU decodes a PDU line of +CMGL or +CMGR.
+func decodedPDU(t *testing.T, line string) smspdu.Message {
+	t.Helper()
+	octets, err := hex.DecodeString(line)
+	if err != nil {
+		t.Fatalf("PDU %q: %v", line, err)
+	}
+	message, err := smspdu.Decode(octets)
+	if err != nil {
+		t.Fatalf("PDU %s: %v", line, err)
+	}
+	return message
 }
 
 func TestMessagesAreStoredInTheLowestFreeSlot(t *testing.T) {
 	t.Parallel()
 	var box inbox
-	stored := []uint32{
-		box.store("+1", "a", receivedAtTheEpoch()),
-		box.store("+1", "b", receivedAtTheEpoch()),
-		box.store("+1", "c", receivedAtTheEpoch()),
-	}
+	stored := storeAll(t, &box, "a", "b", "c")
 
 	removed := box.remove(2)
-	stored = append(stored, box.store("+1", "d", receivedAtTheEpoch()), box.store("+1", "e", receivedAtTheEpoch()))
+	stored = append(stored, storeAll(t, &box, "d", "e")...)
 
 	if !removed || !slices.Equal(stored, []uint32{1, 2, 3, 2, 4}) {
 		t.Errorf("stored at %v (removal %v); want 1, 2, 3, then 2 and 4", stored, removed)
 	}
 }
 
-func TestListingSelectsByStatusAndMarksListedMessagesRead(t *testing.T) {
+func TestAMessageIsStoredAsTheDeliverPDUOfIridiumsCentre(t *testing.T) {
 	t.Parallel()
 	var box inbox
-	box.store("+881631111111", "first\nsecond", receivedAtTheEpoch())
+	if _, err := box.store("+881631111111", "first\nsecond", theEpoch()); err != nil {
+		t.Fatalf("store: %v", err)
+	}
 
 	unread := box.list(smsFilterUnread)
 
-	want := []string{
-		`+CMGL: 1,"REC UNREAD","+881631111111",,"70/01/01,00:00:00+00"`,
-		"first",
-		"second",
+	if len(unread) != 2 || !strings.HasPrefix(unread[1], "0791886126090050") {
+		t.Fatalf("unread %q; want a header, then a PDU through +881662900005", unread)
 	}
-	if !slices.Equal(unread, want) {
-		t.Errorf("unread %q; want %q", unread, want)
+	// The header's <length> is the TPDU's: all but the centre's 8 octets.
+	if want := fmt.Sprintf("+CMGL: 1,0,,%d", len(unread[1])/2-8); unread[0] != want {
+		t.Errorf("header %q; want %q", unread[0], want)
 	}
+	want := smspdu.Message{Kind: smspdu.KindDeliver, Address: "+881631111111", Timestamp: "70/01/01,00:00:00+00", Text: "first\nsecond"}
+	if message := decodedPDU(t, unread[1]); message != want {
+		t.Errorf("PDU says %+v; want %+v", message, want)
+	}
+}
+
+func TestListingSelectsByStatusAndMarksListedMessagesRead(t *testing.T) {
+	t.Parallel()
+	var box inbox
+	storeAll(t, &box, "hello")
+
+	if unread := box.list(smsFilterUnread); len(unread) != 2 {
+		t.Fatalf("unread %q; want one message", unread)
+	}
+
 	if lines := box.list(smsFilterUnread); len(lines) != 0 {
 		t.Errorf("still unread: %q", lines)
 	}
-	if read, all := box.list(smsFilterRead), box.list(smsFilterAll); len(read) != 3 || len(all) != 3 {
-		t.Errorf("read %q, all %q; want three lines each", read, all)
+	read, all := box.list(smsFilterRead), box.list(smsFilterAll)
+	if len(read) != 2 || len(all) != 2 || !strings.HasPrefix(read[0], "+CMGL: 1,1,,") {
+		t.Errorf("read %q, all %q; want the message, now read", read, all)
 	}
 	if sent := box.list(smsFilterSent); len(sent) != 0 {
 		t.Errorf("sent %q; want none", sent)
 	}
 }
 
-func TestReadingMarksReadAndUnknownIndicesAreAbsent(t *testing.T) {
+func TestReadingReportsUnreadOnceThenMarksReadAndUnknownIndicesAreAbsent(t *testing.T) {
 	t.Parallel()
 	var box inbox
-	index := box.store("+1", "hello", receivedAtTheEpoch())
+	index := storeAll(t, &box, "hello")[0]
 
-	lines, found := box.read(index)
+	first, found := box.read(index)
+	again, _ := box.read(index)
 
-	want := []string{`+CMGR: "REC READ","+1",,"70/01/01,00:00:00+00"`, "hello"}
-	if !found || !slices.Equal(lines, want) {
-		t.Errorf("read %q, %v; want %q", lines, found, want)
+	// The ISU AT Command Reference, +CMGR: status 0 on the first read, 1
+	// on the next.
+	if !found || len(first) != 2 || !strings.HasPrefix(first[0], "+CMGR: 0,,") || !strings.HasPrefix(again[0], "+CMGR: 1,,") {
+		t.Errorf("read %q, then %q; want unread, then read", first, again)
 	}
-	if unread := box.list(smsFilterUnread); len(unread) != 0 {
-		t.Errorf("still unread: %q", unread)
+	if message := decodedPDU(t, first[1]); message.Text != "hello" {
+		t.Errorf("PDU says %+v; want hello", message)
 	}
 	if _, found := box.read(99); found {
 		t.Error("read a message at 99")
@@ -79,28 +145,40 @@ func TestReadingMarksReadAndUnknownIndicesAreAbsent(t *testing.T) {
 	}
 }
 
-func TestASenderCannotBreakTheHeader(t *testing.T) {
+func TestAMessageWithoutAPDUIsNotStored(t *testing.T) {
 	t.Parallel()
 	var box inbox
-	box.store("+1\"\r\n2", "x", receivedAtTheEpoch())
 
-	if header := box.list(smsFilterAll)[0]; !strings.Contains(header, `"+12"`) {
-		t.Errorf("header %q; want the sender as \"+12\"", header)
+	_, senderErr := box.store("+1\"\r\n2", "x", theEpoch())
+	_, textErr := box.store("+1", strings.Repeat("x", 161), theEpoch())
+
+	if senderErr == nil || textErr == nil {
+		t.Errorf("stored with errors %v and %v; want both refused", senderErr, textErr)
 	}
+	if all := box.list(smsFilterAll); len(all) != 0 {
+		t.Errorf("stored %q", all)
+	}
+}
+
+// typed types text into draft, and returns what the last byte did.
+func typed(draft *smsDraft, text string) entry {
+	var last entry
+	for i := range len(text) {
+		last = draft.typeByte(text[i])
+	}
+	return last
 }
 
 func TestADraftIsSubmittedOnCtrlZAndCancelledOnEscape(t *testing.T) {
 	t.Parallel()
-	draft := newSMSDraft("+1")
+	draft := newSMSDraft(11)
 
-	typed := []entry{draft.typeByte('h'), draft.typeByte('i')}
+	typing := typed(draft, hiSubmitPDU)
 	submitted := draft.typeByte(ctrlZ)
-	cancelled := newSMSDraft("+1").typeByte(escapeKey)
+	cancelled := newSMSDraft(11).typeByte(escapeKey)
 
-	for _, entry := range typed {
-		if entry.kind != entryContinues {
-			t.Errorf("typing gave %v; want entryContinues", entry.kind)
-		}
+	if typing.kind != entryContinues {
+		t.Errorf("typing gave %v; want entryContinues", typing.kind)
 	}
 	want := entry{kind: entrySubmitted, message: outgoingSMS{number: "+1", text: "hi"}}
 	if submitted != want {
@@ -111,14 +189,27 @@ func TestADraftIsSubmittedOnCtrlZAndCancelledOnEscape(t *testing.T) {
 	}
 }
 
-func TestAnOverlongDraftIsRefused(t *testing.T) {
+func TestADraftTheHandsetCannotSendIsRefused(t *testing.T) {
 	t.Parallel()
-	draft := newSMSDraft("+1")
-	for _, b := range bytes.Repeat([]byte("x"), maxTextLen+1) {
-		draft.typeByte(b)
+	// A DELIVER: what a handset stores, not what it sends.
+	deliver := "00" + "040191F10000700101000000000002E834"
+	tests := map[string]struct {
+		length int
+		pdu    string
+	}{
+		"too long":                  {11, string(bytes.Repeat([]byte("0"), maxEntryLen+1))},
+		"not hexadecimal":           {11, "hello"},
+		"empty":                     {0, ""},
+		"of another length":         {12, hiSubmitPDU},
+		"an SMS-DELIVER":            {len(deliver)/2 - 1, deliver},
+		"a TPDU that does not hold": {2, "001100"},
 	}
+	for name, test := range tests {
+		draft := newSMSDraft(test.length)
+		typed(draft, test.pdu)
 
-	if got := draft.typeByte(ctrlZ); got.kind != entryTooLong {
-		t.Errorf("Ctrl-Z gave %v; want entryTooLong", got.kind)
+		if got := draft.typeByte(ctrlZ); got.kind != entryRefused {
+			t.Errorf("%s: Ctrl-Z gave %v; want entryRefused", name, got.kind)
+		}
 	}
 }

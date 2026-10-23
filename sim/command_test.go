@@ -120,9 +120,9 @@ func TestExtendedCommands(t *testing.T) {
 		known(command{kind: commandQuery, query: queryFastSignalQuality}).forLine("AT+CSQF"),
 		known(command{kind: commandQuery, query: queryRegistration}).forLine("AT+CREG?"),
 		ignored.forLine("AT+CMEE=2"),
-		ignored.forLine("AT+CMGF=1"),
-		// PDU mode is not simulated.
-		unknown("AT+CMGF=0"),
+		ignored.forLine("AT+CMGF=0"),
+		// Text mode, which Iridium handsets refuse.
+		unknown("AT+CMGF=1"),
 		known(settingCommand(setting{kind: settingBearer, bearer: iridiumBearer})).forLine("AT+CBST=71,0,1"),
 		unknown("AT+CBST=71,0"),
 		unknown("AT+CBST=71,0,1,2"),
@@ -133,16 +133,19 @@ func TestExtendedCommands(t *testing.T) {
 func TestSMSCommands(t *testing.T) {
 	t.Parallel()
 	assertParses(t, []parseCase{
-		known(smsCommandOf(smsCommand{kind: smsSend, number: "+881631234567"})).forLine(`AT+CMGS="+881631234567"`),
-		unknown(`AT+CMGS=""`),
-		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterUnread})).forLine(`AT+CMGL="REC UNREAD"`),
-		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterAll})).forLine(`at+cmgl="all"`),
-		unknown(`AT+CMGL="NEW"`),
+		known(smsCommandOf(smsCommand{kind: smsSend, length: 19})).forLine("AT+CMGS=19"),
+		unknown(`AT+CMGS="+881631234567"`),
+		unknown("AT+CMGS=256"),
+		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterUnread})).forLine("AT+CMGL=0"),
+		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterSent})).forLine("at+cmgl=3"),
+		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterAll})).forLine("AT+CMGL=4"),
+		unknown(`AT+CMGL="ALL"`),
+		unknown("AT+CMGL=5"),
 		known(smsCommandOf(smsCommand{kind: smsRead, index: 3})).forLine("AT+CMGR=3"),
 		unknown("AT+CMGD=x"),
 		// Without a status, +CMGL lists the unread messages.
 		known(smsCommandOf(smsCommand{kind: smsList, filter: smsFilterUnread})).forLine("AT+CMGL"),
-		unknown(`AT+CMGS="+1`),
+		known(command{kind: commandQuery, query: queryServiceCentre}).forLine("AT+CSCA?"),
 	})
 }
 

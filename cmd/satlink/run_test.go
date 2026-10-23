@@ -46,7 +46,7 @@ func TestAPanicEndsTheRunWithStatus101OnceTheHandsetIsClosed(t *testing.T) {
 		during string
 	}{
 		{"while the handset is readied", []string{instant, "info"}, "", "Initialize"},
-		{"during a handset command", []string{instant, "status"}, "AT+CSQ", "SignalQuality"},
+		{"during a handset command", []string{instant, "status"}, "AT+CSQF", "LastSignalQuality"},
 		{"while a data call is set up", []string{instant, "net", "status"}, "ATD", "DialData"},
 	}
 	for _, test := range tests {

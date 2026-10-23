@@ -14,6 +14,13 @@ import (
 // commandEnd ends every command line: register S3, carriage return.
 const commandEnd = "\r"
 
+// commandSettle is how long a command line waits after the handset last
+// sent something. A 9555A drops about one command in four written within a
+// millisecond of its previous answer, with no result code at all, and none
+// written a millisecond or more after it. Twenty milliseconds leaves a wide
+// margin, and costs nothing beside the satellite's latencies.
+const commandSettle = 20 * time.Millisecond
+
 // readChunk is the most read from the transport at a time.
 const readChunk = 512
 
@@ -95,11 +102,19 @@ func (h *Handset) exec(req request) (Response, error) {
 	}
 	// Anything complete in the buffer now predates this command.
 	h.queueCompleteLines()
-	if err := h.write([]byte(req.command + commandEnd)); err != nil {
+	if err := h.writeCommandLine(req.command); err != nil {
 		return Response{}, err
 	}
 	run := &commandRun{request: req, ownPrefix: responsePrefix(req.command), sentAt: time.Now()}
 	return h.awaitResponse(run)
+}
+
+// writeCommandLine writes command and the CR that ends it, once
+// commandSettle has passed since the handset last sent something.
+// Whatever it sends meanwhile stays for the next read.
+func (h *Handset) writeCommandLine(command string) error {
+	time.Sleep(time.Until(h.lastReceived.Add(commandSettle)))
+	return h.write([]byte(command + commandEnd))
 }
 
 // awaitResponse reads run's answer until its final result, entering its text

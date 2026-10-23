@@ -49,6 +49,17 @@ func NewHandset(t testing.TB, config sim.Config) (*iridium.Handset, *sim.Control
 	return InitializedHandset(t, simulator), simulator.Control()
 }
 
+// ReceiveSMS has control deliver a message from from, as
+// sim.Control.ReceiveSMS does, and fails the test if it cannot. It fails
+// with t.Errorf rather than t.Fatalf, so that any goroutine may call it, a
+// transport's WriteAll included.
+func ReceiveSMS(t testing.TB, control *sim.Control, from, text string) {
+	t.Helper()
+	if err := control.ReceiveSMS(from, text); err != nil {
+		t.Errorf("receiving an SMS from %q: %v", from, err)
+	}
+}
+
 // InitializedHandset returns a satlink handset over transport, initialised
 // (iridium.Handset.Initialize). A failure to initialise fails the test at
 // once. It closes nothing: the transport is the caller's.

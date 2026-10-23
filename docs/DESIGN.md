@@ -29,12 +29,13 @@ expect, each with its reason. It describes the code as it is.
 | `internal/logtext` | The one rendering of log records for people. | `NewHandler`, `PackageKey` |
 | `internal/debugtext` | The quoting and struct texts that messages use. | `Quote`, `IPv4Settings` |
 | `internal/ringprovider` | The TLS 1.2 suites and key exchange groups that satnet offers and sim serves. | — |
+| `internal/smspdu` | SMS PDUs: the SMS-SUBMIT iridium sends, and the SMS-DELIVER sim stores, both ways. | `Message`, `Decode`, `EncodeSubmit` |
 | `internal/utf8lossy`, `asciicase`, `errnotext` | Lossy UTF-8; ASCII-only case folding; OS error texts as strerror(3) writes them. | — |
 | `internal/memconn` | An in-memory `net.Conn` that sim's TLS echo runs crypto/tls over. | `Conn` |
 | `internal/simtest` | Shared test support: simulators, faulty transports, waiting helpers. | — |
 
-Dependencies point one way. `iridium` imports only the `internal/` text helpers, and `ppp`
-only `utf8lossy`. `satnet` and `sim` build on `iridium`, `ppp` and `ipstack`; `serial` on
+Dependencies point one way. `iridium` imports only the `internal/` text helpers and
+`smspdu`, and `ppp` only `utf8lossy`. `satnet` and `sim` build on `iridium`, `ppp` and `ipstack`; `serial` on
 `iridium`. `mobile` and `cmd/satlink` sit on top. The module root holds no package, only
 the module files and these directories.
 
@@ -451,6 +452,19 @@ verification, since the test CA is not a public root, instead of failing to conn
 
 The CLI ends its TLS session with the TLS goodbye, one alert record more of airtime. A
 `TLSConn` able to skip the goodbye would need API that serves only this caller.
+
+### SMS uses PDU mode
+
+Iridium handsets have only PDU mode (ISU AT Command Reference, +CMGF), and refuse text mode
+with +CME ERROR. `internal/smspdu` encodes and decodes the PDUs for `iridium` and `sim`, which
+refuses text mode too.
+
+- A message is one PDU. Text that does not fit one is refused before anything is sent, and
+  the parts of a concatenated message are listed as messages of their own.
+- The `<length>` of a listing goes unread: a 9555A's is one more than TS 27.005 says, and the
+  PDU holds its own lengths.
+- A message names its SMS centre: the SIM's (AT+CSCA?), or Iridium's when it names none. A
+  9555A whose SIM names none refuses a PDU that leaves the choice to it.
 
 ### Serial writes have no timeout
 

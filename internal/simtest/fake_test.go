@@ -96,6 +96,10 @@ func (r *failureRecorder) Fatalf(format string, args ...any) {
 	r.failures = append(r.failures, fmt.Sprintf(format, args...))
 }
 
+func (r *failureRecorder) Errorf(format string, args ...any) {
+	r.failures = append(r.failures, fmt.Sprintf(format, args...))
+}
+
 // assertTransportError fails the test unless err is an *iridium.Error of kind
 // ErrTransport with message.
 func assertTransportError(t *testing.T, err error, message string) {

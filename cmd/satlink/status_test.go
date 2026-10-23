@@ -22,9 +22,9 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 		// asked are the commands the status sends.
 		asked []string
 	}{
-		{"Signal", 0, []string{"AT+CSQ"}},
-		{"Battery", 1, []string{"AT+CSQ", "AT+CBC"}},
-		{"Registration", 2, []string{"AT+CSQ", "AT+CBC", "AT+CREG?"}},
+		{"Signal", 0, []string{"AT+CSQF"}},
+		{"Battery", 1, []string{"AT+CSQF", "AT+CBC"}},
+		{"Registration", 2, []string{"AT+CSQF", "AT+CBC", "AT+CREG?"}},
 	}
 	for _, test := range tests {
 		t.Run(test.failingLine, func(t *testing.T) {
@@ -42,6 +42,14 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 	}
 }
 
+func TestABatteryWithoutAPercentageShowsItsBars(t *testing.T) {
+	battery := iridium.Battery{Status: iridium.ChargeStatusOnBattery, Bars: 3}
+
+	if got, want := describeBattery(battery, nil), "3 bars (OnBattery)"; got != want {
+		t.Errorf("battery: %q, want %q", got, want)
+	}
+}
+
 func TestAReportTheHandsetCannotGiveSaysWhy(t *testing.T) {
 	refused := &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+CBC"}
 
@@ -54,10 +62,11 @@ func TestAReportTheHandsetCannotGiveSaysWhy(t *testing.T) {
 }
 
 func TestAReportShowsTheLevelAndTheStatusByName(t *testing.T) {
-	battery := iridium.Battery{Status: iridium.ChargeStatus(7), Level: 55}
+	battery := iridium.Battery{Status: iridium.ChargeStatus(7), Bars: 2, Charger: iridium.ChargerStatusNotConnected,
+		Level: 55, LevelReported: true}
 	registration := iridium.Registration{Status: iridium.RegistrationStatusRoaming}
 
-	if got, want := describeBattery(battery, nil), "55% (Unknown(7))"; got != want {
+	if got, want := describeBattery(battery, nil), "55% (Unknown(7), charger NotConnected)"; got != want {
 		t.Errorf("battery: %q, want %q", got, want)
 	}
 	if got, want := describeRegistration(registration, nil), "Roaming"; got != want {

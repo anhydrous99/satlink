@@ -24,7 +24,10 @@ func Example() {
 	}
 	fmt.Println("signal:", bars, "bars")
 
-	control.ReceiveSMS("+881631234567", "Hello from orbit")
+	if err := control.ReceiveSMS("+881631234567", "Hello from orbit"); err != nil {
+		fmt.Println(err)
+		return
+	}
 	inbox, err := handset.ListSMS(iridium.SMSFilterUnread)
 	if err != nil {
 		fmt.Println(err)

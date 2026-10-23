@@ -69,12 +69,57 @@ func (s ChargeStatus) String() string {
 	}
 }
 
-// Battery is what +CBC reports.
+// ChargerStatus is the charger connection status field of +CBC, which
+// 9555(A) and 9575 handsets report. Its value is the code the handset
+// reported; codes without a constant are unknown statuses.
+type ChargerStatus int
+
+// The charger statuses +CBC defines (ISU AT Command Reference, +CBC).
+const (
+	// ChargerStatusUnreported means the handset reported no charger status,
+	// as only 9555(A) and 9575 handsets do.
+	ChargerStatusUnreported ChargerStatus = 0
+	// ChargerStatusCharging means a charger is connected and charging.
+	ChargerStatusCharging ChargerStatus = 1
+	// ChargerStatusNotCharging means a charger is connected, not charging.
+	ChargerStatusNotCharging ChargerStatus = 2
+	// ChargerStatusNotConnected means no charger is connected.
+	ChargerStatusNotConnected ChargerStatus = 3
+)
+
+// String returns the status's name, such as "Charging", or "Unknown(7)"
+// for a code without a constant.
+func (s ChargerStatus) String() string {
+	switch s {
+	case ChargerStatusUnreported:
+		return "Unreported"
+	case ChargerStatusCharging:
+		return "Charging"
+	case ChargerStatusNotCharging:
+		return "NotCharging"
+	case ChargerStatusNotConnected:
+		return "NotConnected"
+	default:
+		return fmt.Sprintf("Unknown(%d)", int(s))
+	}
+}
+
+// Battery is what +CBC reports: +CBC: <bcs>,<bcl>[,<ccs>,<bal>].
 type Battery struct {
-	// Status is the charge status.
+	// Status is the battery connection status.
 	Status ChargeStatus
-	// Level is the charge level, 0 to 100.
+	// Bars is the charge as the handset's battery indicator shows it: 0 to
+	// 4 on 9555(A) and 9575 handsets, 0 to 3 on the others.
+	Bars int
+	// Charger is the charger's status: ChargerStatusUnreported but on
+	// 9555(A) and 9575 handsets.
+	Charger ChargerStatus
+	// Level is the charge in percent, 0 to 100, from the battery's
+	// accumulator. Only 9555(A) and 9575 handsets report it, as
+	// LevelReported says: on the others it is zero.
 	Level int
+	// LevelReported reports that the handset reported Level.
+	LevelReported bool
 }
 
 // RegistrationStatus is the network registration status of +CREG. The
@@ -172,16 +217,20 @@ func (f SMSFilter) String() string {
 type SMSMessage struct {
 	// Index is the message's storage index, for ReadSMS and DeleteSMS.
 	Index int
-	// Status is the storage status as the handset words it, such as
-	// "REC UNREAD".
+	// Status is the storage status as TS 27.005's text mode names it:
+	// "REC UNREAD", "REC READ", "STO UNSENT" or "STO SENT", or
+	// "Unknown(n)" for a status code without a name.
 	Status string
 	// Address is the sender (received messages) or recipient (stored
-	// messages) number.
+	// messages) number, with a '+' when it is international, or the
+	// sender's name when the network gives one.
 	Address string
-	// Timestamp is the service-centre timestamp as the handset sent it
-	// (yy/MM/dd,hh:mm:ss±zz); empty when there is none.
+	// Timestamp is a received message's service-centre timestamp,
+	// yy/MM/dd,hh:mm:ss±zz with zz in quarter hours; empty for a message
+	// stored to send.
 	Timestamp string
-	// Text is the message text, its lines joined by "\n".
+	// Text is the message text. The header of a part of a concatenated
+	// message is left out: each part is a message of its own.
 	Text string
 }
 
@@ -192,6 +241,14 @@ const (
 	// dialTimeout bounds voice dialling and answering: satellite call setup
 	// is slow.
 	dialTimeout = 90 * time.Second
+	// signalQualityTimeout bounds AT+CSQ, which waits for a new reading:
+	// usually within two seconds, within ten while the handset acquires the
+	// system or hands over between satellites, and over fifty, ending in
+	// ERROR, while it is not registered (ISU AT Command Reference, +CSQ). A
+	// shorter wait would leave its late answer to pass for the next
+	// command's: a 9555A asked again within 4.5 s holds the second AT+CSQ,
+	// and drops every other command, until then.
+	signalQualityTimeout = 60 * time.Second
 	// maxHangUpTimeout is the longest wait for ATH's answer, whatever the
 	// handset's timeout: what follows when none comes — dropping DTR, or
 	// reporting that the call may still be up — must not be put off for
@@ -252,6 +309,10 @@ type Handset struct {
 	rx lineBuffer
 	// urcs are the unsolicited result codes received, oldest first.
 	urcs []string
+	// lastReceived is when the handset last sent something: the next
+	// command line waits commandSettle from then. A data call sets it too,
+	// as it reads through the handset.
+	lastReceived time.Time
 }
 
 // NewHandset returns a handset that talks through transport. Nothing is
@@ -267,11 +328,11 @@ func NewHandset(transport Transport) *Handset {
 }
 
 // SetTimeout sets how long ordinary commands wait for their final result;
-// the default is five seconds. Commands with their own timeout (SMS
-// submission, dialling, [Handset.CommandTimeout]) are not affected. A
-// timeout of zero or less waits for nothing: every command it bounds is
-// sent and fails with ErrTimeout at once, even when its answer has
-// arrived. The longest, math.MaxInt64, means no deadline.
+// the default is five seconds. Commands with their own timeout (signal
+// readings, SMS listing and submission, dialling, [Handset.CommandTimeout])
+// are not affected. A timeout of zero or less waits for nothing: every
+// command it bounds is sent and fails with ErrTimeout at once, even when
+// its answer has arrived. The longest, math.MaxInt64, means no deadline.
 //
 // It also bounds, to at most ten seconds, the wait for the handset's
 // answer to ATH — [Handset.HangUp]'s, and the one that ends a data call —
@@ -296,8 +357,9 @@ func (h *Handset) hangUpTimeout() time.Duration {
 
 // Initialize synchronises with the handset and puts it into a known state:
 // echo off (ATE0), verbose result codes (ATV1), verbose +CME ERROR
-// (AT+CMEE=2) and SMS text mode (AT+CMGF=1). The last two are optional on
-// some firmware and their failure is ignored.
+// (AT+CMEE=2) and SMS PDU mode (AT+CMGF=0), the only one Iridium handsets
+// have. The last two are optional on some firmware and their failure is
+// ignored.
 //
 // Any half-entered SMS a previous session left is aborted (ESC) and stale
 // input discarded first, for at most two seconds: a handset left in a call
@@ -353,12 +415,24 @@ func (h *Handset) IMSI() (string, error) {
 }
 
 // SignalQuality reports the signal strength in bars, 0 to 5 on Iridium
-// handsets (AT+CSQ).
+// handsets, from a new reading (AT+CSQ). The handset answers once it has
+// one, usually within two seconds, so SignalQuality waits up to a minute,
+// whatever SetTimeout says. One that is not registered may take fifty
+// seconds and then fail with ErrCommandFailed: check [Handset.Registration]
+// first, or use [Handset.LastSignalQuality].
 func (h *Handset) SignalQuality() (int, error) {
 	return exchange(h, h.signalQuality)
 }
 
-// Battery reports the charge status and level (AT+CBC).
+// LastSignalQuality reports the last signal strength the handset measured,
+// in bars, 0 to 5, at once (AT+CSQF): what its signal indicator shows.
+func (h *Handset) LastSignalQuality() (int, error) {
+	return exchange(h, h.lastSignalQuality)
+}
+
+// Battery reports the battery's status and charge (AT+CBC): the bars of
+// the handset's indicator on every handset, and the charger and the charge
+// in percent on 9555(A) and 9575 handsets.
 func (h *Handset) Battery() (Battery, error) {
 	return exchange(h, h.battery)
 }
@@ -374,17 +448,23 @@ func (h *Handset) Clock() (string, error) {
 	return exchange(h, h.clock)
 }
 
-// SendSMS sends a text message (AT+CMGS, in text mode) and returns the
+// SendSMS sends a text message (AT+CMGS, in PDU mode) and returns the
 // message reference the network assigned. Submission goes over the
 // satellite link and may take up to two minutes.
 //
-// number must be dialable (digits, '*' and '#' after an optional '+') and
-// text must not contain Ctrl-Z or ESC, which end or abort text entry;
-// otherwise it fails with ErrInvalidArgument before anything is sent. When
-// the handset's prompt for the text does not come in time, it is sent ESC
-// to leave text entry, so that it accepts commands again. Once the text has
-// been entered, a timeout leaves the handset submitting the message, and
-// its late answer may still follow.
+// The text goes in the GSM 7-bit alphabet when it can, and in UCS-2
+// otherwise. number must be dialable (digits, '*' and '#' after an
+// optional '+'), and text must fit one message: 160 GSM characters, those
+// of its extension table such as '€' or '[' counting two, or else 70 UCS-2
+// ones, a character outside the Basic Multilingual Plane counting two.
+// Otherwise it fails with ErrInvalidArgument before anything is sent.
+//
+// The message goes through the SMS centre the SIM names (AT+CSCA?), or
+// Iridium's, +881662900005, when it names none. When the handset's prompt
+// for the PDU does not come in time, it is sent ESC to leave text entry,
+// so that it accepts commands again. Once the PDU has been entered, a
+// timeout leaves the handset submitting the message, and its late answer
+// may still follow.
 func (h *Handset) SendSMS(number, text string) (int, error) {
 	return exchange(h, func() (int, error) { return h.sendSMS(number, text) })
 }
@@ -392,7 +472,9 @@ func (h *Handset) SendSMS(number, text string) (int, error) {
 // ListSMS lists the stored messages filter selects (AT+CMGL). Listing marks
 // unread messages read, as 3GPP TS 27.005 specifies. A filter without a
 // constant of its own fails with ErrInvalidArgument, "%d is not an SMS
-// filter", before anything is sent.
+// filter", before anything is sent. A handset takes a while for each
+// message it lists, so ListSMS waits up to a minute, whatever SetTimeout
+// says.
 func (h *Handset) ListSMS(filter SMSFilter) ([]SMSMessage, error) {
 	return exchange(h, func() ([]SMSMessage, error) { return h.listSMS(filter) })
 }
@@ -505,11 +587,29 @@ func (h *Handset) info() (DeviceInfo, error) {
 
 // signalQuality is SignalQuality, with the handset's lock held.
 func (h *Handset) signalQuality() (int, error) {
-	fields, err := h.queryFields("AT+CSQ", "+CSQ")
+	response, err := h.commandWithTimeout("AT+CSQ", signalQualityTimeout)
 	if err != nil {
 		return 0, err
 	}
-	return parseNumber(fields, 0, "+CSQ", byteField)
+	return parseSignalBars(response, "+CSQ")
+}
+
+// lastSignalQuality is LastSignalQuality, with the handset's lock held.
+func (h *Handset) lastSignalQuality() (int, error) {
+	response, err := h.command("AT+CSQF")
+	if err != nil {
+		return 0, err
+	}
+	return parseSignalBars(response, "+CSQF")
+}
+
+// parseSignalBars returns the bars that follow "<prefix>:" in response.
+func parseSignalBars(response Response, prefix string) (int, error) {
+	fields, err := fieldsWithPrefix(response, prefix)
+	if err != nil {
+		return 0, err
+	}
+	return parseNumber(fields, 0, prefix, byteField)
 }
 
 // battery is Battery, with the handset's lock held.
@@ -518,15 +618,38 @@ func (h *Handset) battery() (Battery, error) {
 	if err != nil {
 		return Battery{}, err
 	}
+	return parseBattery(fields)
+}
+
+// batteryFieldsWithLevel is how many fields +CBC has when it reports the
+// charger and the charge in percent: <bcs>,<bcl>,<ccs>,<bal>.
+const batteryFieldsWithLevel = 4
+
+// parseBattery parses the fields of +CBC: <bcs>,<bcl>[,<ccs>,<bal>]. The
+// charger and the level are read only when both are there.
+func parseBattery(fields []string) (Battery, error) {
 	status, err := parseNumber(fields, 0, "+CBC", byteField)
 	if err != nil {
 		return Battery{}, err
 	}
-	level, err := parseNumber(fields, 1, "+CBC", byteField)
+	bars, err := parseNumber(fields, 1, "+CBC", byteField)
 	if err != nil {
 		return Battery{}, err
 	}
-	return Battery{Status: ChargeStatus(status), Level: level}, nil
+	battery := Battery{Status: ChargeStatus(status), Bars: bars}
+	if len(fields) < batteryFieldsWithLevel {
+		return battery, nil
+	}
+	charger, err := parseNumber(fields, 2, "+CBC", byteField)
+	if err != nil {
+		return Battery{}, err
+	}
+	level, err := parseNumber(fields, 3, "+CBC", byteField)
+	if err != nil {
+		return Battery{}, err
+	}
+	battery.Charger, battery.Level, battery.LevelReported = ChargerStatus(charger), level, true
+	return battery, nil
 }
 
 // registration is Registration, with the handset's lock held.
