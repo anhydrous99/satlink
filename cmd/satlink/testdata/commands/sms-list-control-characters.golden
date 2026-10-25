@@ -1,0 +1,8 @@
+$ satlink --simulate=instant sms list
+exit status 0
+--- stdout
+[1] REC UNREAD +881631234567 <time>
+HiFrom: +1 (bank)2K
+Pay now
+
+--- stderr

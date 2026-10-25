@@ -3,7 +3,11 @@ package wire
 import (
 	"bytes"
 	"errors"
+	"log/slog"
+	"slices"
 	"testing"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // tcpPacketBytes is a segment with FIN, RST, ACK and URG, a window scale
@@ -14,6 +18,10 @@ func tcpPacketBytes() []byte {
 		0x23, 0x01, 0xb6, 0x02, 0x01, 0x03, 0x03, 0x0c, 0x01, 0xaa, 0x00, 0x00, 0xff,
 	}
 }
+
+// tcpFlagURG is the URG flag, which tcpPacketBytes carries but the package
+// neither reads nor writes.
+const tcpFlagURG uint16 = 0x020
 
 func tcpOptionBytes() []byte {
 	return []byte{0x03, 0x03, 0x0c, 0x01}
@@ -88,9 +96,7 @@ func TestTCPPacketDeconstruct(t *testing.T) {
 		{"RST", packet.RST(), true},
 		{"PSH", packet.PSH(), false},
 		{"ACK", packet.ACK(), true},
-		{"URG", packet.URG(), true},
 		{"WindowLen", packet.WindowLen(), uint16(0x0123)},
-		{"UrgentPointer", packet.UrgentPointer(), uint16(0x0201)},
 		{"Checksum", packet.Checksum(), uint16(0x01b6)},
 		{"VerifyChecksum", packet.VerifyChecksum(testSrcAddr, testDstAddr), true},
 	})
@@ -117,7 +123,7 @@ func TestTCPPacketConstruct(t *testing.T) {
 	packet.SetRST(true)
 	packet.SetPSH(false)
 	packet.SetACK(true)
-	packet.SetURG(true)
+	packet.setFlag(tcpFlagURG, true)
 	packet.SetWindowLen(0x0123)
 	packet.SetUrgentPointer(0x0201)
 	packet.SetChecksum(0xeeee)
@@ -212,10 +218,6 @@ func TestTCPPacketFlagsAreIndependent(t *testing.T) {
 		{"RST", TCPPacket.SetRST, TCPPacket.RST},
 		{"PSH", TCPPacket.SetPSH, TCPPacket.PSH},
 		{"ACK", TCPPacket.SetACK, TCPPacket.ACK},
-		{"URG", TCPPacket.SetURG, TCPPacket.URG},
-		{"ECE", TCPPacket.SetECE, TCPPacket.ECE},
-		{"CWR", TCPPacket.SetCWR, TCPPacket.CWR},
-		{"NS", TCPPacket.SetNS, TCPPacket.NS},
 	}
 	for _, flag := range flags {
 		packet := TCPPacket(make([]byte, TCPHeaderLen))
@@ -243,23 +245,6 @@ func TestTCPPacketClearFlagsKeepsTheHeaderLength(t *testing.T) {
 
 	if packet.HeaderLen() != TCPHeaderLen || packet.dataOffsetAndFlags()&tcpFlagsMask != 0 {
 		t.Errorf("header length %d, flags %#x; want 20 and none", packet.HeaderLen(), packet.dataOffsetAndFlags()&tcpFlagsMask)
-	}
-}
-
-func TestTCPPacketSegmentLenCountsSYNAndFIN(t *testing.T) {
-	t.Parallel()
-	packet := TCPPacket(make([]byte, TCPHeaderLen+3))
-	packet.SetHeaderLen(TCPHeaderLen)
-
-	withoutFlags := packet.SegmentLen()
-	packet.SetSYN(true)
-	withSYN := packet.SegmentLen()
-	packet.SetFIN(true)
-	withSYNAndFIN := packet.SegmentLen()
-
-	if withoutFlags != 3 || withSYN != 4 || withSYNAndFIN != 5 {
-		t.Errorf("SegmentLen without flags, with SYN, with SYN and FIN = %d, %d, %d; want 3, 4, 5",
-			withoutFlags, withSYN, withSYNAndFIN)
 	}
 }
 
@@ -464,7 +449,7 @@ func TestTCPChecksumOfALongSegmentCoversTheHighOctetOfItsLength(t *testing.T) {
 }
 
 func TestParseTCPReprCapsTheWindowScaleAndLogs(t *testing.T) {
-	logs := recordLogs(t)
+	logs := logtest.Record(t, "ipstack", slog.LevelDebug)
 	packet := TCPPacket(make([]byte, TCPHeaderLen+4))
 	tcpPacketRepr().emitHeader(packet)
 	packet.SetHeaderLen(TCPHeaderLen + 4)
@@ -475,9 +460,12 @@ func TestParseTCPReprCapsTheWindowScaleAndLogs(t *testing.T) {
 	if err != nil || repr.WindowScale != Some[uint8](14) {
 		t.Errorf("WindowScale = %v, %v; want 14", repr.WindowScale, err)
 	}
-	want := "parsed window scaling factor >14, setting to 14 pkg=ipstack src=192.168.1.1:48896 dst=192.168.1.2:80"
-	if got := logs.messages(); len(got) != 1 || got[0] != want {
-		t.Errorf("logged %q, want %q", got, want)
+	want := []logtest.Line{{
+		Level: slog.LevelDebug,
+		Text:  "parsed window scaling factor >14, setting to 14 src=192.168.1.1:48896 dst=192.168.1.2:80",
+	}}
+	if got := logs(); !slices.Equal(got, want) {
+		t.Errorf("logged %+v, want %+v", got, want)
 	}
 }
 

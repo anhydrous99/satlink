@@ -10,7 +10,6 @@ import (
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/mobile"
 	"github.com/anhydrous99/satlink/ppp"
-	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -285,22 +284,10 @@ func TestARecoveryThatCannotEndTheCallFailsWithHangUpFailedAgain(t *testing.T) {
 	assertKind(t, signalQuality(handset)(), mobile.SatlinkErrorHangUpFailed)
 }
 
-// dataCallCommand dials Iridium's internet gateway as a link would, but as
-// a raw command: the call then belongs to no link.
-const dataCallCommand = "ATD" + satnet.IridiumInternetNumber
-
 func TestACallLeftUpThatCannotBeEndedIsReportedWhenTheHandsetIsOpened(t *testing.T) {
 	t.Parallel()
-	transport, _, control := stubbornUSB(t, sim.DefaultConfig())
-	earlierSession := newHandset(t, transport)
-	if _, err := earlierSession.Command(dataCallCommand, timeoutMillis); err != nil {
-		t.Fatalf("Command(%s): %v", dataCallCommand, err)
-	}
-	// The app is killed with the call up: its handset is merely let go of,
-	// and closing one over the app's transport leaves the transport alone.
-	if err := earlierSession.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
+	transport, faulty, control := stubbornUSB(t, sim.DefaultConfig())
+	leaveADataCallUp(t, faulty)
 
 	_, err := mobile.NewIridiumHandset(transport)
 
@@ -462,6 +449,20 @@ func TestReinitializeEndsACallHeldInOnlineCommandMode(t *testing.T) {
 func TestADataCallAnsweredByMistakeThatCannotBeEndedStrandsTheHandset(t *testing.T) {
 	t.Parallel()
 	handset := newHandset(t, &dataCallThatWillNotEnd{})
+
+	err := handset.Answer()
+
+	assertKind(t, err, mobile.SatlinkErrorHangUpFailed)
+	assertKind(t, signalQuality(handset)(), mobile.SatlinkErrorHangUpFailed)
+}
+
+func TestADataCallAnswerFindsUpThatCannotBeEndedStrandsTheHandset(t *testing.T) {
+	// Slow — two seconds of data, then an escape that goes unanswered — but
+	// timing-insensitive.
+	t.Parallel()
+	transport := &dataCallThatWillNotEnd{}
+	handset := newHandset(t, transport)
+	transport.relayCall()
 
 	err := handset.Answer()
 
@@ -757,11 +758,9 @@ func TestCancellingALinkThatIsUpChangesNothing(t *testing.T) {
 
 func TestReinitializeStrandsAReadyHandsetWhoseCallCannotBeEnded(t *testing.T) {
 	t.Parallel()
-	transport, _, control := stubbornUSB(t, sim.DefaultConfig())
+	transport, faulty, control := stubbornUSB(t, sim.DefaultConfig())
 	handset := newHandset(t, transport)
-	if _, err := handset.Command(dataCallCommand, timeoutMillis); err != nil {
-		t.Fatalf("Command(%s): %v", dataCallCommand, err)
-	}
+	leaveADataCallUp(t, faulty)
 
 	err := handset.Reinitialize()
 

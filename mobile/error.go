@@ -25,8 +25,10 @@ const (
 	// SatlinkErrorSMS reports +CMS ERROR, an SMS service error; Code is its
 	// code.
 	SatlinkErrorSMS
-	// SatlinkErrorCall reports that call setup failed; Result is the
-	// handset's result, such as NO CARRIER or BUSY.
+	// SatlinkErrorCall reports that call setup failed, or that a data call
+	// no command awaited came up and was hung up (see
+	// IridiumHandset.PollEvents). Result is the handset's result, such as
+	// NO CARRIER or BUSY, or what happened.
 	SatlinkErrorCall
 	// SatlinkErrorParse reports that the handset gave an unexpected
 	// answer; Reason describes it.
@@ -69,8 +71,12 @@ const (
 	// so the call may still be up and billing. Reason says why: why the
 	// link ended (SatelliteLink.HangUp), why it did not come up (the
 	// EstablishLink functions), what failed in ending a data call
-	// (IridiumHandset.Answer, Reinitialize), or that the handset's last data
-	// call could not be hung up (a stranded IridiumHandset).
+	// (IridiumHandset.Answer, Command, Reinitialize), or that the handset's
+	// last data call could not be hung up (a stranded IridiumHandset). Any
+	// IridiumHandset method that talks to the handset, PollEvents most
+	// likely, reports it too when it cannot end the call of a CONNECT that
+	// no command awaited: one the handset answered on its own, or one that
+	// came after Command gave up.
 	// IridiumHandset.Reinitialize tries to end the call; power-cycling the
 	// handset is the last resort. After EstablishLink, which leaves no
 	// handset to reinitialize, make an IridiumHandset on the transport and
@@ -78,8 +84,9 @@ const (
 	// its port, which only one may open: it does so a moment after the call
 	// has ended. Making an IridiumHandset or establishing a link fails with
 	// it too when the handset does not answer and a data call it may be
-	// relaying could not be ended: try again later, or power-cycle the
-	// handset.
+	// relaying could not be ended, or when a data call that came up while
+	// the handset was readied could not be ended. Try again later, or
+	// power-cycle the handset.
 	SatlinkErrorHangUpFailed
 	// SatlinkErrorInternal reports a fault inside the library, recovered
 	// rather than ending the app; Reason describes it. After one from

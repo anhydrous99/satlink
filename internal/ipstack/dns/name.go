@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"iter"
 
+	"github.com/anhydrous99/satlink/internal/asciicase"
 	"github.com/anhydrous99/satlink/internal/ipstack/internal/netlog"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
@@ -62,21 +63,21 @@ func checkLabel(label []byte) error {
 
 // copyName makes name the wire form of labels, which replaces it. It fails
 // with the first error labels yields, or with wire.ErrMalformed when the name
-// would exceed MaxNameSize octets, and then leaves name holding what it copied
-// before the failure.
+// would exceed MaxNameSize octets, and then leaves name as it was.
 func copyName(name *[]byte, labels iter.Seq2[[]byte, error]) error {
-	*name = (*name)[:0]
+	copied := make([]byte, 0, MaxNameSize)
 	for label, err := range labels {
 		if err != nil {
 			return err
 		}
-		if !appendLabel(name, label) {
+		if !appendLabel(&copied, label) {
 			return wire.ErrMalformed
 		}
 	}
-	if !appendWithinNameSize(name, rootLabel) {
+	if !appendWithinNameSize(&copied, rootLabel) {
 		return wire.ErrMalformed
 	}
+	*name = copied
 	return nil
 }
 
@@ -99,9 +100,9 @@ func appendWithinNameSize(name *[]byte, octets ...byte) bool {
 	return true
 }
 
-// namesEqual reports whether two names have the same labels, compared octet
-// for octet in step: it fails with the first
-// error either name yields before they differ or end.
+// namesEqual reports whether two names have the same labels, compared in
+// step and without regard to the case of ASCII letters (RFC 4343): it fails
+// with the first error either name yields before they differ or end.
 func namesEqual(a, b iter.Seq2[[]byte, error]) (bool, error) {
 	nextA, stopA := iter.Pull2(a)
 	defer stopA()
@@ -121,7 +122,7 @@ func namesEqual(a, b iter.Seq2[[]byte, error]) (bool, error) {
 		case !moreA || !moreB:
 			// One finished before the other: not equal.
 			return false, nil
-		case !bytes.Equal(labelA, labelB):
+		case !asciicase.EqualFold(string(labelA), string(labelB)):
 			return false, nil
 		}
 	}

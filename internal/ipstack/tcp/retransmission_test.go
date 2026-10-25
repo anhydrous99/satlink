@@ -242,6 +242,29 @@ func TestFastRetransmitAfterTripleDuplicateACK(t *testing.T) {
 	send(t, s.at(1120*time.Millisecond), ackFromRemote(3*5))
 }
 
+// A fast retransmission leaves the retransmission timer idle, and its
+// transmission arms the timer again: if it is lost too, the data goes again
+// at the retransmission timeout.
+func TestLostFastRetransmissionIsResentAtTheRetransmissionTimeout(t *testing.T) {
+	t.Parallel()
+	s := socketEstablished(t)
+	s.remoteMSS = 3
+	mustSendSlice(t, s, []byte("aaaBBBccc"))
+	receive(t, s, dataFromLocal(0, "aaa"))
+	receive(t, s, dataFromLocal(3, "BBB"))
+	receive(t, s, dataFromLocal(3*2, "ccc"))
+	for range 1 + fastRetransmitThreshold {
+		send(t, s, ackFromRemote(0))
+	}
+	fastRetransmittedAt := 100 * time.Millisecond
+	receive(t, s.at(fastRetransmittedAt), dataFromLocal(0, "aaa"))
+
+	assertRetransmitTimer(t, s, "after the fast retransmission")
+	retransmitAt := fastRetransmittedAt + s.rttEstimator.retransmissionTimeout()
+	receiveNothing(t, s.at(retransmitAt-time.Millisecond))
+	receive(t, s.at(retransmitAt), dataFromLocal(0, "aaa"))
+}
+
 func TestFastRetransmitDuplicateDetectionWithData(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -378,8 +401,8 @@ func TestDataRetransmitACKMoreThanExpected(t *testing.T) {
 	receiveNothing(t, s)
 	receiveNothing(t, s.at(50*time.Millisecond))
 
-	// retransmit timer expires, we want to retransmit all 3 packets but we
-	// only manage to retransmit 2 (due to e.g. lack of device buffer space)
+	// retransmit timer expires, we want to retransmit all 3 packets but
+	// only two polls run before the ACK arrives
 	assertRetransmitTimer(t, s, "before the retransmission")
 	receive(t, s.at(1000*time.Millisecond), dataFromLocal(0, "aaaaaa"))
 	receive(t, s.at(1000*time.Millisecond), dataFromLocal(6, "bbbbbb"))

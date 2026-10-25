@@ -4,8 +4,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/spf13/cobra"
 )
 
 func TestOptionsAreListedInTheOrderDeclaredThenByName(t *testing.T) {
@@ -29,7 +27,7 @@ func TestOptionsAreListedInTheOrderDeclaredThenByName(t *testing.T) {
 }
 
 func TestOptionsWithAndWithoutShortNamesShareTheirColumn(t *testing.T) {
-	cmd := newCommand(&cobra.Command{Use: "fixture", Short: "A fixture"},
+	cmd := newCommand("fixture", "A fixture", nil,
 		&argument{short: 'x', valueName: "X", help: "Short only", value: stringValue{target: new(string)}},
 		&argument{long: "long", help: "Long only", action: actionCount, value: countValue{target: new(int)}})
 
@@ -45,7 +43,7 @@ func TestOptionsWithAndWithoutShortNamesShareTheirColumn(t *testing.T) {
 }
 
 func TestACommandWithoutADescriptionStartsWithItsUsage(t *testing.T) {
-	cmd := newCommand(&cobra.Command{Use: "fixture"})
+	cmd := newCommand("fixture", "", nil)
 
 	if got := renderHelp(cmd, longHelp, noVariables, palette{}); !strings.HasPrefix(got, "Usage: fixture\n") {
 		t.Errorf("help starts %q", got)

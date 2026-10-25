@@ -53,12 +53,22 @@
 // with an [*Error] of kind [ErrBusy]. Hanging up, successfully or not,
 // releases the handset.
 //
+// A CONNECT that no command awaited, such as that of a call the handset
+// answered on its own, has its call ended as soon as a method reads it: the
+// command it arrives during, or the next method that reads from the
+// handset, [Handset.PollURCs], [Handset.Answer], [Handset.DialData] and
+// [Handset.AnswerData] included. That method fails with ErrCall.
+// [Handset.Initialize] and [Handset.EndDataCall] instead end a call whose
+// CONNECT arrived before they ran as one left up, and succeed. Until a
+// method reads it, nothing ends the call, which bills by the minute.
+//
 // A hang-up can fail: neither ATH after the escape nor a DTR drop is
 // confirmed. The call may then still be up and billing, and the error says
 // so: errors.Is(err, [ErrCallMayStillBeUp]) holds, for this package's
 // errors and for satnet's. It holds too when [Handset.Initialize] finds a
-// call a previous session left up and cannot end it, and when
-// [Handset.Answer] cannot end a data call it answered by mistake.
+// call a previous session left up and cannot end it, when [Handset.Answer]
+// cannot end a data call it answered by mistake or found up, and when a
+// method cannot end the call of a CONNECT that no command awaited.
 // [Handset.EndDataCall] tries again once the handset answers;
 // power-cycling the handset is the last resort.
 //

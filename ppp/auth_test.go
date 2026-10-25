@@ -528,6 +528,54 @@ func TestEveryChallengeAnsweredGetsAFullSetOfRetries(t *testing.T) {
 	assertOutgoing(t, out.take(), []outgoingPacket{response})
 }
 
+func TestAnAuthenticateeGivesUpOnChallengesThatNeverEndInAVerdict(t *testing.T) {
+	timers := DefaultTimers()
+	authenticatee := newAuthenticatee(AuthProtocolCHAPMD5, testCredentials, timers)
+	var out outbox
+	authenticatee.start(testStart, &out)
+	// An authenticator that challenges again and again, and never decides.
+	answerChallenges(t, authenticatee, 1, timers.MaxConfigure)
+
+	got := authenticatee.receive(packet{code: 1, identifier: 99, data: []byte{1, 0xAA}}, testStart, &out)
+
+	assertOutcome(t, got, failed("the peer never completed authentication"))
+	if sent := out.take(); len(sent) != 0 {
+		t.Errorf("the challenge beyond MaxConfigure drew %+v", sent)
+	}
+	assertNoTimerRuns(t, authenticatee)
+}
+
+func TestASuccessStartsTheCountOfChallengesAfresh(t *testing.T) {
+	timers := DefaultTimers()
+	authenticatee := newAuthenticatee(AuthProtocolCHAPMD5, testCredentials, timers)
+	var out outbox
+	authenticatee.start(testStart, &out)
+	answerChallenges(t, authenticatee, 1, timers.MaxConfigure)
+	// The Success (3) answers the last challenge.
+	success := packet{code: 3, identifier: uint8(timers.MaxConfigure)}
+	assertOutcome(t, authenticatee.receive(success, testStart, &out), succeeded)
+
+	// The authenticator may challenge again at any time (RFC 1994 §2.2).
+	answerChallenges(t, authenticatee, uint8(timers.MaxConfigure)+1, timers.MaxConfigure)
+}
+
+// answerChallenges hands authenticatee count CHAP challenges, numbered from
+// first, and fails the test unless it answers each at once with a Response
+// of the challenge's identifier.
+func answerChallenges(t *testing.T, authenticatee *authenticatee, first uint8, count int) {
+	t.Helper()
+	var out outbox
+	for offset := range uint8(count) {
+		identifier := first + offset
+		// A Challenge (1) whose value is one octet, without a name.
+		challenge := packet{code: 1, identifier: identifier, data: []byte{1, 0xAA}}
+		assertOutcome(t, authenticatee.receive(challenge, testStart, &out), undecided)
+		if response := takeOnly(t, &out).packet; response.code != 2 || response.identifier != identifier {
+			t.Fatalf("challenge %d drew %v, want a Response (2) with its identifier", identifier, response)
+		}
+	}
+}
+
 func TestAnAuthenticatorGivesUpWhenThePeerNeverAuthenticates(t *testing.T) {
 	timers := DefaultTimers()
 	for _, protocol := range []AuthProtocol{AuthProtocolPAP, AuthProtocolCHAPMD5} {

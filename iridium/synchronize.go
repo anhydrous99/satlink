@@ -74,8 +74,8 @@ func (h *Handset) synchronizeEndingACallLeftUp() error {
 // where the handset answers commands while the call goes on. Firmware
 // without +CPAS cannot tell, and is left as it is.
 func (h *Handset) endCallHeldInCommandMode() error {
-	if !h.isInDataCall() {
-		return nil
+	if inDataCall, err := h.isInDataCall(); !inDataCall || err != nil {
+		return err
 	}
 	if err := h.hangUp(); err != nil {
 		return callMayStillBeUpError(fmt.Sprintf("ATH failed on a data call left up: %v", err))
@@ -92,9 +92,13 @@ func (h *Handset) configure() error {
 	if _, err := h.command("ATV1"); err != nil {
 		return err
 	}
-	// Optional on some firmware; the handset still works without them.
-	_, _ = h.command("AT+CMEE=2")
-	_, _ = h.command("AT+CMGF=0")
+	// Optional on some firmware, as the handset works without them; but
+	// what they show of a call is the caller's to hear about (callTrouble).
+	for _, optional := range []string{"AT+CMEE=2", "AT+CMGF=0"} {
+		if _, err := h.command(optional); callTrouble(err) != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -120,37 +124,44 @@ func (h *Handset) synchronize() error {
 // resynchronize reads until the handset falls quiet, keeping unsolicited
 // result codes and dropping the rest: late answers to commands that timed
 // out, which would otherwise be taken as answers to the next ones. A
-// handset that does not fall quiet is still relaying a call's data.
-func (h *Handset) resynchronize() error {
+// handset that does not fall quiet is still relaying a call's data. It
+// reports whether what it dropped held a CONNECT: a data call came up that
+// no command awaited, a call the handset answered on its own, say, and is
+// up still.
+func (h *Handset) resynchronize() (connected bool, err error) {
 	deadline := time.Now().Add(resyncLimit)
 	var buf [readChunk]byte
 	for {
 		received, err := h.read(buf[:], resyncQuiet)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if received == 0 {
 			break
 		}
 		if !time.Now().Before(deadline) {
 			h.rx.clear()
-			return callError("the handset keeps sending data: it is still online")
+			return false, callError("the handset keeps sending data: it is still online")
 		}
 		h.rx.push(buf[:received])
 	}
-	h.keepURCs()
-	return nil
+	return h.keepURCs(), nil
 }
 
-// keepURCs queues the URCs among the complete lines received so far and
-// drops everything else received.
-func (h *Handset) keepURCs() {
+// keepURCs queues the URCs among the complete lines received so far, up to
+// a CONNECT, which it reports, and drops everything else received: what
+// follows a CONNECT is its call's data.
+func (h *Handset) keepURCs() (connected bool) {
+	defer h.rx.clear()
 	for line, ok := h.rx.nextLine(); ok; line, ok = h.rx.nextLine() {
+		if result, isFinal := classifyFinalResult(line); isFinal && result.Kind == FinalResultConnect {
+			return true
+		}
 		if isURC(line, "") {
 			h.urcs = append(h.urcs, line)
 		}
 	}
-	h.rx.clear()
+	return false
 }
 
 // drain discards input until the handset is quiet for quiet, or for at most

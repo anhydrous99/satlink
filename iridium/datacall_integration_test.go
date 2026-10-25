@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/iridium"
 )
 
@@ -316,12 +317,21 @@ func TestAnOKBeforeConnectDoesNotEndTheDial(t *testing.T) {
 }
 
 func TestAnsweringAVoiceCallHangsItUp(t *testing.T) {
-	transport := newScripted(step{"ATA\r", okReply}, step{"ATH\r", okReply})
+	// NO CARRIER to ATH means the voice call had just ended: no data call
+	// is left to escape from.
+	for name, hangUpReply := range map[string]string{"OK": okReply, "NO CARRIER": "\r\nNO CARRIER\r\n"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			transport := newScripted(step{"ATA\r", okReply}, step{"ATH\r", hangUpReply})
 
-	_, err := newTestHandset(transport).AnswerData(callSettings())
+			_, err := newTestHandset(transport).AnswerData(callSettings())
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: "ATA answered a voice call, not a data call"})
-	assertAllPlayed(t, transport)
+			assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: "ATA answered a voice call, not a data call"})
+			if written := string(transport.history()); written != "ATA\rATH\r" {
+				t.Errorf("written %q, want only ATA and ATH", written)
+			}
+		})
+	}
 }
 
 func TestAHandsetDeafToTheEscapeIsHungUpByDroppingDTR(t *testing.T) {
@@ -337,6 +347,27 @@ func TestAHandsetDeafToTheEscapeIsHungUpByDroppingDTR(t *testing.T) {
 	}
 
 	assertHungUpByDroppingDTR(t, transport)
+	assertAllPlayed(t, transport)
+}
+
+func TestTheFarEndsDataAfterADTRDropDoesNotPassForEvents(t *testing.T) {
+	// What the handset relays as the drop takes effect is the far end's
+	// data, a CONNECT and a RING of its own included: dropped, not queued.
+	transport := newScripted(
+		dialStep(connectReply),
+		step{dtrDropped, "\r\nCONNECT 9600\r\n\r\nRING\r\n"},
+		step{"ATH\r", okReply},
+	)
+	handset := newTestHandset(transport)
+	call := mustDial(t, handset, callSettings())
+
+	if err := call.HangUp(); err != nil {
+		t.Fatalf("HangUp: %v; the DTR drop should end the call", err)
+	}
+
+	if urcs, err := handset.PollURCs(0); err != nil || len(urcs) != 0 {
+		t.Errorf("PollURCs = %q, %v; want no event", urcs, err)
+	}
 	assertAllPlayed(t, transport)
 }
 
@@ -478,12 +509,34 @@ func TestAHandsetFoundRelayingACallItCannotEndIsReported(t *testing.T) {
 	// Slow — two seconds of data before the escape and after the DTR drop —
 	// but timing-insensitive.
 	t.Parallel()
-	handset := newTestHandset(endlessCallFor(30 * time.Second))
+	// DialData fails with the hang-up's error, flagged; Answer with
+	// ErrCallMayStillBeUp, the kind on which mobile strands the handset.
+	tests := map[string]struct {
+		method func(*testing.T, *iridium.Handset) error
+		want   *iridium.Error
+	}{
+		"DialData": {
+			method: func(t *testing.T, handset *iridium.Handset) error {
+				return mustFailToDial(t, handset, callSettings())
+			},
+			want: &iridium.Error{Kind: iridium.ErrTimeout, Command: "+++"},
+		},
+		"Answer": {
+			method: func(_ *testing.T, handset *iridium.Handset) error { return handset.Answer() },
+			want: &iridium.Error{Kind: iridium.ErrCallMayStillBeUp,
+				Message: `the handset keeps sending data, and the call could not be ended: timed out waiting for a response to "+++"`},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	err := mustFailToDial(t, handset, callSettings())
+			err := test.method(t, newTestHandset(endlessCallFor(30*time.Second)))
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrTimeout, Command: "+++"})
-	assertCallMayStillBeUp(t, err, true)
+			assertError(t, err, test.want)
+			assertCallMayStillBeUp(t, err, true)
+		})
+	}
 }
 
 func TestAReadFailingWhileWaitingForConnectAbortsTheAttempt(t *testing.T) {
@@ -669,6 +722,22 @@ func TestADataCallWhoseConnectWasLostWithAFailedReadIsEnded(t *testing.T) {
 
 	assertError(t, err, &iridium.Error{Kind: iridium.ErrTransport, Err: errUSBHiccup})
 	assertAllPlayed(t, transport)
+}
+
+func TestADataCallWhoseConnectCameAfterAFailedAbortIsEnded(t *testing.T) {
+	// Slow — an escape with the default guard — but timing-insensitive.
+	t.Parallel()
+	// The read after the abort failed, and the CONNECT came after it: the
+	// handset is online, and AT would go to the far end as data.
+	transport := newScripted(step{"ATA\r", ""}, step{"\r", connectReply}, step{"+++", okReply}, step{"ATH\r", okReply})
+	handset := newTestHandset(hiccupAfter("ATA", transport).andAfter("\r"))
+
+	err := handset.Answer()
+
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrTransport, Err: errUSBHiccup})
+	if written := string(transport.history()); written != "ATA\r\r+++ATH\r" {
+		t.Errorf("written %q, want ATA, the abort, the escape and ATH", written)
+	}
 }
 
 func TestALateAnswerToATimedOutCommandDoesNotPassForATAs(t *testing.T) {
@@ -1021,22 +1090,25 @@ func TestACallLeftUpThatIsEndedFailsTheDialWithWhatShowedIt(t *testing.T) {
 	assertAllPlayed(t, transport)
 }
 
-func TestTheDataOfACallLeftUpAreNoPartOfTheNextAnswer(t *testing.T) {
+func TestACallLeftUpIsEndedInsteadOfAnsweredAndItsDataAreNoPartOfTheNextAnswer(t *testing.T) {
 	// Slow — two seconds of data before Answer gives up — but
 	// timing-insensitive.
 	t.Parallel()
-	// The handset relays a call left up, whose far end has fallen silent by
-	// the next command: what Answer took in before giving up on the handset
-	// must not come back as the start of that command's answer.
-	transport := newScripted(step{"AT+CGMI\r", "\r\nIridium\r\n\r\nOK\r\n"})
-	handset := newTestHandset(callUntil("AT+CGMI", transport))
+	// The handset relays a call left up, until the escape: ATA would go
+	// into it as its data, so Answer ends it instead. What Answer took in
+	// before that must not come back as the start of the next command's
+	// answer.
+	transport := newScripted(step{"+++", okReply}, step{"ATH\r", okReply},
+		step{"AT+CGMI\r", "\r\nIridium\r\n\r\nOK\r\n"})
+	handset := newTestHandset(callUntil("+++", transport))
 
 	answerErr := handset.Answer()
 	response, commandErr := handset.Command("AT+CGMI")
 
 	assertError(t, answerErr, &iridium.Error{Kind: iridium.ErrCall, Message: "the handset keeps sending data: it is still online"})
-	if written := string(transport.history()); written != "AT+CGMI\r" {
-		t.Errorf("written %q, want only AT+CGMI: Answer sends nothing into a call", written)
+	assertCallMayStillBeUp(t, answerErr, false)
+	if written := string(transport.history()); written != "+++ATH\rAT+CGMI\r" {
+		t.Errorf("written %q, want the call ended, then AT+CGMI: Answer sends no ATA into a call", written)
 	}
 	if commandErr != nil || !slices.Equal(response.Lines, []string{"Iridium"}) {
 		t.Errorf("Command = %q, %v; want only Iridium", response.Lines, commandErr)
@@ -1144,6 +1216,80 @@ func TestAPartialAnswerLeftBeforeAnswerDoesNotPassForATAs(t *testing.T) {
 
 	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: "ATA answered a data call, which was ended again"})
 	assertAllPlayed(t, transport)
+}
+
+func TestACallThatCameUpAsADialIsPreparedIsEndedAndFailsIt(t *testing.T) {
+	// The handset answered a call on its own (ATS0=1) as the dial began,
+	// within the 200 ms of quiet with which late answers are dropped: the
+	// dial's commands would go into that call as its data.
+	transport := newScripted(step{"+++", okReply}, step{"ATH\r", okReply}).
+		unsolicitedAfter(lateAnswerBeforeACall, "\r\nRING\r\n"+connectReply)
+	handset := newTestHandset(transport)
+
+	err := mustFailToDial(t, handset, callSettings())
+
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall,
+		Message: "a CONNECT arrived before the call was set up: the handset went online"})
+	assertCallMayStillBeUp(t, err, false)
+	if written := string(transport.history()); written != "+++ATH\r" {
+		t.Errorf("written %q, want only the escape and ATH", written)
+	}
+	if urcs := handset.TakeURCs(); !slices.Equal(urcs, []string{"RING"}) {
+		t.Errorf("TakeURCs = %q, want the RING before the CONNECT", urcs)
+	}
+}
+
+func TestACallThatCameUpDuringADataCallsSetUpIsEndedOnceWithTheSettingsGuard(t *testing.T) {
+	// A call the handset answered on its own (ATS0=1) came up during one of
+	// the setup's own commands, or straight after it, in the same read: the
+	// setup ends it once, with the guard its settings give, which a handset
+	// may need longer than the default.
+	dial := func(handset *iridium.Handset, settings iridium.DataCallSettings) error {
+		settings.EndCallWhenDTRDrops = true
+		_, err := handset.DialData(testNumber, settings)
+		return err
+	}
+	answer := func(handset *iridium.Handset, settings iridium.DataCallSettings) error {
+		_, err := handset.AnswerData(settings)
+		return err
+	}
+	setUps := []struct {
+		name string
+		// steps lead to command, which a CONNECT answers, or follows.
+		steps   []step
+		command string
+		// arrived says when the CONNECT came: "during" or "after" command.
+		arrived string
+		setUp   func(*iridium.Handset, iridium.DataCallSettings) error
+	}{
+		{"a dial's AT&D2", []step{{"AT&D2\r", connectReply}}, "AT&D2", "during", dial},
+		{"after a dial's AT&D2", []step{{"AT&D2\r", okReply + connectReply}}, "AT&D2", "after", dial},
+		{"the ATH of a voice call answered", []step{{"ATA\r", okReply}, {"ATH\r", connectReply}}, "ATH", "during", answer},
+		{"after the ATH of a voice call answered", []step{{"ATA\r", okReply}, {"ATH\r", okReply + connectReply}},
+			"ATH", "after", answer},
+	}
+	for _, setUp := range setUps {
+		t.Run(setUp.name, func(t *testing.T) {
+			// Slow — two guards longer than the default — but
+			// timing-insensitive.
+			t.Parallel()
+			transport := newScripted(slices.Concat(setUp.steps, []step{{"+++", okReply}, {"ATH\r", okReply}})...).
+				inWholeReads()
+			settings := callSettings()
+			settings.EscapeGuard = longEscapeGuard
+
+			err := setUp.setUp(newTestHandset(transport), settings)
+
+			assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: "a CONNECT arrived " + setUp.arrived +
+				" " + debugtext.Quote(setUp.command) + ": the handset went online"})
+			assertCallMayStillBeUp(t, err, false)
+			if escapes := plusSigns(transport) / len("+++"); escapes != 1 {
+				t.Errorf("%d escapes written (%q), want one", escapes, transport.history())
+			}
+			assertWaitedBetween(t, transport, setUp.command+"\r", "+++", longEscapeGuard)
+			assertAllPlayed(t, transport)
+		})
+	}
 }
 
 func TestALateAnswerArrivingWhileADialIsPreparedDoesNotDecideIt(t *testing.T) {

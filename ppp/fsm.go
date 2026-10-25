@@ -24,6 +24,12 @@ const maxRepeatedRequests = 3
 // back before the line is called looped.
 const ownRequestLoopbackLimit = 3
 
+// stalledReason is why a negotiation fails once the peer has answered our
+// request more often than the Nak tolerance allows without naming anything
+// we could change. An empty Nak or Reject, or one naming only options we
+// never proposed, would otherwise draw the same request again forever.
+const stalledReason = "the peer keeps refusing our request without naming a change we can make"
+
 // verdictKind classifies a verdict.
 type verdictKind int
 
@@ -180,9 +186,12 @@ type automaton[N negotiator] struct {
 	restartCounter  int
 	naksSent        int
 	naksReceived    int
+	// fruitlessAnswers counts the Naks and Rejects that left our options as
+	// they were: each drew the same request again.
+	fruitlessAnswers int
 	// nakTolerance is how many Naks in a row are accepted before further
-	// ones count as Rejects, so that a peer cannot stall negotiation
-	// forever.
+	// ones count as Rejects, and how many fruitless answers before the
+	// negotiation fails, so that a peer cannot stall negotiation forever.
 	nakTolerance int
 	// ackedRequest is the peer's request we last acknowledged, nil before
 	// the first; repeatsAnswered counts how often it was repeated since.
@@ -195,7 +204,7 @@ type automaton[N negotiator] struct {
 }
 
 // newAutomaton returns a closed automaton for protocol that accepts up to
-// Max-Failure Naks in a row.
+// Max-Failure Naks in a row, and as many fruitless answers.
 func newAutomaton[N negotiator](protocol uint16, negotiator N, timers Timers) *automaton[N] {
 	return &automaton[N]{
 		protocol:     protocol,
@@ -207,7 +216,7 @@ func newAutomaton[N negotiator](protocol uint16, negotiator N, timers Timers) *a
 }
 
 // toleratingNaks makes the automaton accept up to tolerance Naks in a row,
-// and returns it.
+// and as many fruitless answers, and returns it.
 func (a *automaton[N]) toleratingNaks(tolerance int) *automaton[N] {
 	a.nakTolerance = tolerance
 	return a
@@ -231,6 +240,7 @@ func (a *automaton[N]) open(now time.Time, out *outbox) {
 	}
 	a.naksSent = 0
 	a.naksReceived = 0
+	a.fruitlessAnswers = 0
 	a.ownRequestsReceived = 0
 	a.restart(now, out)
 	a.state = stateRequestSent
@@ -435,6 +445,7 @@ func (a *automaton[N]) enterOpened() transition {
 	a.deadline = time.Time{}
 	a.repeatsAnswered = 0
 	a.naksReceived = 0
+	a.fruitlessAnswers = 0
 	return layerUp
 }
 
@@ -508,8 +519,7 @@ func (a *automaton[N]) onConfigureNak(nak packet, now time.Time, out *outbox) tr
 	if err := a.adoptSuggestions(options); err != nil {
 		return a.fail(err.Error())
 	}
-	a.requestAgain(now, out)
-	return noTransition
+	return a.requestAgain(now, out)
 }
 
 // adoptSuggestions adopts the values a Nak suggests for our options. A
@@ -532,8 +542,7 @@ func (a *automaton[N]) onConfigureReject(reject packet, now time.Time, out *outb
 	if err := a.negotiator.applyReject(options); err != nil {
 		return a.fail(err.Error())
 	}
-	a.requestAgain(now, out)
-	return noTransition
+	return a.requestAgain(now, out)
 }
 
 // optionsAnsweringRequest returns the options of a Nak or Reject that
@@ -551,9 +560,18 @@ func (a *automaton[N]) optionsAnsweringRequest(answer packet) ([]configOption, b
 
 // requestAgain replaces the request the peer answered with a fresh one, our
 // options adjusted to its answer (RFC 1661's irc, scr). Request-Sent and
-// Ack-Sent, the only states an answer reaches, stay as they are.
-func (a *automaton[N]) requestAgain(now time.Time, out *outbox) {
+// Ack-Sent, the only states an answer reaches, stay as they are. An answer
+// that left our options as they were is fruitless: beyond the Nak
+// tolerance, the negotiation fails instead of asking the same again.
+func (a *automaton[N]) requestAgain(now time.Time, out *outbox) transition {
+	if bytes.Equal(encodeOptionList(a.negotiator.ownOptions()), a.request.data) {
+		a.fruitlessAnswers++
+		if a.fruitlessAnswers > a.nakTolerance {
+			return a.fail(stalledReason)
+		}
+	}
 	a.restart(now, out)
+	return noTransition
 }
 
 // fail stops the automaton because the two sides cannot agree, for reason.
@@ -660,7 +678,8 @@ func (a *automaton[N]) countTransmission(now time.Time) {
 }
 
 // allocateIdentifier returns the identifier for our next packet, wrapping
-// around after 255.
+// around after 255. The endpoint takes LCP's for the LCP packets it sends
+// itself, so that one count numbers every LCP packet we originate.
 func (a *automaton[N]) allocateIdentifier() uint8 {
 	a.lastIdentifier++
 	return a.lastIdentifier

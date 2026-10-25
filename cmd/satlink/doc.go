@@ -8,7 +8,7 @@
 //	satlink status                    # signal bars, battery, registration
 //	satlink sms send +881631234567 "hello from the field"
 //	satlink sms list unread
-//	satlink at 'AT+CSQ'               # anything else, raw
+//	satlink at 'AT+CSQ'               # other commands, raw; not a data dial
 //	satlink monitor                   # print incoming SMS / RING events
 //
 //	satlink net status                # dial, show the negotiated addresses, hang up

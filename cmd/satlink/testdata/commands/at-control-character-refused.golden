@@ -1,0 +1,5 @@
+$ satlink --simulate=instant at 'ATD008816000025;'
+exit status 1
+--- stdout
+--- stderr
+error: invalid argument: "ATD008816000025;\u{8}" holds a character other than printable ASCII, which can change the command the handset runs

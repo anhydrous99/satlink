@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // These tests record the process-wide logger, so they do not run in
@@ -24,17 +26,17 @@ func TestAnAddressTheStackCannotUseIsLeftOutWithAWarning(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.address, func(t *testing.T) {
-			recorder := recordLogs(t)
+			lines := logtest.Record(t, logPackage, slog.LevelDebug)
 			network := DefaultNetworkConfig()
 			network.GatewayAddress = netip.MustParseAddr(test.address)
 
 			newInternet(network, int(network.GatewayMRU), time.Now()).close()
 
-			warning := logRecord{
-				level:   slog.LevelWarn,
-				message: "simulated internet: " + test.address + " cannot be the gateway's own address",
+			warning := logtest.Line{
+				Level: slog.LevelWarn,
+				Text:  "simulated internet: " + test.address + " cannot be the gateway's own address",
 			}
-			if warned := slices.Contains(recorder.recorded(), warning); warned != test.warned {
+			if warned := slices.Contains(lines(), warning); warned != test.warned {
 				t.Errorf("warned %v; want %v", warned, test.warned)
 			}
 		})
@@ -70,7 +72,7 @@ func TestTheUDPServicesLogTheAnswersTheyCannotSend(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.service, func(t *testing.T) {
-			recorder := recordLogs(t)
+			lines := logtest.Record(t, logPackage, slog.LevelDebug)
 			now := time.Now()
 			simulated := newInternet(network, int(network.GatewayMRU), now)
 			t.Cleanup(simulated.close)
@@ -78,8 +80,8 @@ func TestTheUDPServicesLogTheAnswersTheyCannotSend(t *testing.T) {
 			simulated.deliver(UDPDatagram(unanswerable, test.to, test.payload))
 			simulated.poll(now)
 
-			want := logRecord{level: slog.LevelDebug, message: test.want}
-			if got := recorder.recorded(); !slices.Contains(got, want) {
+			want := logtest.Line{Level: slog.LevelDebug, Text: test.want}
+			if got := lines(); !slices.Contains(got, want) {
 				t.Errorf("records %v; want one of them %v", got, want)
 			}
 		})

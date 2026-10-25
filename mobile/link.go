@@ -45,7 +45,8 @@ const (
 	LinkCloseReasonCallTimeLimit
 	// LinkCloseReasonDataLimit means the data volume limit was reached.
 	LinkCloseReasonDataLimit
-	// LinkCloseReasonNegotiationTimedOut means PPP did not come up in time.
+	// LinkCloseReasonNegotiationTimedOut means PPP did not come up, or back
+	// up after the peer started renegotiating, in time.
 	LinkCloseReasonNegotiationTimedOut
 	// LinkCloseReasonPPP means PPP went down: peer terminated,
 	// authentication failed, … (Detail).
@@ -318,8 +319,6 @@ func establishOwnLink(handset *iridium.Handset, config satnet.Config, listener L
 // listener, if not nil, hearing every change of its state.
 func startLink(established *satnet.Link, listener LinkListener) *SatelliteLink {
 	watcher := established.Watcher()
-	// The listener's goroutine starts before dialling, so that failing to start
-	// it costs no airtime; starting a goroutine cannot fail.
 	if listener != nil {
 		// The goroutine holds the watcher alone, never the link, so that a
 		// link the app drops still hangs up.

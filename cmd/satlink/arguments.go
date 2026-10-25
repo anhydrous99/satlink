@@ -52,6 +52,9 @@ type argument struct {
 	// env names an environment variable that stands in for an option not
 	// given, even when it is set to "".
 	env string
+	// hidesEnvValue is set for a variable that holds a secret, such as a
+	// password: help names the variable without its value.
+	hidesEnvValue bool
 	// defaultValue is the value of an argument not given, when hasDefault.
 	defaultValue string
 	hasDefault   bool

@@ -54,8 +54,9 @@ type driver struct {
 	repeats *repeatFilter
 	// connectedAt is when the call connected.
 	connectedAt time.Time
-	// negotiationDeadline is when PPP must be up by; the zero time once it
-	// is.
+	// negotiationDeadline is when PPP must be up by: the negotiation
+	// timeout after the call connected, and after PPP left the Open phase
+	// once it has been up; the zero time while it is up.
 	negotiationDeadline time.Time
 	// drainDeadline is when a requested close stops waiting for what was
 	// written to be delivered; the zero time until one starts draining.
@@ -265,7 +266,19 @@ func (d *driver) handlePPPEvents(e *engine, now time.Time) (CloseReason, bool) {
 			return CloseReason{Kind: CloseReasonPPP, PPP: event.Reason}, true
 		}
 	}
+	d.watchRenegotiation(now)
 	return CloseReason{}, false
+}
+
+// watchRenegotiation gives PPP the negotiation timeout, from now, to come
+// back up once it has left the Open phase after coming up; until it first
+// comes up, the deadline from the connection stands. PPP reports nothing
+// while the peer renegotiates, and the link carries nothing then while the
+// call bills: a peer that never completes would keep it so for good.
+func (d *driver) watchRenegotiation(now time.Time) {
+	if d.negotiationDeadline.IsZero() && d.ppp.Phase() != ppp.PhaseOpen {
+		d.negotiationDeadline = now.Add(d.tuning.NegotiationTimeout)
+	}
 }
 
 // ipv4Up adopts the addresses IPCP agreed on, and reports a failure when the
@@ -321,7 +334,8 @@ func (d *driver) limitReached(e *engine, now time.Time) (CloseReasonKind, bool) 
 	}
 }
 
-// negotiationTimedOut reports whether PPP is still not up at its deadline.
+// negotiationTimedOut reports whether PPP is still not up, or not back up, at
+// its deadline.
 func (d *driver) negotiationTimedOut(now time.Time) bool {
 	return !d.negotiationDeadline.IsZero() && !now.Before(d.negotiationDeadline)
 }

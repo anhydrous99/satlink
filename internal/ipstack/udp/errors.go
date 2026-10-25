@@ -16,7 +16,4 @@ var (
 	ErrBufferFull = errors.New("buffer full")
 	// ErrExhausted reports that no datagram has been received.
 	ErrExhausted = errors.New("exhausted")
-	// ErrTruncated reports a datagram larger than the slice given to copy it
-	// into.
-	ErrTruncated = errors.New("truncated")
 )

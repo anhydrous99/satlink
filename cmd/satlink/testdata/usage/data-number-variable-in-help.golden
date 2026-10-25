@@ -19,7 +19,7 @@ Options:
   -b, --baud <BAUD>                Serial port speed, in bits per second [default: 19200]
       --simulate[=<SIMULATE>]      Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
       --username <USERNAME>        PPP user name (Iridium's gateway accepts any) [default: ""]
-      --password <PASSWORD>        PPP password (Iridium's gateway accepts any) [default: ""]
+      --password <PASSWORD>        PPP password (Iridium's gateway accepts any) [env: SATLINK_PASSWORD] [default: ""]
   -v, --verbose...                 Log what the link is doing (-v), in more detail (-vv, -vvv)
       --idle-secs <IDLE_SECS>      Hang up after this many seconds without traffic [default: 300]
       --max-minutes <MAX_MINUTES>  Longest the call may last, in minutes, hanging up included [default: 60]

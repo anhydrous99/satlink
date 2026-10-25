@@ -1,10 +1,6 @@
 package main
 
-import (
-	"io"
-
-	"github.com/spf13/cobra"
-)
+import "io"
 
 // programName is the command's name, as its help and its hang-up warning
 // give it.
@@ -41,19 +37,7 @@ func newCLI(env environment, stderr io.Writer) *cli {
 // rootCommand returns the command tree of the run, whose arguments the run's
 // options and the commands' own variables keep.
 func (c *cli) rootCommand() *command {
-	root := newRoot(&cobra.Command{
-		Use:   programName,
-		Short: "Talk to an Iridium satellite handset over USB",
-		// Before every command, once the command line has been read.
-		PersistentPreRun: func(*cobra.Command, []string) { c.installLogger() },
-		// run reports errors itself.
-		SilenceErrors: true,
-		SilenceUsage:  true,
-	}, c.options.arguments()...)
-	// cobra has nothing to say, but must never say it on the process's own
-	// streams.
-	root.runner.SetOut(c.streams.stdout)
-	root.runner.SetErr(c.streams.stderr)
+	root := newRoot(programName, "Talk to an Iridium satellite handset over USB", c.options.arguments()...)
 	return root.withSubcommands(
 		c.listCommand(), c.infoCommand(), c.statusCommand(), c.smsCommand(),
 		c.dialCommand(), c.answerCommand(), c.hangUpCommand(), c.atCommand(),

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/anhydrous99/satlink/internal/ipstack/tcp"
+	"github.com/anhydrous99/satlink/internal/logtest"
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
@@ -186,21 +186,6 @@ func (h panicOnAClosingConnection) WithAttrs([]slog.Attr) slog.Handler { return 
 
 func (h panicOnAClosingConnection) WithGroup(string) slog.Handler { return h }
 
-// installLogHandler makes handler the process-wide logger until the test
-// ends. Tests that call it must not run in parallel.
-func installLogHandler(t *testing.T, handler slog.Handler) {
-	t.Helper()
-	previous, previousOutput, previousFlags := slog.Default(), log.Writer(), log.Flags()
-	slog.SetDefault(slog.New(handler))
-	t.Cleanup(func() {
-		// SetDefault also points the log package at the handler; the
-		// previous default does not undo that.
-		slog.SetDefault(previous)
-		log.SetOutput(previousOutput)
-		log.SetFlags(previousFlags)
-	})
-}
-
 // armPanicOnAClosingConnection installs, until the test ends, a logger that
 // panics once, as the hang-up aborts the open connections, and arms it.
 // Tests that call it must not run in parallel.
@@ -222,7 +207,7 @@ func armPanicOnEveryClosingConnection(t *testing.T) {
 // and arms it.
 func installArmed(t *testing.T, handler panicOnAClosingConnection) {
 	t.Helper()
-	installLogHandler(t, handler)
+	logtest.Install(t, handler)
 	handler.armed.Store(true)
 }
 

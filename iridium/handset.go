@@ -16,11 +16,15 @@ type Response struct {
 	// Lines are the command's information lines, without the echo and
 	// without unsolicited result codes, which are queued instead.
 	Lines []string
-	// Connected reports that the command ended in CONNECT rather than OK:
-	// the handset is online, a data call is up.
+	// Connected reports that the command ended in CONNECT rather than OK,
+	// with a data call up. It is always false in what [Handset.Command] and
+	// [Handset.CommandTimeout] return: they refuse the commands that can go
+	// online, and end the call of any CONNECT that comes all the same. The
+	// package's own dials and answers read it, to tell a data call from a
+	// voice call or from no call.
 	Connected bool
 	// ConnectMessage is what followed CONNECT, usually the data rate; empty
-	// when nothing did, or when the command ended in OK.
+	// when Connected is false.
 	ConnectMessage string
 }
 
@@ -266,9 +270,6 @@ const (
 	voiceCallSuffix = ";"
 	// answerCommand answers an incoming call.
 	answerCommand = "ATA"
-	// returnOnlineCommand takes the handset back online into a call left
-	// for command mode.
-	returnOnlineCommand = "ATO"
 	// hangUpCommand ends a call.
 	hangUpCommand = "ATH"
 )
@@ -358,8 +359,10 @@ func (h *Handset) hangUpTimeout() time.Duration {
 // Initialize synchronises with the handset and puts it into a known state:
 // echo off (ATE0), verbose result codes (ATV1), verbose +CME ERROR
 // (AT+CMEE=2) and SMS PDU mode (AT+CMGF=0), the only one Iridium handsets
-// have. The last two are optional on some firmware and their failure is
-// ignored.
+// have. The last two are optional on some firmware: their failure is
+// ignored unless it is ErrCall or ErrCallMayStillBeUp, as when a data call
+// came up meanwhile (see the package documentation). So is that of
+// AT+CPAS, below.
 //
 // Any half-entered SMS a previous session left is aborted (ESC) and stale
 // input discarded first, for at most two seconds: a handset left in a call
@@ -386,21 +389,62 @@ func (h *Handset) Initialize() error {
 // Command sends a raw AT command, without its trailing CR, and waits for
 // its final result within the handset's timeout.
 //
-// It fails with ErrInvalidArgument if command contains CR or LF, ErrTimeout
-// when no final result arrives in time, ErrCommandFailed on ERROR,
-// ErrEquipment on +CME ERROR, ErrSMS on +CMS ERROR, and ErrCall on NO
-// CARRIER, BUSY, NO ANSWER and NO DIALTONE. A CONNECT ends only commands
-// that can take the handset online (a data dial, ATA, ATO; the Response then
-// says Connected); after any other command it fails with ErrCall, as a late
-// CONNECT from an abandoned dial must not pass for an answer.
+// A command line that can take the handset online fails with
+// ErrInvalidArgument before anything is sent. One does if it holds a data
+// dial (D without ';'), A (answer) or O (return online) anywhere among its
+// commands, as the handset reads them, or A/, which repeats the last line.
+// So "ATD123", "at d123", "ATE0D123", "AT+CSQ D123", "AT+CSQD123" and
+// "ATA0" are refused. So are auto-answer, "ATS0=1", the writes to S3 and
+// S5, which change how the handset reads the lines after, and "=n", which
+// writes the register last referred to. Each would leave a data call up,
+// billing, that nothing ends. The handset tells where an extended command's
+// name ends by knowing the names, so one that the ISU AT Command Reference
+// does not define is read letter by letter, and refused if a letter can go
+// online: "AT+BOGUS" is. A space ends an extended command, and what follows
+// is read as commands: "AT+CKPD=160" is sent, but "AT+CKPD = 160" is
+// refused. So is a line that holds a character other than printable ASCII,
+// such as a backspace, which can change the line the handset runs.
+// [Handset.DialData] and [Handset.AnswerData] set data calls up, and
+// [Handset.EndDataCall] ends one.
+//
+// A CONNECT that arrives all the same with the command's answer, such as
+// that of a call the handset answered on its own, has its call ended at
+// once, as EndDataCall ends one, and Command fails with ErrCall. If the
+// call could not be ended, it fails with ErrCallMayStillBeUp instead: the
+// call may still be up and billing. One that arrives after Command gave up
+// or returned, as that of a call answered by a key press ("AT+CKPD=140",
+// the Green key) may, is ended by the next method that reads from the
+// handset (see the package documentation). A response line that reads as
+// CONNECT counts as a call's, even if it is message text, as AT+SBDRT's
+// may be.
+//
+// It fails with ErrInvalidArgument too if command contains CR or LF, with
+// ErrTimeout when no final result arrives in time, ErrCommandFailed on
+// ERROR, ErrEquipment on +CME ERROR, ErrSMS on +CMS ERROR, and ErrCall on
+// NO CARRIER, BUSY, NO ANSWER and NO DIALTONE.
 func (h *Handset) Command(command string) (Response, error) {
-	return exchange(h, func() (Response, error) { return h.command(command) })
+	return exchange(h, func() (Response, error) { return h.rawCommand(command, h.commandTimeout()) })
 }
 
 // CommandTimeout is [Handset.Command] with its own timeout instead of the
 // handset's.
 func (h *Handset) CommandTimeout(command string, timeout time.Duration) (Response, error) {
-	return exchange(h, func() (Response, error) { return h.commandWithTimeout(command, timeout) })
+	return exchange(h, func() (Response, error) { return h.rawCommand(command, timeout) })
+}
+
+// rawCommand is Command, with the handset's lock held, within timeout.
+func (h *Handset) rawCommand(command string, timeout time.Duration) (Response, error) {
+	if err := checkOneLine(command); err != nil {
+		return Response{}, err
+	}
+	if err := checkPrintable(command); err != nil {
+		return Response{}, err
+	}
+	if mayGoOnline(command) {
+		return Response{}, invalidArgument(debugtext.Quote(command) +
+			" can take the handset online, leaving a data call up and billing")
+	}
+	return h.commandWithTimeout(command, timeout)
 }
 
 // Info reports manufacturer, model, firmware revision and IMEI (AT+CGMI,
@@ -499,7 +543,10 @@ func (h *Handset) Dial(number string) error {
 
 // Answer answers an incoming voice call (ATA), waiting up to ninety
 // seconds. Late answers to commands that timed out are dropped first, as
-// one would pass for ATA's.
+// one would pass for ATA's. A data call found up meanwhile, which a CONNECT
+// among them or two seconds of data without a pause show, is ended as
+// [Handset.EndDataCall] ends one, and Answer fails with ErrCall — failing
+// that, with ErrCallMayStillBeUp.
 //
 // A data call answered by mistake is ended again at once, as nothing else
 // would end it, and Answer fails with ErrCall "ATA answered a data call,
@@ -539,6 +586,10 @@ func (h *Handset) TakeURCs() []string {
 
 // PollURCs waits up to timeout for unsolicited result codes and returns all
 // queued ones, possibly none. It returns as soon as there is one.
+//
+// A CONNECT, which no command awaited, has its call ended, and PollURCs
+// fails with ErrCall, or with ErrCallMayStillBeUp if the call could not be
+// ended; the codes queued stay queued (see the package documentation).
 func (h *Handset) PollURCs(timeout time.Duration) ([]string, error) {
 	return exchange(h, func() ([]string, error) { return h.pollURCs(timeout) })
 }

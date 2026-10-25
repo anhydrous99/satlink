@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink/satnet"
-	"github.com/spf13/cobra"
 )
 
 // `satlink net tcp`: standard input to a TCP connection, and what comes back
@@ -47,10 +46,8 @@ type tcpAction struct {
 // global --port, the handset's serial port.
 func tcpCommand(start func(netAction) error) *command {
 	var action tcpAction
-	return netSubcommand(&cobra.Command{
-		Use:   "tcp",
-		Short: "Connect to HOST PORT and relay standard input and output, like netcat",
-	}, start, func() netAction { return action },
+	return netSubcommand("tcp", "Connect to HOST PORT and relay standard input and output, like netcat",
+		start, func() netAction { return action },
 		requiredPositional("HOST", "Host to connect to: a name or an IPv4 address", stringValue{target: &action.host}),
 		requiredPositional("PORT", "TCP port to connect to", boundedValue[uint16]{target: &action.port}))
 }

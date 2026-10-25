@@ -1,26 +1,22 @@
 package main
 
 import (
+	"context"
 	"io"
 
 	"github.com/anhydrous99/satlink/iridium"
-	"github.com/spf13/cobra"
 )
 
 // infoCommand is `satlink info`: who made the handset, and what it is.
 func (c *cli) infoCommand() *command {
-	return newCommand(&cobra.Command{
-		Use:   "info",
-		Short: "Manufacturer, model, firmware and IMEI",
-		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
-				info, err := handset.Info()
-				if err != nil {
-					return err
-				}
-				return printInfo(c.streams.stdout, info)
-			}))
-		},
+	return newCommand("info", "Manufacturer, model, firmware and IMEI", func(context.Context) error {
+		return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
+			info, err := handset.Info()
+			if err != nil {
+				return err
+			}
+			return printInfo(c.streams.stdout, info)
+		}))
 	})
 }
 

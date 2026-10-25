@@ -1,0 +1,5 @@
+$ satlink --simulate=instant monitor
+exit status 0
+--- stdout
++CLIP: "+881631234567+1 (bank)5m",145
+--- stderr

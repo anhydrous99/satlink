@@ -5,30 +5,6 @@ import (
 	"time"
 )
 
-func TestPollAtAccessors(t *testing.T) {
-	t.Parallel()
-	at := epoch.Add(3 * time.Second)
-	cases := map[string]struct {
-		poll          PollAt
-		wantNow       bool
-		wantTime      time.Time
-		wantTimed     bool
-		wantOnIngress bool
-	}{
-		"now":        {poll: PollNow(), wantNow: true},
-		"at a time":  {poll: PollAtTime(at), wantTime: at, wantTimed: true},
-		"on ingress": {poll: PollOnIngress(), wantOnIngress: true},
-		"zero value": {poll: PollAt{}, wantNow: true},
-	}
-	for name, c := range cases {
-		gotTime, gotTimed := c.poll.Time()
-		if c.poll.IsNow() != c.wantNow || c.poll.IsOnIngress() != c.wantOnIngress ||
-			gotTimed != c.wantTimed || !gotTime.Equal(c.wantTime) {
-			t.Errorf("%s: IsNow %v, Time %v %v, IsOnIngress %v", name, c.poll.IsNow(), gotTime, gotTimed, c.poll.IsOnIngress())
-		}
-	}
-}
-
 func TestPollAtDeadline(t *testing.T) {
 	t.Parallel()
 	now := epoch.Add(time.Second)
@@ -41,6 +17,7 @@ func TestPollAtDeadline(t *testing.T) {
 		"now is the current time": {poll: PollNow(), wantDeadline: now, wantSet: true},
 		"a time is itself":        {poll: PollAtTime(at), wantDeadline: at, wantSet: true},
 		"ingress sets none":       {poll: PollOnIngress(), wantSet: false},
+		"the zero value is now":   {poll: PollAt{}, wantDeadline: now, wantSet: true},
 	}
 	for name, c := range cases {
 		deadline, set := c.poll.Deadline(now)

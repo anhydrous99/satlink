@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/iridium"
 )
 
@@ -395,18 +396,18 @@ func TestErrorsAreTyped(t *testing.T) {
 		step{"AT+CIMI\r", "\r\n+CME ERROR: SIM not inserted\r\n"},
 		step{"AT+CMGD=9\r", "\r\n+CMS ERROR: 321\r\n"},
 		step{"ATD+12025550100;\r", "\r\nNO CARRIER\r\n"},
-		step{"AT+BOGUS\r", "\r\nERROR\r\n"},
+		step{"AT+XYZZY\r", "\r\nERROR\r\n"},
 	))
 
 	_, imsiErr := handset.IMSI()
 	deleteErr := handset.DeleteSMS(9)
 	dialErr := handset.Dial("+12025550100")
-	_, commandErr := handset.Command("AT+BOGUS")
+	_, commandErr := handset.Command("AT+XYZZY")
 
 	assertError(t, imsiErr, &iridium.Error{Kind: iridium.ErrEquipment, Code: "SIM not inserted"})
 	assertError(t, deleteErr, &iridium.Error{Kind: iridium.ErrSMS, Code: "321"})
 	assertError(t, dialErr, &iridium.Error{Kind: iridium.ErrCall, Message: "NO CARRIER"})
-	assertError(t, commandErr, &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+BOGUS"})
+	assertError(t, commandErr, &iridium.Error{Kind: iridium.ErrCommandFailed, Command: "AT+XYZZY"})
 }
 
 func TestAnOKLineFromACallLeftUpDoesNotPassForTheHandsets(t *testing.T) {
@@ -599,13 +600,23 @@ func TestATimeoutTooLongForTheClockMeansNoDeadline(t *testing.T) {
 	}
 }
 
-func TestAnUnexpectedConnectIsAnError(t *testing.T) {
-	// A late CONNECT from an abandoned dial must not pass as an answer.
-	handset := newTestHandset(newScripted(step{"AT+CSQ\r", "\r\nCONNECT 9600\r\n"}))
+func TestACONNECTDuringACommandThatCannotGoOnlineHasItsCallEnded(t *testing.T) {
+	// It must not pass for an answer, and nothing else would end its call.
+	// Slow — an escape with the default guard — but timing-insensitive.
+	t.Parallel()
+	transport := newScripted(
+		step{"AT+CSQF\r", connectReply},
+		step{"+++", okReply},
+		step{"ATH\r", okReply},
+	)
+	handset := newTestHandset(transport)
 
-	_, err := handset.SignalQuality()
+	_, err := handset.LastSignalQuality()
 
-	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: "unexpected CONNECT after AT+CSQ: the handset is online"})
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall,
+		Message: `a CONNECT arrived during "AT+CSQF": the handset went online, and the call was ended`})
+	assertCallMayStillBeUp(t, err, false)
+	assertAllPlayed(t, transport)
 }
 
 func TestTimeoutAndValidation(t *testing.T) {
@@ -623,6 +634,210 @@ func TestTimeoutAndValidation(t *testing.T) {
 	assertError(t, injectionErr, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: "command must not contain CR or LF"})
 	if written := string(transport.history()); written != "AT\r" {
 		t.Errorf("written %q, want only the AT that timed out", written)
+	}
+}
+
+func TestARawCommandThatCanGoOnlineIsRefusedUnsent(t *testing.T) {
+	// Nothing would end the call it left up.
+	transport := newScripted()
+	handset := newTestHandset(transport)
+
+	commands := []string{
+		"ATD" + testNumber, "atd" + testNumber, "AT D" + testNumber, " ATD" + testNumber,
+		"ATA", "ATA ", "ATA0", "ATO", "A/",
+		// Chained after another command, as the handset reads the line.
+		"ATE0D" + testNumber, "ATAE0", "ATE0A", "AT+CSQ;D" + testNumber,
+		"AT+CSQ D" + testNumber, "AT+CBST=71,0,1 D" + testNumber, "AT+CBST=71,0,1D" + testNumber,
+		"AT+CSQD" + testNumber, "AT-MSSTMD" + testNumber, "AT+GSN&VD" + testNumber,
+		// Auto-answer, whose calls no command awaits.
+		"ATS0=1", "AT=1",
+		// The handset reads from the first AT as written.
+		"A T+ ATD" + testNumber,
+	}
+	for _, command := range commands {
+		_, commandErr := handset.Command(command)
+		_, timeoutErr := handset.CommandTimeout(command, commandTimeout)
+
+		want := &iridium.Error{Kind: iridium.ErrInvalidArgument,
+			Message: `"` + command + `" can take the handset online, leaving a data call up and billing`}
+		assertError(t, commandErr, want)
+		assertError(t, timeoutErr, want)
+	}
+	if written := transport.history(); len(written) != 0 {
+		t.Errorf("written %q, want nothing", written)
+	}
+}
+
+func TestARawCommandBeyondPrintableASCIIIsRefusedUnsent(t *testing.T) {
+	// The handset would run another line than the one checked: a backspace
+	// or a delete takes the ';' of a voice dial away, and a byte beyond
+	// ASCII loses its eighth bit, which turns 0xBB into ';'.
+	transport := newScripted()
+	handset := newTestHandset(transport)
+
+	commands := []string{
+		"ATD" + testNumber + ";\b", "ATD" + testNumber + ";\x7f", "AT+CSQ\xbbD" + testNumber,
+		"A\tTD" + testNumber, "AT\x00",
+	}
+	for _, command := range commands {
+		_, err := handset.Command(command)
+
+		assertError(t, err, &iridium.Error{Kind: iridium.ErrInvalidArgument, Message: debugtext.Quote(command) +
+			" holds a character other than printable ASCII, which can change the command the handset runs"})
+	}
+	if written := transport.history(); len(written) != 0 {
+		t.Errorf("written %q, want nothing", written)
+	}
+}
+
+// lateConnect is how long after a raw command that times out the CONNECT
+// of a call the handset answered on its own arrives: well after the
+// command's timeout, and before the next command's.
+const lateConnect = 10 * commandTimeout
+
+func TestACONNECTAfterARawCommandGaveUpHasItsCallEndedByTheNext(t *testing.T) {
+	// Slow — an escape with the default guard — but timing-insensitive.
+	t.Parallel()
+	transport := newScripted(
+		step{"AT+CSQ\r", connectReply},
+		step{"AT\r", ""},
+		step{"+++", okReply},
+		step{"ATH\r", okReply},
+	).answersLate("AT+CSQ\r", lateConnect)
+	handset := newTestHandset(transport)
+
+	_, gaveUp := handset.CommandTimeout("AT+CSQ", commandTimeout)
+	_, err := handset.CommandTimeout("AT", time.Minute)
+
+	assertError(t, gaveUp, &iridium.Error{Kind: iridium.ErrTimeout, Command: "AT+CSQ"})
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall,
+		Message: `a CONNECT arrived during "AT": the handset went online, and the call was ended`})
+	assertCallMayStillBeUp(t, err, false)
+	assertAllPlayed(t, transport)
+}
+
+func TestACallThatCameUpDuringAQueryAMethodDoesWithoutFailsTheMethod(t *testing.T) {
+	// The method would carry on without the query's answer, and say
+	// nothing of the call, or of a call that may still be up.
+	queries := []struct {
+		name string
+		// before are the steps that lead to query, which a CONNECT answers.
+		before []step
+		query  string
+		method func(*iridium.Handset) error
+	}{
+		{"Initialize's AT+CPAS", []step{{"AT\r", okReply}}, "AT+CPAS", (*iridium.Handset).Initialize},
+		{"Initialize's AT+CMEE=2", []step{
+			{"AT\r", okReply},
+			{"AT+CPAS\r", "\r\n+CPAS: 000\r\n" + okReply},
+			{"ATE0\r", okReply},
+			{"ATV1\r", okReply},
+		}, "AT+CMEE=2", (*iridium.Handset).Initialize},
+		{"SendSMS's AT+CSCA?", nil, "AT+CSCA?", func(handset *iridium.Handset) error {
+			_, err := handset.SendSMS("+881631234567", "hi")
+			return err
+		}},
+	}
+	for _, query := range queries {
+		connected := slices.Concat(query.before, []step{{query.query + "\r", connectReply}})
+		wentOnline := "a CONNECT arrived during " + debugtext.Quote(query.query) + ": the handset went online"
+		t.Run(query.name+" ended", func(t *testing.T) {
+			// Slow — an escape with the default guard — but timing-insensitive.
+			t.Parallel()
+			transport := newScripted(slices.Concat(connected, []step{{"+++", okReply}, {"ATH\r", okReply}})...)
+
+			err := query.method(newTestHandset(transport))
+
+			assertError(t, err, &iridium.Error{Kind: iridium.ErrCall, Message: wentOnline + ", and the call was ended"})
+			if written := string(transport.history()); !strings.HasSuffix(written, query.query+"\r+++ATH\r") {
+				t.Errorf("written %q, want nothing after the call was ended", written)
+			}
+		})
+		t.Run(query.name+" left up", func(t *testing.T) {
+			transport := newScripted(connected...).unpluggedOncePlayedOut()
+
+			err := query.method(newTestHandset(transport))
+
+			assertError(t, err, &iridium.Error{Kind: iridium.ErrCallMayStillBeUp,
+				Message: wentOnline + ", and the call could not be ended: transport error: unplugged"})
+			assertCallMayStillBeUp(t, err, true)
+		})
+	}
+}
+
+func TestACallWhoseCONNECTArrivesWithARawCommandsAnswerIsEnded(t *testing.T) {
+	// Slow — an escape with the default guard — but timing-insensitive.
+	t.Parallel()
+	// In the read that brings the command's OK, read and dropped with it,
+	// the CONNECT would leave its call up unseen.
+	transport := newScripted(
+		step{"AT+CSQF\r", "\r\n+CSQF:3\r\n" + okReply + connectReply},
+		step{"+++", okReply},
+		step{"ATH\r", okReply},
+	).inWholeReads()
+	handset := newTestHandset(transport)
+
+	_, err := handset.CommandTimeout("AT+CSQF", commandTimeout)
+
+	assertError(t, err, &iridium.Error{Kind: iridium.ErrCall,
+		Message: `a CONNECT arrived after "AT+CSQF": the handset went online, and the call was ended`})
+	if written := string(transport.history()); written != "AT+CSQF\r+++ATH\r" {
+		t.Errorf("written %q, want the command, then the call ended once", written)
+	}
+}
+
+func TestACallWhoseCONNECTArrivesDuringARawCommandAndCannotBeEndedMayStillBeUp(t *testing.T) {
+	transport := newScripted(step{"AT+CSQ\r", connectReply}).unpluggedOncePlayedOut()
+	handset := newTestHandset(transport)
+
+	_, err := handset.CommandTimeout("AT+CSQ", commandTimeout)
+
+	assertError(t, err, &iridium.Error{
+		Kind: iridium.ErrCallMayStillBeUp,
+		Message: `a CONNECT arrived during "AT+CSQ": the handset went online, ` +
+			`and the call could not be ended: transport error: unplugged`,
+	})
+	assertCallMayStillBeUp(t, err, true)
+}
+
+func TestACONNECTDoesNotPassForTheEchoOfARawLineWrittenAsOne(t *testing.T) {
+	// The handset ignores the line, which has no AT, and the CONNECT is a
+	// call's: taken for the echo, it would leave that call up unseen.
+	transport := newScripted(step{"CONNECT 9600\r", connectReply}).unpluggedOncePlayedOut()
+	handset := newTestHandset(transport)
+
+	_, err := handset.CommandTimeout("CONNECT 9600", commandTimeout)
+
+	assertError(t, err, &iridium.Error{
+		Kind: iridium.ErrCallMayStillBeUp,
+		Message: `a CONNECT arrived during "CONNECT 9600": the handset went online, ` +
+			`and the call could not be ended: transport error: unplugged`,
+	})
+}
+
+func TestARawVoiceDialAndOrdinaryCommandsAreSent(t *testing.T) {
+	transport := newScripted(
+		step{"ATD" + testNumber + ";\r", okReply},
+		step{"AT+CSQ\r", "\r\n+CSQ:4\r\n" + okReply},
+		step{"AT+SBDWT=on;off\r", okReply},
+		step{"AT+CAPBD=ALL\r", okReply},
+	)
+	handset := newTestHandset(transport)
+
+	_, dialErr := handset.Command("ATD" + testNumber + ";")
+	response, signalErr := handset.CommandTimeout("AT+CSQ", commandTimeout)
+	// Their values run to the end of the line, ';', A and D and all.
+	_, textErr := handset.Command("AT+SBDWT=on;off")
+	_, deleteErr := handset.Command("AT+CAPBD=ALL")
+
+	if dialErr != nil || signalErr != nil || !slices.Equal(response.Lines, []string{"+CSQ:4"}) {
+		t.Errorf("voice dial: %v; AT+CSQ = %q, %v; want both answered", dialErr, response.Lines, signalErr)
+	}
+	if textErr != nil || deleteErr != nil {
+		t.Errorf("AT+SBDWT=on;off: %v; AT+CAPBD=ALL: %v", textErr, deleteErr)
+	}
+	if unplayed := transport.unplayedSteps(); unplayed != 0 {
+		t.Errorf("%d steps unplayed", unplayed)
 	}
 }
 

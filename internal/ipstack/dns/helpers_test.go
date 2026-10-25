@@ -59,8 +59,6 @@ var (
 
 	exampleAddress = netip.MustParseAddr("203.0.113.80")
 	targetAddress  = netip.MustParseAddr("203.0.113.81")
-
-	errRefused = errors.New("refused")
 )
 
 // testContext returns a context at the epoch with seed 0, the test IP MTU and
@@ -86,24 +84,15 @@ type sentQuery struct {
 	message []byte
 }
 
-// recordingEmit returns an EmitFunc that records every datagram, copying
-// its payload, and returns err.
-func recordingEmit(sent *[]sentQuery, err error) EmitFunc {
-	return func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) error {
-		*sent = append(*sent, sentQuery{ip: ip, header: header, message: bytes.Clone(payload)})
-		return err
-	}
-}
-
-// dispatchAt runs Dispatch at the time elapsed after the epoch, with emit
-// granted, and returns what it emitted.
+// dispatchAt runs Dispatch at the time elapsed after the epoch, and returns
+// what it emitted, each payload copied.
 func dispatchAt(t *testing.T, s *Socket, cx *socket.Context, elapsed time.Duration) []sentQuery {
 	t.Helper()
 	cx.SetNow(at(elapsed))
 	var sent []sentQuery
-	if err := s.Dispatch(cx, recordingEmit(&sent, nil)); err != nil {
-		t.Fatalf("Dispatch at %v: %v", elapsed, err)
-	}
+	s.Dispatch(cx, func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) {
+		sent = append(sent, sentQuery{ip: ip, header: header, message: bytes.Clone(payload)})
+	})
 	return sent
 }
 

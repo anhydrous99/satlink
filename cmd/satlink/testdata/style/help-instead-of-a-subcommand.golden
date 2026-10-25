@@ -20,7 +20,7 @@ Use a data call as an IP link that only this program can use
   [1m-b[0m, [1m--baud[0m <BAUD>                Serial port speed, in bits per second [default: 19200]
       [1m--simulate[0m[=<SIMULATE>]      Use a simulated handset instead of a real one, with Iridium's real timing (the default) or instant responses [possible values: iridium, instant]
       [1m--username[0m <USERNAME>        PPP user name (Iridium's gateway accepts any) [default: ""]
-      [1m--password[0m <PASSWORD>        PPP password (Iridium's gateway accepts any) [default: ""]
+      [1m--password[0m <PASSWORD>        PPP password (Iridium's gateway accepts any) [env: SATLINK_PASSWORD] [default: ""]
   [1m-v[0m, [1m--verbose[0m...                 Log what the link is doing (-v), in more detail (-vv, -vvv)
       [1m--idle-secs[0m <IDLE_SECS>      Hang up after this many seconds without traffic [default: 300]
       [1m--max-minutes[0m <MAX_MINUTES>  Longest the call may last, in minutes, hanging up included [default: 60]

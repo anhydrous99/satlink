@@ -48,7 +48,8 @@ func TestNamesEqualComparesLabelsInStep(t *testing.T) {
 		{"the same labels", labelsOf("example", "com"), labelsOf("example", "com"), true, nil},
 		{"two root names", labelsOf(), labelsOf(), true, nil},
 		{"a different label", labelsOf("example", "com"), labelsOf("example", "org"), false, nil},
-		{"labels in another case", labelsOf("Example"), labelsOf("example"), false, nil},
+		{"labels in another case", labelsOf("Example", "COM"), labelsOf("example", "com"), true, nil},
+		{"letters beyond ASCII in another case", labelsOf("\u00c9cole"), labelsOf("\u00e9cole"), false, nil},
 		{"the first name shorter", labelsOf("example"), labelsOf("example", "com"), false, nil},
 		{"the second name shorter", labelsOf("www", "example"), labelsOf("www"), false, nil},
 		{"an empty label against the end", labelsOf("example", ""), labelsOf("example"), false, nil},
@@ -80,31 +81,20 @@ func TestCopyNameWritesTheWireForm(t *testing.T) {
 	}
 }
 
-func TestCopyNameKeepsWhatItCopiedBeforeAFailure(t *testing.T) {
+func TestCopyNameLeavesTheNameAsItWasOnAFailure(t *testing.T) {
 	t.Parallel()
 	label63 := strings.Repeat("a", maxLabelLen)
 	label62 := label63[:maxLabelLen-1]
 	tests := []struct {
-		name     string
-		labels   iter.Seq2[[]byte, error]
-		wantName string
-		wantErr  error
+		name    string
+		labels  iter.Seq2[[]byte, error]
+		wantErr error
 	}{
-		{"a broken name", brokenNameOf("www", "example"), "\x03www\x07example", errBrokenName},
+		{"a broken name", brokenNameOf("www", "example"), errBrokenName},
 		// 3 × 64 octets leave 63 for the fourth label: its length octet
 		// fits, its 63 octets do not.
-		{
-			"a label over the size limit",
-			labelsOf(label63, label63, label63, label63),
-			strings.Repeat("\x3f"+label63, 3) + "\x3f",
-			wire.ErrMalformed,
-		},
-		{
-			"no room for the root label",
-			labelsOf(label63, label63, label63, label62),
-			strings.Repeat("\x3f"+label63, 3) + "\x3e" + label62,
-			wire.ErrMalformed,
-		},
+		{"a label over the size limit", labelsOf(label63, label63, label63, label63), wire.ErrMalformed},
+		{"no room for the root label", labelsOf(label63, label63, label63, label62), wire.ErrMalformed},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -113,8 +103,8 @@ func TestCopyNameKeepsWhatItCopiedBeforeAFailure(t *testing.T) {
 
 			err := copyName(&name, test.labels)
 
-			if !errors.Is(err, test.wantErr) || string(name) != test.wantName {
-				t.Errorf("copyName = %q, %v; want %q, %v", name, err, test.wantName, test.wantErr)
+			if !errors.Is(err, test.wantErr) || !bytes.Equal(name, exampleName) {
+				t.Errorf("copyName = %q, %v; want %q, %v", name, err, exampleName, test.wantErr)
 			}
 		})
 	}

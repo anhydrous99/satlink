@@ -17,25 +17,28 @@ const (
 )
 
 // isInDataCall reports whether +CPAS says that a data call is up; false
-// when it cannot say.
-func (h *Handset) isInDataCall() bool {
+// when it cannot say. It fails only with the errors a method returns all
+// the same (callTrouble).
+func (h *Handset) isInDataCall() (bool, error) {
 	fields, err := h.queryFields("AT+CPAS", "+CPAS")
 	if err != nil {
-		return false
+		return false, callTrouble(err)
 	}
 	status, err := parseNumber(fields, 0, "+CPAS", byteField)
-	return err == nil && status == dataCallInProgress
+	return err == nil && status == dataCallInProgress, nil
 }
 
 // isInVoiceCall reports whether a voice call is up: the handset answers
 // commands, which it does not while online, +CLCC lists a call up, and
 // +CPAS says it is no data call. Late answers are dropped first, so that
-// one to an earlier command cannot pass for AT's. false when it cannot say.
+// one to an earlier command cannot pass for AT's; a CONNECT among them
+// shows a data call. false when it cannot say.
 func (h *Handset) isInVoiceCall() bool {
-	if h.resynchronize() != nil || h.synchronize() != nil {
+	if connected, err := h.resynchronize(); connected || err != nil || h.synchronize() != nil {
 		return false
 	}
-	if h.isInDataCall() {
+	// A call's trouble during AT+CPAS shows no voice call either.
+	if inDataCall, err := h.isInDataCall(); inDataCall || err != nil {
 		return false
 	}
 	states, err := h.queryFields("AT+CLCC", "+CLCC")

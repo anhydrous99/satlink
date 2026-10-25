@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -28,6 +29,33 @@ func TestTheLastLogLinesOfARunReachStandardErrorBeforeItEnds(t *testing.T) {
 
 	if status := <-ended; status != exitSuccess || stderr.String() != "the last log line\n" {
 		t.Errorf("exit status %d after standard error got %q, want success after the log line", status, stderr.String())
+	}
+}
+
+// errorFromAServer is the error of a TLS connection to a server whose
+// certificate is for other names. The names are checked before the chain
+// of trust, so any server can cause it, and the error repeats them as they
+// come: a certificate's names may hold any ASCII. These write to the
+// clipboard and clear the screen. errorFromAServerShown is what a terminal
+// gets of it.
+var (
+	errorFromAServer = errors.New("TLS: tls: failed to verify certificate: x509: certificate is valid for " +
+		"\x1b]52;c;cm0gLXJmIH4K\x07\x1b[2Jevil.test, not web.test")
+	errorFromAServerShown = "TLS: tls: failed to verify certificate: x509: certificate is valid for " +
+		"evil.test, not web.test"
+)
+
+func TestAnErrorShowsWithoutTheControlCharactersAServerPutInIt(t *testing.T) {
+	stderr := &lockedBuffer{}
+	c := newCLI(environment{}, stderr)
+	t.Cleanup(c.log.close)
+
+	if status := c.finish(errorFromAServer); status != exitFailure {
+		t.Errorf("exit status %d, want %d", status, exitFailure)
+	}
+
+	if want := "error: " + errorFromAServerShown + "\n"; stderr.String() != want {
+		t.Errorf("reported %q, want %q", stderr.String(), want)
 	}
 }
 

@@ -1,0 +1,9 @@
+$ satlink --simulate=instant status
+exit status 1
+--- stdout
+Signal:       4/5
+Battery:      80% (ExternalPower, charger Charging)
+Registration: unavailable (the call may still be up: a CONNECT arrived during "AT+CREG?": the handset went online, and the call could not be ended: transport error: unplugged)
+--- stderr
+warning: the hang-up was not confirmed, so the call may still be up and billing. End it with `satlink hangup`, or power-cycle the handset.
+error: the call may still be up: a CONNECT arrived during "AT+CREG?": the handset went online, and the call could not be ended: transport error: unplugged

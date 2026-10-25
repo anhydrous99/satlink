@@ -1,10 +1,6 @@
 package main
 
-import (
-	"testing"
-
-	"github.com/spf13/cobra"
-)
+import "testing"
 
 func TestAUsageProblemIsLaidOutAsAnError(t *testing.T) {
 	f := newFixture()
@@ -33,9 +29,9 @@ func TestAUsageProblemIsLaidOutAsAnError(t *testing.T) {
 }
 
 func TestAGroupWithoutAHelpOptionSuggestsItsHelpSubcommand(t *testing.T) {
-	group := newCommand(&cobra.Command{Use: "group"}).withSubcommands(newCommand(&cobra.Command{Use: "leaf"}))
+	group := newCommand("group", "", nil).withSubcommands(newCommand("leaf", "", nil))
 	group.help = nil
-	newRoot(&cobra.Command{Use: "fixture"}).withSubcommands(group)
+	newRoot("fixture", "").withSubcommands(group)
 
 	if got := helpFlagOf(group); got != "fixture group help" {
 		t.Errorf("helpFlagOf = %q, want fixture group help", got)

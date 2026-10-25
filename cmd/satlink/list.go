@@ -2,25 +2,21 @@ package main
 
 import (
 	"cmp"
+	"context"
 	"io"
 
 	"github.com/anhydrous99/satlink/serial"
-	"github.com/spf13/cobra"
 )
 
 // listCommand is `satlink list`: the handsets on USB. It opens none of them,
 // so --simulate changes nothing.
 func (c *cli) listCommand() *command {
-	return newCommand(&cobra.Command{
-		Use:   "list",
-		Short: "List connected handsets",
-		RunE: func(*cobra.Command, []string) error {
-			ports, err := c.env.discoverHandsets()
-			if err != nil {
-				return err
-			}
-			return printPorts(c.streams.stdout, ports)
-		},
+	return newCommand("list", "List connected handsets", func(context.Context) error {
+		ports, err := c.env.discoverHandsets()
+		if err != nil {
+			return err
+		}
+		return printPorts(c.streams.stdout, ports)
 	})
 }
 

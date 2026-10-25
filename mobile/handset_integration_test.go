@@ -7,6 +7,7 @@ import (
 
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/mobile"
+	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -76,9 +77,35 @@ func TestARawCommandReturnsItsLines(t *testing.T) {
 
 	response, err := handset.Command("AT+CSQ", eventTimeoutMillis)
 
-	if err != nil || response.Connected || response.Lines.Len() != 1 || response.Lines.Get(0) != "+CSQ:4" {
+	if err != nil || response.Lines.Len() != 1 || response.Lines.Get(0) != "+CSQ:4" {
 		t.Errorf("Command(AT+CSQ) = %+v, %v, want one line +CSQ:4", response, err)
 	}
+}
+
+func TestARawCommandThatCanGoOnlineIsRefused(t *testing.T) {
+	t.Parallel()
+	handset, control := simulatedHandset(t)
+
+	// A handset would dial each of them.
+	for _, dial := range []string{"ATD", "atd", "AT D", " ATD", "ATE0D", "AT+CSQ;D"} {
+		_, err := handset.Command(dial+satnet.IridiumInternetNumber, timeoutMillis)
+
+		assertKind(t, err, mobile.SatlinkErrorInvalidArgument)
+	}
+	if stats := control.Stats(); stats.CallsPlaced != 0 || stats.InDataCall {
+		t.Errorf("%d calls placed, a data call up: %t; want none", stats.CallsPlaced, stats.InDataCall)
+	}
+}
+
+func TestACallThatCameUpDuringARawCommandAndCannotBeHungUpStrandsTheHandset(t *testing.T) {
+	// Slow — two escapes with the default guard — but timing-insensitive.
+	t.Parallel()
+	handset := newHandset(t, &dataCallThatWillNotEnd{})
+
+	_, err := handset.Command(answeredDuring, timeoutMillis)
+
+	assertKind(t, err, mobile.SatlinkErrorHangUpFailed)
+	assertKind(t, signalQuality(handset)(), mobile.SatlinkErrorHangUpFailed)
 }
 
 func TestAHandsetSendsSMS(t *testing.T) {

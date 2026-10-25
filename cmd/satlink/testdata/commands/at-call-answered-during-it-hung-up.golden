@@ -1,0 +1,5 @@
+$ satlink --simulate=instant at AT+CSQ
+exit status 1
+--- stdout
+--- stderr
+error: call failed: a CONNECT arrived during "AT+CSQ": the handset went online, and the call was ended

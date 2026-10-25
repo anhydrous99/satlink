@@ -51,9 +51,7 @@ func (c *cli) establish(handset *iridium.Handset, config satnet.Config, interrup
 		return nil, err
 	}
 	link, err := satnet.Establish(handset, config)
-	if errors.Is(err, iridium.ErrCallMayStillBeUp) {
-		warnCallMayStillBeUp(c.streams.stderr, "")
-	}
+	warnIfCallMayStillBeUp(c.streams.stderr, err)
 	return link, err
 }
 
@@ -100,8 +98,7 @@ func netResult(stderr io.Writer, outcome, hangUp error) error {
 		return outcome
 	}
 	if outcome != nil {
-		// Best effort: the failed hang-up is what must be reported.
-		_, _ = fmt.Fprintf(stderr, "error: %v\n", outcome)
+		reportError(stderr, outcome)
 	}
 	return hangUp
 }
@@ -121,6 +118,14 @@ func callSummary(status satnet.Status) string {
 		return callMayStillBeUpWarning(" (" + traffic + ")")
 	}
 	return fmt.Sprintf("Call lasted %d s: %s.", int64(usage.ConnectedFor/time.Second), traffic)
+}
+
+// warnIfCallMayStillBeUp writes callMayStillBeUpWarning to stderr if err
+// says that the call may still be up.
+func warnIfCallMayStillBeUp(stderr io.Writer, err error) {
+	if errors.Is(err, iridium.ErrCallMayStillBeUp) {
+		warnCallMayStillBeUp(stderr, "")
+	}
 }
 
 // warnCallMayStillBeUp writes callMayStillBeUpWarning to stderr.

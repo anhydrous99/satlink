@@ -106,17 +106,6 @@ func (r *RingBuffer[T]) DequeueOneWith(take func(element *T) error) error {
 	return nil
 }
 
-// DequeueOne dequeues the oldest element and returns it, or returns
-// ErrEmpty.
-func (r *RingBuffer[T]) DequeueOne() (*T, error) {
-	var dequeued *T
-	err := r.DequeueOneWith(func(element *T) error {
-		dequeued = element
-		return nil
-	})
-	return dequeued, err
-}
-
 // EnqueueManyWith calls fill with the largest contiguous free area and
 // enqueues as many elements as fill returns, which it also returns. It
 // panics if fill returns more than it was given.
@@ -221,16 +210,6 @@ func (r *RingBuffer[T]) Allocated(offset, size int) []T {
 	}
 	start := r.index(offset)
 	return r.area(start, min(size, r.length-offset, r.Capacity()-start))
-}
-
-// ReadAllocated copies as many allocated elements as fit into data, starting
-// offset elements past the oldest one, without dequeuing them, and returns
-// how many it copied.
-func (r *RingBuffer[T]) ReadAllocated(offset int, data []T) int {
-	// The allocated elements may wrap around the end of the storage, so they
-	// take up to two contiguous runs.
-	read := copy(data, r.Allocated(offset, len(data)))
-	return read + copy(data[read:], r.Allocated(offset+read, len(data)-read))
 }
 
 // DequeueAllocated dequeues count elements without reading them. It panics if

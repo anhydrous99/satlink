@@ -208,11 +208,6 @@ func (e *bulkExchange) serve() {
 	e.service.serve()
 }
 
-// isEstablished reports whether both ends have the connection established.
-func (e *bulkExchange) isEstablished() bool {
-	return e.client.socket.State() == tcp.StateEstablished && e.service.socket.State() == tcp.StateEstablished
-}
-
 // isOver reports whether both ends have read everything and both sockets
 // are closed.
 func (e *bulkExchange) isOver() bool {

@@ -1,10 +1,13 @@
 package mobile
 
 import (
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 func TestTheListenerStopsOnceItHasDeliveredTheClose(t *testing.T) {
@@ -30,15 +33,15 @@ func TestTheListenerStopsOnceItHasDeliveredTheClose(t *testing.T) {
 }
 
 func TestAListenerThatCannotFollowItsLinkLogsItsPanic(t *testing.T) {
-	// No t.Parallel: recordErrors replaces the process-wide logger.
-	records := recordErrors(t)
+	// No t.Parallel: logtest.Record replaces the process-wide logger.
+	records := logtest.Record(t, logPackage, slog.LevelError)
 
 	// A watcher of no link stands in for a fault in following the link,
 	// which the recovery around the app's OnStateChanged does not cover.
 	deliverStateChanges(nil, &StateRecorder{})
 
 	logged := records()
-	if !slices.ContainsFunc(logged, func(text string) bool { return strings.HasPrefix(text, "the link listener panicked: ") }) {
-		t.Errorf("logged %q, want the link listener's panic", logged)
+	if !slices.ContainsFunc(logged, func(line logtest.Line) bool { return strings.HasPrefix(line.Text, "the link listener panicked: ") }) {
+		t.Errorf("logged %+v, want the link listener's panic", logged)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/mobile"
+	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/sim"
 )
 
@@ -72,23 +73,33 @@ func newNoDTRUSB(t *testing.T) *noDTRUSB {
 	return &noDTRUSB{ByteTransport: simtest.NewByteTransport(faulty), faulty: faulty, control: simulator.Control()}
 }
 
-// dataCallThatWillNotEnd is a handset that answers a data call to ATA, then
-// ignores everything — the escape, ATH, DTR — as nothing ends the call. It
-// answers each command line as it is written, OK to all but ATA and
-// AT+CPAS, and has no control lines.
+// dataCallThatWillNotEnd is a handset that answers a data call to ATA, or
+// during answeredDuring, then ignores everything — the escape, ATH, DTR — as
+// nothing ends the call. It answers each command line as it is written, OK
+// to all but those and AT+CPAS, and has no control lines.
 type dataCallThatWillNotEnd struct {
 	mu sync.Mutex
-	// online reports that ATA brought the call up: nothing is heard after.
+	// online reports that ATA brought the call up: nothing is heard after,
+	// unless relaying.
 	online bool
+	// relaying has the call relay the far end's data without pause, as one
+	// a crashed session left up may (see relayCall).
+	relaying bool
 	// line is the command line written so far.
 	line []byte
 	// replies are the answers not read yet.
 	replies []byte
 }
 
+// answeredDuring is a raw command during which dataCallThatWillNotEnd
+// answers a data call on its own, as a handset set to answer after a ring
+// (ATS0=1) does: CONNECT comes instead of the command's answer.
+const answeredDuring = "AT+CSQ"
+
 // The answers dataCallThatWillNotEnd gives, by command.
 const (
-	// dataCallAnswer is ATA's: a data call, where a voice call was asked for.
+	// dataCallAnswer is ATA's: a data call, where a voice call may have been
+	// asked for.
 	dataCallAnswer = "\r\nCONNECT 9600\r\n"
 	// idleActivityStatus is AT+CPAS's: no call in progress.
 	idleActivityStatus = "\r\n+CPAS: 000\r\n\r\nOK\r\n"
@@ -120,7 +131,7 @@ func (d *dataCallThatWillNotEnd) Write(data []byte) error {
 // respondTo carries out command and returns the handset's answer to it.
 func (d *dataCallThatWillNotEnd) respondTo(command string) string {
 	switch command {
-	case "ATA":
+	case "ATA", answeredDuring:
 		d.online = true
 		return dataCallAnswer
 	case "AT+CPAS":
@@ -137,7 +148,24 @@ func (d *dataCallThatWillNotEnd) Read(maxLen int, timeoutMillis int64) ([]byte, 
 	// Only a write brings an answer, and the handset never writes while it
 	// reads: let the read's time pass, a little of it at a time.
 	time.Sleep(min(time.Duration(timeoutMillis)*time.Millisecond, quietReadNap))
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.relaying {
+		return []byte(farEndData), nil
+	}
 	return nil, nil
+}
+
+// farEndData is what a relayed call's far end sends at every read: a PPP
+// flag.
+const farEndData = "~"
+
+// relayCall brings a data call up on d that relays the far end's data
+// without pause.
+func (d *dataCallThatWillNotEnd) relayCall() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.online, d.relaying = true, true
 }
 
 // takeReplies returns up to maxLen bytes of the answers not read yet.
@@ -190,6 +218,16 @@ func newHandset(t *testing.T, transport mobile.ByteTransport) *mobile.IridiumHan
 		t.Fatalf("NewIridiumHandset: %v", err)
 	}
 	return handset
+}
+
+// leaveADataCallUp dials Iridium's internet gateway over transport as a
+// link would, and leaves the call to nothing, as an app killed with a call
+// up does: no link or IridiumHandset knows of it.
+func leaveADataCallUp(t *testing.T, transport iridium.Transport) {
+	t.Helper()
+	if _, err := iridium.NewHandset(transport).DialData(satnet.IridiumInternetNumber, iridium.DefaultDataCallSettings()); err != nil {
+		t.Fatalf("DialData: %v", err)
+	}
 }
 
 // lend brings a link up with handset, hung up when the test ends.

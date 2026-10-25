@@ -80,93 +80,27 @@ func (b *PacketBuffer[H]) Enqueue(size int, header H) ([]byte, error) {
 	return b.payload.EnqueueMany(size), nil
 }
 
-// EnqueueWith reserves room for a packet of up to maxSize octets, calls fill
-// with it and queues the packet with the length fill returns, which it also
-// returns. It returns ErrFull, without calling fill, when maxSize octets do
-// not fit, and panics if maxSize is negative or fill returns more than
-// maxSize.
-func (b *PacketBuffer[H]) EnqueueWith(maxSize int, header H, fill func(payload []byte) int) (int, error) {
-	requireSize("EnqueueWith", maxSize)
-	if !b.admits(maxSize) {
-		return 0, ErrFull
-	}
-	if err := b.makeContiguousRoom(maxSize); err != nil {
-		return 0, err
-	}
-	metadata, err := b.metadata.EnqueueOne()
-	if err != nil {
-		return 0, err
-	}
-	size := b.payload.EnqueueManyWith(func(free []byte) int {
-		return checkedCount("EnqueueWith", fill(free[:maxSize:maxSize]), maxSize)
-	})
-	*metadata = packetMetadata[H]{size: size, header: header}
-	return size, nil
-}
-
-// DequeueWith calls take with the oldest packet and dequeues it if take
-// returns nil; otherwise the packet stays queued and take's error is
-// returned. It returns ErrEmpty, without calling take, when no packet is
-// queued.
-func (b *PacketBuffer[H]) DequeueWith(take func(header *H, payload []byte) error) error {
+// Dequeue dequeues the oldest packet and returns its header and payload, or
+// returns ErrEmpty.
+func (b *PacketBuffer[H]) Dequeue() (H, []byte, error) {
+	var header H
+	var payload []byte
 	b.dequeuePadding()
-	return b.metadata.DequeueOneWith(func(metadata *packetMetadata[H]) error {
-		if err := take(&metadata.header, b.payload.Allocated(0, metadata.size)); err != nil {
-			return err
-		}
+	err := b.metadata.DequeueOneWith(func(metadata *packetMetadata[H]) error {
+		header, payload = metadata.header, b.payload.Allocated(0, metadata.size)
 		b.payload.DequeueAllocated(metadata.size)
 		// Drop the header, so that the buffer does not keep what it refers
 		// to alive.
 		*metadata = packetMetadata[H]{}
 		return nil
 	})
-}
-
-// Dequeue dequeues the oldest packet and returns its header and payload, or
-// returns ErrEmpty.
-func (b *PacketBuffer[H]) Dequeue() (H, []byte, error) {
-	var header H
-	var payload []byte
-	err := b.DequeueWith(func(dequeuedHeader *H, dequeuedPayload []byte) error {
-		header, payload = *dequeuedHeader, dequeuedPayload
-		return nil
-	})
 	return header, payload, err
-}
-
-// Peek returns the header and payload of the oldest packet without
-// dequeuing it, or returns ErrEmpty. It drops padding at the front of the
-// buffer first, which PayloadBytesCount then no longer counts.
-func (b *PacketBuffer[H]) Peek() (H, []byte, error) {
-	b.dequeuePadding()
-	oldest := b.metadata.Allocated(0, 1)
-	if len(oldest) == 0 {
-		var none H
-		return none, nil, ErrEmpty
-	}
-	return oldest[0].header, b.payload.Allocated(0, oldest[0].size), nil
-}
-
-// PacketCapacity returns the most packets the buffer holds.
-func (b *PacketBuffer[H]) PacketCapacity() int {
-	return b.metadata.Capacity()
-}
-
-// PayloadCapacity returns the most payload octets the buffer holds.
-func (b *PacketBuffer[H]) PayloadCapacity() int {
-	return b.payload.Capacity()
 }
 
 // PayloadBytesCount returns how many payload octets are queued, padding
 // included.
 func (b *PacketBuffer[H]) PayloadBytesCount() int {
 	return b.payload.Len()
-}
-
-// Clear drops every queued packet.
-func (b *PacketBuffer[H]) Clear() {
-	b.payload.Clear()
-	b.metadata.Clear()
 }
 
 // requireSize panics if size, the payload size given to operation, is

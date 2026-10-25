@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -37,6 +38,34 @@ func TestAStatusAsksTheHandsetNothingMoreOnceALineCannotBeWritten(t *testing.T) 
 
 			if err == nil || !slices.Equal(transport.commands, test.asked) {
 				t.Errorf("%v after asking %q; want a failure after asking %q", err, transport.commands, test.asked)
+			}
+		})
+	}
+}
+
+// A reading that left a call that may still be up says how to end it even when
+// its line cannot be written: the call outranks the output.
+func TestAStatusReadingThatLeftACallUpWarnsEvenWhenItsLineCannotBeWritten(t *testing.T) {
+	tests := []struct {
+		// during is the command a data call comes up during.
+		during string
+		// linesTaken is how many lines the output takes before it fails.
+		linesTaken int
+	}{
+		{"AT+CBC", 1},
+		{"AT+CREG?", 2},
+	}
+	for _, test := range tests {
+		t.Run(test.during, func(t *testing.T) {
+			t.Parallel()
+			callLeftUp := world{handset: answeringDuringUnplugged(test.during)}
+			env, _, stderr := callLeftUp.environment(t, []string{instant, "status"})
+			env.stdout = &breakingWriter{writesLeft: test.linesTaken}
+
+			status := run(context.Background(), env)
+
+			if warning := callMayStillBeUpWarning("") + "\n"; status != exitFailure || !strings.HasPrefix(stderr.String(), warning) {
+				t.Errorf("exit status %d after %q, want %d after %q first", status, stderr.String(), exitFailure, warning)
 			}
 		})
 	}

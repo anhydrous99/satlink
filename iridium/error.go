@@ -61,9 +61,10 @@ const (
 
 	// ErrCallMayStillBeUp reports that a data call could not be ended, so
 	// that it may still be up and billing; Message says what failed.
-	// [Handset.Initialize] and [Handset.Answer] report it. Retry with
-	// [Handset.EndDataCall] once the handset answers again; power-cycling
-	// it is the last resort.
+	// [Handset.Initialize] and [Handset.Answer] report it, as does any
+	// method that cannot end the call of a CONNECT that no command awaited.
+	// Retry with [Handset.EndDataCall] once the handset answers again;
+	// power-cycling it is the last resort.
 	//
 	// As a sentinel it matches every error that means the call may still be
 	// up, through any wrapping: an *Error of this kind, an *Error of any

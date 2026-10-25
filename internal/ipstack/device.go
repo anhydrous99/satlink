@@ -9,26 +9,20 @@ import (
 // Device is a network device that carries bare IPv4 datagrams, without a
 // link-layer header, as on a PPP link.
 //
-// It works in a pull model. The interface asks for the next received datagram
-// when it polls, and asks for a transmit slot each time it has a datagram
-// ready to send, so the device decides when the stack may send, and the stack
-// decides what to send only then. A Device is used by one interface at a
-// time, from one goroutine.
+// The interface asks for the next received datagram when it polls, and asks
+// for a transmit slot each time a socket has a datagram ready to send. A
+// Device is used by one interface at a time, from one goroutine.
 type Device interface {
 	// Receive takes the next received datagram, if any, and returns it with
-	// a slot for a reply. The reply slot must accept a datagram even when
-	// Transmit would refuse one: the interface answers some datagrams at
-	// once (an ACK, a RST, an ICMP error), assuming that
-	// it can always send zero or one datagrams for each one it receives.
-	// The interface reads datagram only until the poll call that took it
-	// returns, so the device may reuse its storage afterwards.
+	// a slot for a reply: the interface answers some datagrams at once (an
+	// ACK, a RST, an ICMP error), with zero or one datagrams for each one it
+	// receives. The interface reads datagram only until the poll call that
+	// took it returns, so the device may reuse its storage afterwards.
 	Receive(now time.Time) (datagram []byte, reply TransmitSlot, ok bool)
-	// Transmit asks for a slot for one outgoing datagram the interface has
-	// ready, and returns false when the device cannot take one now. A
-	// refusal ends the poll's current round of sending (Poll starts another
-	// only if that round sent something); the sockets keep what they had to
-	// send, and choose again when next offered a slot.
-	Transmit(now time.Time) (slot TransmitSlot, ok bool)
+	// Transmit returns a slot for one outgoing datagram the interface has
+	// ready. The sockets count the datagram as sent once it is in the slot,
+	// so a device whose line cannot take it yet must hold it.
+	Transmit(now time.Time) TransmitSlot
 }
 
 // TransmitSlot sends one datagram through the device that handed out the

@@ -1,12 +1,10 @@
 package udp
 
 import (
-	"errors"
 	"net/netip"
 
 	"github.com/anhydrous99/satlink/internal/ipstack/internal/netlog"
 	"github.com/anhydrous99/satlink/internal/ipstack/socket"
-	"github.com/anhydrous99/satlink/internal/ipstack/storage"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
@@ -16,11 +14,8 @@ import (
 
 // EmitFunc sends one datagram for Dispatch. ip.PayloadLen covers the UDP
 // header and payload, and payload shares the socket's transmit buffer, so the
-// datagram must be serialized before EmitFunc returns.
-//
-// An error means the datagram was not sent, typically because the device has
-// no room for it: it then stays queued, and goes at a later poll.
-type EmitFunc func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) error
+// datagram must be serialised before EmitFunc returns.
+type EmitFunc func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte)
 
 // Accepts reports whether a datagram with header, which arrived in datagram
 // ip, is for this socket: its destination port is the bound port and, if
@@ -50,19 +45,16 @@ func (s *Socket) Process(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) 
 	copy(buffer, payload)
 }
 
-// Dispatch emits the oldest queued datagram, if any, from the address its
-// Metadata names, the bound address or the interface's choice, and dequeues
-// it. A datagram with no possible source address is dropped. It returns
-// emit's error unchanged, with the datagram still queued, or nil.
-func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) error {
-	err := s.transmitBuffer.DequeueWith(func(meta *Metadata, payload []byte) error {
-		return s.emitDatagram(cx, *meta, payload, emit)
-	})
-	if errors.Is(err, storage.ErrEmpty) {
-		// An empty queue is not a failure: there is nothing to send.
-		return nil
+// Dispatch dequeues the oldest queued datagram, if any, and emits it from the
+// address its Metadata names, the bound address or the interface's choice. A
+// datagram with no possible source address is dropped.
+func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) {
+	meta, payload, err := s.transmitBuffer.Dequeue()
+	if err != nil {
+		// The queue is empty: there is nothing to send.
+		return
 	}
-	return err
+	s.emitDatagram(cx, meta, payload, emit)
 }
 
 // PollAt returns now while datagrams wait to be sent, and on ingress
@@ -74,14 +66,13 @@ func (s *Socket) PollAt() socket.PollAt {
 	return socket.PollNow()
 }
 
-// emitDatagram emits a queued datagram with meta and payload, and returns
-// emit's error; a datagram without a source address is dropped instead,
-// which dequeues it as if it had been sent.
-func (s *Socket) emitDatagram(cx *socket.Context, meta Metadata, payload []byte, emit EmitFunc) error {
+// emitDatagram emits a dequeued datagram with meta and payload; a datagram
+// without a source address is dropped instead.
+func (s *Socket) emitDatagram(cx *socket.Context, meta Metadata, payload []byte, emit EmitFunc) {
 	source, ok := s.sourceAddress(cx, meta)
 	if !ok {
 		netlog.Trace("udp: cannot find suitable source address, dropping.", "local", s.endpoint, "remote", meta.Endpoint)
-		return nil
+		return
 	}
 	netlog.Trace("udp: sending octets", "local", s.endpoint, "remote", meta.Endpoint, "octets", len(payload))
 	header := wire.UDPRepr{SrcPort: s.endpoint.Port, DstPort: meta.Endpoint.Port()}
@@ -92,7 +83,7 @@ func (s *Socket) emitDatagram(cx *socket.Context, meta Metadata, payload []byte,
 		PayloadLen: header.HeaderLen() + len(payload),
 		HopLimit:   wire.DefaultHopLimit,
 	}
-	return emit(ip, header, payload)
+	emit(ip, header, payload)
 }
 
 // sourceAddress returns the address a queued datagram with meta goes from:

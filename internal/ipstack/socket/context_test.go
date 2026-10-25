@@ -38,7 +38,7 @@ func addr(text string) netip.Addr {
 // replaceFirstAddr replaces the first address, keeping the others.
 func replaceFirstAddr(t *testing.T, cx *Context, prefix string) {
 	t.Helper()
-	addrs := cx.IPAddrs()
+	addrs := slices.Clone(cx.ipAddrs)
 	addrs[0] = netip.MustParsePrefix(prefix)
 	if err := cx.SetIPAddrs(addrs); err != nil {
 		t.Fatalf("SetIPAddrs: %v", err)
@@ -49,7 +49,7 @@ func assertBroadcasts(t *testing.T, cx *Context, broadcasts map[string]bool) {
 	t.Helper()
 	for address, want := range broadcasts {
 		if got := cx.IsBroadcast(addr(address)); got != want {
-			t.Errorf("with %v, IsBroadcast(%s) = %v, want %v", cx.IPAddrs(), address, got, want)
+			t.Errorf("with %v, IsBroadcast(%s) = %v, want %v", cx.ipAddrs, address, got, want)
 		}
 	}
 }
@@ -143,14 +143,14 @@ func TestContextSetIPAddrsRejectsAddressesAnInterfaceCannotHave(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			cx := newTestContext(t)
-			before := cx.IPAddrs()
+			before := slices.Clone(cx.ipAddrs)
 
 			err := cx.SetIPAddrs([]netip.Prefix{netip.MustParsePrefix("10.0.0.1/8"), c.prefix})
 
 			if !errors.Is(err, ErrInvalidIPAddr) || err.Error() != c.wantText {
 				t.Errorf("SetIPAddrs: %v, want %q", err, c.wantText)
 			}
-			if after := cx.IPAddrs(); !slices.Equal(after, before) {
+			if after := cx.ipAddrs; !slices.Equal(after, before) {
 				t.Errorf("addresses changed to %v", after)
 			}
 		})
@@ -163,19 +163,8 @@ func TestContextSetIPAddrsAcceptsTheUnspecifiedAddress(t *testing.T) {
 
 	setAddrs(t, cx, "0.0.0.0/0")
 
-	if got := cx.IPAddrs(); !slices.Equal(got, []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}) {
-		t.Errorf("IPAddrs() = %v", got)
-	}
-}
-
-func TestContextIPAddrsReturnsACopy(t *testing.T) {
-	t.Parallel()
-	cx := newTestContext(t)
-
-	cx.IPAddrs()[0] = netip.MustParsePrefix("10.0.0.1/8")
-
-	if first := cx.IPAddrs()[0]; first != netip.MustParsePrefix("192.168.1.1/24") {
-		t.Errorf("first address = %v after changing the copy", first)
+	if got := cx.ipAddrs; !slices.Equal(got, []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}) {
+		t.Errorf("addresses %v, want 0.0.0.0/0", got)
 	}
 }
 
@@ -261,10 +250,10 @@ func TestContextAccessors(t *testing.T) {
 	cx.SetNow(later)
 	cx.SetAnyIP(true)
 
-	if cx.Now() != later || cx.IPMTU() != 1280 || !cx.AnyIP() {
-		t.Errorf("Now %v, IPMTU %d, AnyIP %v; want %v, 1280, true", cx.Now(), cx.IPMTU(), cx.AnyIP(), later)
+	if cx.Now() != later || cx.IPMTU() != 1280 || !cx.anyIP {
+		t.Errorf("Now %v, IPMTU %d, any-IP %v; want %v, 1280, true", cx.Now(), cx.IPMTU(), cx.anyIP, later)
 	}
-	if NewContext(epoch, 0, 1280).AnyIP() {
+	if NewContext(epoch, 0, 1280).anyIP {
 		t.Error("a new context has any-IP on")
 	}
 }
@@ -273,8 +262,8 @@ func TestZeroContextIsAtTheEpochSeededWithZeroWithoutMTUOrAddresses(t *testing.T
 	t.Parallel()
 	var cx Context
 
-	if !cx.Now().IsZero() || cx.IPMTU() != 0 || len(cx.IPAddrs()) != 0 || cx.AnyIP() {
-		t.Errorf("zero context: Now %v, IPMTU %d, IPAddrs %v, AnyIP %t; want the epoch, 0, none, false", cx.Now(), cx.IPMTU(), cx.IPAddrs(), cx.AnyIP())
+	if !cx.Now().IsZero() || cx.IPMTU() != 0 || len(cx.ipAddrs) != 0 || cx.anyIP {
+		t.Errorf("zero context: Now %v, IPMTU %d, addresses %v, any-IP %t; want the epoch, 0, none, false", cx.Now(), cx.IPMTU(), cx.ipAddrs, cx.anyIP)
 	}
 	if first := cx.Rand().Uint32(); first != 0x3 {
 		t.Errorf("the zero context's first Uint32 is %#x, want seed 0's 0x3", first)

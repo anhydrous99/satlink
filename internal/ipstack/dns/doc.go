@@ -9,10 +9,11 @@
 // with the delay back at a second. After the last server, the query fails.
 // A retransmission keeps the query's transaction id.
 //
-// Compared with smoltcp, this socket has no multicast DNS of its own (responses
-// from port 5353 are still accepted, as smoltcp accepts them), always sends
-// with the default hop limit, has no async wakers, and keeps any number of
-// queries at once in growable storage.
+// Compared with smoltcp, this socket compares names without regard to the
+// case of ASCII letters, as RFC 4343 asks, has no multicast DNS of its own
+// (responses from port 5353 are still accepted, as smoltcp accepts them),
+// always sends with the default hop limit, has no async wakers, and keeps any
+// number of queries at once in growable storage.
 //
 // Derived from smoltcp (https://github.com/smoltcp-rs/smoltcp), 0BSD licence;
 // see ../LICENSE-smoltcp.

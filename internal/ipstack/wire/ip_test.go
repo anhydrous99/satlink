@@ -31,25 +31,20 @@ func TestIPProtocolString(t *testing.T) {
 	}
 }
 
-func TestListenEndpoint(t *testing.T) {
+func TestListenEndpointString(t *testing.T) {
 	t.Parallel()
 	address := netip.MustParseAddr("192.168.1.1")
-	cases := []struct {
-		endpoint  ListenEndpoint
-		specified bool
-		text      string
-	}{
-		{ListenEndpoint{}, false, "*:0"},
-		{ListenEndpoint{Port: 80}, false, "*:80"},
-		{ListenEndpoint{Addr: address}, false, "192.168.1.1:0"},
-		{ListenEndpoint{Addr: address, Port: 80}, true, "192.168.1.1:80"},
-		{ListenEndpoint{Addr: netip.IPv4Unspecified(), Port: 53}, true, "0.0.0.0:53"},
+	cases := map[string]ListenEndpoint{
+		"*:0":            {},
+		"*:80":           {Port: 80},
+		"192.168.1.1:0":  {Addr: address},
+		"192.168.1.1:80": {Addr: address, Port: 80},
+		"0.0.0.0:53":     {Addr: netip.IPv4Unspecified(), Port: 53},
 	}
-	for _, c := range cases {
-		checkFields(t, []field{
-			{c.text + " IsSpecified", c.endpoint.IsSpecified(), c.specified},
-			{c.text + " String", c.endpoint.String(), c.text},
-		})
+	for want, endpoint := range cases {
+		if got := endpoint.String(); got != want {
+			t.Errorf("String() of %+v = %q, want %q", endpoint, got, want)
+		}
 	}
 }
 

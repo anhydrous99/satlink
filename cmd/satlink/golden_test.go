@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 // Golden files: what a command line left, kept in testdata and compared
@@ -39,12 +40,17 @@ func goldenText(args []string, got outcome) string {
 	return text
 }
 
-// shellWords quotes args as a shell would take them back.
+// shellSpecial are the characters a shell takes for more than themselves.
+const shellSpecial = " '\"*?;&|<>()$`\\"
+
+// shellWords quotes args as a shell would take them back: in single quotes
+// when they hold a character a shell takes for more than itself, or a
+// control character.
 func shellWords(args []string) []string {
 	words := make([]string, len(args))
 	for i, arg := range args {
 		words[i] = arg
-		if arg == "" || strings.ContainsAny(arg, " '\"*?") {
+		if arg == "" || strings.ContainsAny(arg, shellSpecial) || strings.ContainsFunc(arg, unicode.IsControl) {
 			words[i] = "'" + arg + "'"
 		}
 	}

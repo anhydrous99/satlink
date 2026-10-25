@@ -28,25 +28,6 @@ func (s *Socket) Send(size int, meta Metadata) ([]byte, error) {
 	return payload, nil
 }
 
-// SendWith reserves room for a datagram of up to maxSize octets for
-// meta.Endpoint, calls fill with it and queues the datagram with the length
-// fill returns, which it also returns. The room shares the transmit buffer's
-// storage: fill writes the payload in place, and must not keep the slice. It
-// fails like Send, without calling fill, and panics if maxSize is negative or
-// fill returns more than it was given.
-func (s *Socket) SendWith(maxSize int, meta Metadata, fill func(payload []byte) int) (int, error) {
-	requireSize("SendWith", maxSize)
-	if err := s.checkAddressable(meta); err != nil {
-		return 0, err
-	}
-	size, err := s.transmitBuffer.EnqueueWith(maxSize, meta, fill)
-	if err != nil {
-		return 0, ErrBufferFull
-	}
-	s.traceQueued(meta, size)
-	return size, nil
-}
-
 // SendSlice queues a copy of data as one datagram for meta.Endpoint. It fails
 // like Send.
 func (s *Socket) SendSlice(data []byte, meta Metadata) error {

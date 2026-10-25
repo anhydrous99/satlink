@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/logtest"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -710,7 +711,7 @@ func TestTheModemLogsItsEvents(t *testing.T) {
 	cases := []struct {
 		name  string
 		event func(t *testing.T, now time.Time)
-		want  logRecord
+		want  logtest.Line
 	}{
 		{"a data call", dialADataCall, infoRecord("simulated handset: dialling 008816000025 for a data call")},
 		{"a voice call", placeAVoiceCall, infoRecord("simulated handset: voice call to +12025550100, without audio")},
@@ -718,27 +719,27 @@ func TestTheModemLogsItsEvents(t *testing.T) {
 		{"the app's hang-up", hangUpInOnlineCommandMode, infoRecord("simulated handset: the app hung up")},
 		{"a network drop", dropTheCallFromTheNetwork, infoRecord("simulated handset: the network dropped the call")},
 		{"a DTR drop", dropDTRAfterAndD2, infoRecord("simulated handset: DTR dropped, ending the call")},
-		{"a gateway that cannot start", dialAGatewayThatCannotStart, logRecord{
-			level:   slog.LevelWarn,
-			message: "simulated handset: the PPP gateway cannot start: MRU 20 is below the IPv4 minimum of 68",
+		{"a gateway that cannot start", dialAGatewayThatCannotStart, logtest.Line{
+			Level: slog.LevelWarn,
+			Text:  "simulated handset: the PPP gateway cannot start: MRU 20 is below the IPv4 minimum of 68",
 		}},
 	}
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			recorder := recordLogs(t)
+			lines := logtest.Record(t, logPackage, slog.LevelDebug)
 
 			test.event(t, time.Now())
 
-			if got := recorder.recorded(); !slices.Contains(got, test.want) {
+			if got := lines(); !slices.Contains(got, test.want) {
 				t.Errorf("records %v; want one of them %v", got, test.want)
 			}
 		})
 	}
 }
 
-func infoRecord(message string) logRecord {
-	return logRecord{level: slog.LevelInfo, message: message}
+func infoRecord(message string) logtest.Line {
+	return logtest.Line{Level: slog.LevelInfo, Text: message}
 }
 
 func dialADataCall(_ *testing.T, now time.Time) {

@@ -3,8 +3,12 @@ package wire
 import (
 	"bytes"
 	"errors"
+	"log/slog"
 	"reflect"
+	"slices"
 	"testing"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // sackOption returns a SACK option holding blocks.
@@ -127,7 +131,7 @@ func TestTCPOptionParseReturnsTheOctetsAfterTheOption(t *testing.T) {
 }
 
 func TestSACKOptionWithFourBlocksKeepsThreeAndLogs(t *testing.T) {
-	logs := recordLogs(t)
+	logs := logtest.Record(t, "ipstack", slog.LevelDebug)
 	encoded := []byte{0x05, 0x22}
 	for block := range uint32(4) {
 		encoded = append(encoded, 0, 0, 0, byte(2*block), 0, 0, 0, byte(2*block+1))
@@ -139,8 +143,9 @@ func TestSACKOptionWithFourBlocksKeepsThreeAndLogs(t *testing.T) {
 	if err != nil || len(rest) != 0 || !reflect.DeepEqual(option, want) {
 		t.Errorf("parseTCPOption = %+v, % x, %v; want %+v", option, rest, err, want)
 	}
-	if got := logs.messages(); len(got) != 1 || got[0] != "sACK with >3 blocks, truncating to 3 pkg=ipstack" {
-		t.Errorf("logged %q", got)
+	logged := []logtest.Line{{Level: slog.LevelDebug, Text: "sACK with >3 blocks, truncating to 3"}}
+	if got := logs(); !slices.Equal(got, logged) {
+		t.Errorf("logged %+v, want %+v", got, logged)
 	}
 }
 

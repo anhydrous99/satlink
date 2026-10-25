@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"slices"
 	"testing"
 	"time"
 
@@ -111,24 +110,12 @@ type sentDatagram struct {
 }
 
 // dispatch runs Dispatch with an EmitFunc that records every datagram,
-// copying its payload, and returns emitErr; it returns what was emitted and
-// Dispatch's error.
-func dispatch(cx *socket.Context, s *Socket, emitErr error) ([]sentDatagram, error) {
+// copying its payload, and returns what was emitted.
+func dispatch(cx *socket.Context, s *Socket) []sentDatagram {
 	var sent []sentDatagram
-	err := s.Dispatch(cx, func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) error {
+	s.Dispatch(cx, func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) {
 		sent = append(sent, sentDatagram{ip: ip, header: header, payload: bytes.Clone(payload)})
-		return emitErr
 	})
-	return sent, err
-}
-
-// mustDispatch runs Dispatch with emit granted and returns what it emitted.
-func mustDispatch(t *testing.T, cx *socket.Context, s *Socket) []sentDatagram {
-	t.Helper()
-	sent, err := dispatch(cx, s, nil)
-	if err != nil {
-		t.Fatalf("Dispatch: %v", err)
-	}
 	return sent
 }
 
@@ -233,7 +220,7 @@ func TestSendDispatch(t *testing.T) {
 	if !s.CanSend() {
 		t.Fatal("a new socket cannot send")
 	}
-	if sent := mustDispatch(t, cx, s); len(sent) != 0 {
+	if sent := dispatch(cx, s); len(sent) != 0 {
 		t.Fatalf("Dispatch with nothing queued emitted %d datagrams", len(sent))
 	}
 
@@ -245,17 +232,7 @@ func TestSendDispatch(t *testing.T) {
 		t.Error("CanSend with a full buffer")
 	}
 
-	refused := errors.New("refused")
-	sent, err := dispatch(cx, s, refused)
-	if !errors.Is(err, refused) {
-		t.Errorf("Dispatch with a refusing emit = %v, want %v", err, refused)
-	}
-	assertSentLocalDatagram(t, sent)
-	if s.CanSend() {
-		t.Error("a refused datagram was dequeued")
-	}
-
-	assertSentLocalDatagram(t, mustDispatch(t, cx, s))
+	assertSentLocalDatagram(t, dispatch(cx, s))
 	if !s.CanSend() {
 		t.Error("a sent datagram was not dequeued")
 	}
@@ -292,62 +269,6 @@ func TestRecvProcess(t *testing.T) {
 	assertReceived(t, payload, meta, err)
 	if s.CanReceive() {
 		t.Error("the datagram that did not fit was queued")
-	}
-}
-
-func TestPeekProcess(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(buffer(1), buffer(0))
-	mustBind(t, s, localPortOnly)
-
-	if _, _, err := s.Peek(); !errors.Is(err, ErrExhausted) {
-		t.Errorf("Peek on a new socket = %v, want %v", err, ErrExhausted)
-	}
-
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-
-	payload, meta, err := s.Peek()
-	assertReceived(t, payload, meta, err)
-	payload, meta, err = s.Receive()
-	assertReceived(t, payload, meta, err)
-	if _, _, err := s.Peek(); !errors.Is(err, ErrExhausted) {
-		t.Errorf("Peek after Receive = %v, want %v", err, ErrExhausted)
-	}
-}
-
-func TestRecvTruncatedSlice(t *testing.T) {
-	t.Parallel()
-	cx := testContext(t)
-	s := NewSocket(buffer(1), buffer(0))
-	mustBind(t, s, localPortOnly)
-	if !s.Accepts(cx, remoteIPRepr, remoteUDPRepr) {
-		t.Fatal("the socket does not accept the peer's datagram")
-	}
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-
-	var slice [4]byte
-	_, _, err := s.ReceiveSlice(slice[:])
-
-	if !errors.Is(err, ErrTruncated) {
-		t.Errorf("ReceiveSlice into 4 octets = %v, want %v", err, ErrTruncated)
-	}
-}
-
-func TestPeekTruncatedSlice(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(buffer(1), buffer(0))
-	mustBind(t, s, localPortOnly)
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-
-	var slice [4]byte
-	if _, _, err := s.PeekSlice(slice[:]); !errors.Is(err, ErrTruncated) {
-		t.Errorf("PeekSlice into 4 octets = %v, want %v", err, ErrTruncated)
-	}
-	if _, _, err := s.ReceiveSlice(slice[:]); !errors.Is(err, ErrTruncated) {
-		t.Errorf("ReceiveSlice into 4 octets = %v, want %v", err, ErrTruncated)
-	}
-	if _, _, err := s.PeekSlice(slice[:]); !errors.Is(err, ErrExhausted) {
-		t.Errorf("PeekSlice after the truncated datagram was dropped = %v, want %v", err, ErrExhausted)
 	}
 }
 
@@ -413,17 +334,17 @@ func TestProcessEmptyPayload(t *testing.T) {
 	}
 }
 
-func TestClosing(t *testing.T) {
+func TestABoundSocketIsOpen(t *testing.T) {
 	t.Parallel()
 	s := NewSocket(NewPacketBuffer(1, 0), buffer(0))
+	if s.IsOpen() {
+		t.Fatal("an unbound socket is open")
+	}
+
 	mustBind(t, s, localPortOnly)
 
 	if !s.IsOpen() {
-		t.Fatal("a bound socket is not open")
-	}
-	s.Close()
-	if s.IsOpen() {
-		t.Error("a closed socket is open")
+		t.Error("a bound socket is not open")
 	}
 }
 
@@ -457,19 +378,17 @@ func TestSendRefusesAddressesThatAreNotIPv4(t *testing.T) {
 			t.Parallel()
 			s := NewSocket(buffer(0), buffer(1))
 			mustBind(t, s, localPortOnly)
-			fillCalled := false
 
 			_, sendErr := s.Send(len(testPayload), test.meta)
-			_, sendWithErr := s.SendWith(len(testPayload), test.meta, func([]byte) int { fillCalled = true; return 0 })
 			sendSliceErr := s.SendSlice(testPayload, test.meta)
 
-			for operation, err := range map[string]error{"Send": sendErr, "SendWith": sendWithErr, "SendSlice": sendSliceErr} {
+			for operation, err := range map[string]error{"Send": sendErr, "SendSlice": sendSliceErr} {
 				if !errors.Is(err, ErrUnaddressable) {
 					t.Errorf("%s = %v, want %v", operation, err, ErrUnaddressable)
 				}
 			}
-			if fillCalled || s.SendQueue() != 0 || !s.CanSend() {
-				t.Errorf("fill called %t, %d octets queued; want nothing queued", fillCalled, s.SendQueue())
+			if s.SendQueue() != 0 || !s.CanSend() {
+				t.Errorf("%d octets queued; want nothing queued", s.SendQueue())
 			}
 		})
 	}
@@ -487,74 +406,31 @@ func TestSendReturnsThePayloadToFill(t *testing.T) {
 	}
 	copy(payload, testPayload)
 
-	assertSentLocalDatagram(t, mustDispatch(t, cx, s))
-}
-
-func TestSendWithQueuesTheLengthFillReturns(t *testing.T) {
-	t.Parallel()
-	cx := testContext(t)
-	s := NewSocket(buffer(0), buffer(1))
-	mustBind(t, s, localEnd)
-
-	size, err := s.SendWith(payloadOctetsPerPacket, toRemote, func(payload []byte) int {
-		if len(payload) != payloadOctetsPerPacket {
-			t.Errorf("fill got %d octets, want %d", len(payload), payloadOctetsPerPacket)
-		}
-		return copy(payload, testPayload)
-	})
-
-	if err != nil || size != len(testPayload) || s.SendQueue() != len(testPayload) {
-		t.Fatalf("SendWith = %d, %v with %d octets queued; want %d queued", size, err, s.SendQueue(), len(testPayload))
-	}
-	assertSentLocalDatagram(t, mustDispatch(t, cx, s))
-}
-
-func TestSendWithDoesNotCallFillWhenTheDatagramDoesNotFit(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(buffer(0), buffer(1))
-	mustBind(t, s, localEnd)
-
-	size, err := s.SendWith(payloadOctetsPerPacket+1, toRemote, func([]byte) int {
-		t.Error("fill was called")
-		return 0
-	})
-
-	if size != 0 || !errors.Is(err, ErrBufferFull) {
-		t.Errorf("SendWith = %d, %v; want 0, %v", size, err, ErrBufferFull)
-	}
+	assertSentLocalDatagram(t, dispatch(cx, s))
 }
 
 // The size is checked first, so an unbound socket, which refuses every
 // datagram, panics all the same.
 func TestSendPanicsOnANegativeSize(t *testing.T) {
 	t.Parallel()
-	tests := map[string]struct {
-		send      func(s *Socket)
-		wantPanic string
-	}{
-		"Send":     {func(s *Socket) { _, _ = s.Send(-1, toRemote) }, "udp: Send: size -1 is negative"},
-		"SendWith": {func(s *Socket) { _, _ = s.SendWith(-1, toRemote, func([]byte) int { return 0 }) }, "udp: SendWith: size -1 is negative"},
-	}
-	for operation, test := range tests {
-		for _, bound := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s, bound %t", operation, bound), func(t *testing.T) {
-				t.Parallel()
-				s := NewSocket(buffer(0), buffer(1))
-				if bound {
-					mustBind(t, s, localEnd)
+	for _, bound := range []bool{true, false} {
+		t.Run(fmt.Sprintf("bound %t", bound), func(t *testing.T) {
+			t.Parallel()
+			s := NewSocket(buffer(0), buffer(1))
+			if bound {
+				mustBind(t, s, localEnd)
+			}
+			defer func() {
+				if recovered, want := recover(), "udp: Send: size -1 is negative"; recovered != want {
+					t.Errorf("Send(-1) panicked with %v, want %q", recovered, want)
 				}
-				defer func() {
-					if recovered := recover(); recovered != test.wantPanic {
-						t.Errorf("%s(-1) panicked with %v, want %q", operation, recovered, test.wantPanic)
-					}
-					if s.SendQueue() != 0 || !s.CanSend() {
-						t.Errorf("%s(-1) queued something", operation)
-					}
-				}()
+				if s.SendQueue() != 0 || !s.CanSend() {
+					t.Error("Send(-1) queued something")
+				}
+			}()
 
-				test.send(s)
-			})
-		}
+			_, _ = s.Send(-1, toRemote)
+		})
 	}
 }
 
@@ -581,7 +457,7 @@ func TestDispatchChoosesTheSourceAddress(t *testing.T) {
 			mustBind(t, s, test.bind)
 			mustSendSlice(t, s, testPayload, test.meta)
 
-			sent := mustDispatch(t, cx, s)
+			sent := dispatch(cx, s)
 			if len(sent) != 1 {
 				t.Fatalf("Dispatch emitted %d datagrams, want one", len(sent))
 			}
@@ -603,10 +479,10 @@ func TestDispatchDropsADatagramWithoutASourceAddress(t *testing.T) {
 	mustBind(t, s, localPortOnly)
 	mustSendSlice(t, s, testPayload, toRemote)
 
-	sent, err := dispatch(cx, s, nil)
+	sent := dispatch(cx, s)
 
-	if err != nil || len(sent) != 0 {
-		t.Errorf("Dispatch emitted %d datagrams and returned %v; want none and nil", len(sent), err)
+	if len(sent) != 0 {
+		t.Errorf("Dispatch emitted %d datagrams, want none", len(sent))
 	}
 	if s.SendQueue() != 0 {
 		t.Errorf("%d octets still queued, want the datagram dropped", s.SendQueue())
@@ -619,15 +495,15 @@ func TestPollAtIsNowWhileDatagramsWait(t *testing.T) {
 	s := NewSocket(buffer(0), buffer(1))
 	mustBind(t, s, localEnd)
 
-	if !s.PollAt().IsOnIngress() {
+	if !s.PollAt().Equal(socket.PollOnIngress()) {
 		t.Errorf("PollAt with nothing queued = %v, want on ingress", s.PollAt())
 	}
 	mustSendSlice(t, s, testPayload, toRemote)
-	if !s.PollAt().IsNow() {
+	if !s.PollAt().Equal(socket.PollNow()) {
 		t.Errorf("PollAt with a datagram queued = %v, want now", s.PollAt())
 	}
-	mustDispatch(t, cx, s)
-	if !s.PollAt().IsOnIngress() {
+	dispatch(cx, s)
+	if !s.PollAt().Equal(socket.PollOnIngress()) {
 		t.Errorf("PollAt after the datagram went = %v, want on ingress", s.PollAt())
 	}
 }
@@ -664,23 +540,6 @@ func TestUnboundSocketAcceptsNothing(t *testing.T) {
 	}
 }
 
-func TestCloseDropsWhatTheSocketHolds(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(buffer(1), buffer(1))
-	mustBind(t, s, localEnd)
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-	mustSendSlice(t, s, testPayload, toRemote)
-
-	s.Close()
-
-	if s.CanReceive() || s.ReceiveQueue() != 0 || s.SendQueue() != 0 {
-		t.Errorf("after Close: CanReceive %t, %d octets received, %d to send; want nothing", s.CanReceive(), s.ReceiveQueue(), s.SendQueue())
-	}
-	if s.Endpoint() != (wire.ListenEndpoint{}) {
-		t.Errorf("Endpoint after Close = %v, want the zero endpoint", s.Endpoint())
-	}
-}
-
 func TestEndpointIsTheBoundEndpoint(t *testing.T) {
 	t.Parallel()
 	s := NewSocket(buffer(0), buffer(0))
@@ -694,18 +553,7 @@ func TestEndpointIsTheBoundEndpoint(t *testing.T) {
 	}
 }
 
-func TestCapacitiesAreTheBuffers(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(NewPacketBuffer(2, 30), NewPacketBuffer(3, 40))
-
-	got := []int{s.PacketReceiveCapacity(), s.PayloadReceiveCapacity(), s.PacketSendCapacity(), s.PayloadSendCapacity()}
-
-	if want := []int{2, 30, 3, 40}; !slices.Equal(got, want) {
-		t.Errorf("capacities (packets and payload received, then sent) = %v, want %v", got, want)
-	}
-}
-
-func TestQueuesCountPayloadOctetsAndPadding(t *testing.T) {
+func TestSendQueueCountsPayloadOctetsAndPadding(t *testing.T) {
 	t.Parallel()
 	cx := testContext(t)
 	s := NewSocket(NewPacketBuffer(3, 10), NewPacketBuffer(3, 10))
@@ -714,63 +562,14 @@ func TestQueuesCountPayloadOctetsAndPadding(t *testing.T) {
 	for range 2 {
 		mustSendSlice(t, s, four, toRemote)
 	}
-	mustDispatch(t, cx, s)
+	dispatch(cx, s)
 
 	// Two octets are left at the end of the storage, too few for the next
 	// datagram, which goes to the front behind two octets of padding.
 	mustSendSlice(t, s, four, toRemote)
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
 
 	if s.SendQueue() != 10 {
 		t.Errorf("SendQueue = %d, want 10: two datagrams and two octets of padding", s.SendQueue())
-	}
-	if s.ReceiveQueue() != len(testPayload) {
-		t.Errorf("ReceiveQueue = %d, want %d", s.ReceiveQueue(), len(testPayload))
-	}
-}
-
-func TestPeekSliceCopiesTheDatagramWithoutDequeuingIt(t *testing.T) {
-	t.Parallel()
-	s := NewSocket(buffer(1), buffer(0))
-	mustBind(t, s, localPortOnly)
-	s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-	data := make([]byte, payloadOctetsPerPacket)
-
-	peeked, peekMeta, peekErr := s.PeekSlice(data)
-	assertReceived(t, data[:peeked], peekMeta, peekErr)
-	received, receiveMeta, receiveErr := s.ReceiveSlice(data)
-	assertReceived(t, data[:received], receiveMeta, receiveErr)
-
-	if _, _, err := s.ReceiveSlice(data); !errors.Is(err, ErrExhausted) {
-		t.Errorf("ReceiveSlice of an empty buffer = %v, want %v", err, ErrExhausted)
-	}
-}
-
-func TestSlicesMustHoldTheWholeDatagram(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		sliceOf int
-		wantErr error
-	}{
-		{"one octet short", len(testPayload) - 1, ErrTruncated},
-		{"just long enough", len(testPayload), nil},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			s := NewSocket(buffer(1), buffer(0))
-			mustBind(t, s, localPortOnly)
-			s.Process(remoteIPRepr, remoteUDPRepr, testPayload)
-			data := make([]byte, test.sliceOf)
-
-			_, _, peekErr := s.PeekSlice(data)
-			_, _, receiveErr := s.ReceiveSlice(data)
-
-			if !errors.Is(peekErr, test.wantErr) || !errors.Is(receiveErr, test.wantErr) {
-				t.Errorf("PeekSlice = %v, ReceiveSlice = %v; want %v", peekErr, receiveErr, test.wantErr)
-			}
-		})
 	}
 }
 

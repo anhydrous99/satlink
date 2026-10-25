@@ -138,9 +138,9 @@ func subcommandOptionLike(cmd *command, name string, rest []string) (subcommand,
 	first := len(rest)
 	for _, candidate := range cmd.subcommands {
 		similar, alike := mostSimilarName(name, candidate.longNames())
-		position := slices.Index(rest, candidate.name())
+		position := slices.Index(rest, candidate.name)
 		if alike && position >= 0 && position < first {
-			first, subcommand, option, found = position, candidate.name(), similar, true
+			first, subcommand, option, found = position, candidate.name, similar, true
 		}
 	}
 	return subcommand, option, found

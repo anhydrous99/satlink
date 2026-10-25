@@ -1,29 +1,33 @@
 package main
 
 import (
+	"context"
 	"slices"
-
-	"github.com/spf13/cobra"
 )
 
 // The tree of commands. Where an option may stand, which token is a value,
-// the help pages and the errors are what users of satlink rely on, and
-// cobra and its flag library would decide all of these differently. So the
+// the help pages and the errors are what users of satlink rely on, so the
 // CLI reads, documents and checks the command line itself (commandline.go,
-// help.go, usage.go), and cobra only runs the command it names.
+// help.go, usage.go), then runs the command it names (run.go).
 
 // helpSubcommandName is the name of the subcommand that every command with
 // subcommands gets, which shows their help.
 const helpSubcommandName = "help"
 
-// command is one command of the command line: its name and what it does
-// (its runner's Use and Short), the arguments it takes, its subcommands,
-// and what running it does (its runner's RunE). The zero command is not
-// usable; newCommand makes one.
+// command is one command of the command line: its name and what it does,
+// the arguments it takes, its subcommands, and what running it does. The
+// zero command is not usable; newCommand makes one.
 type command struct {
-	// runner is the cobra command that runs the command once the command
-	// line names it.
-	runner *cobra.Command
+	// name is the command's name, as the command line gives it.
+	name string
+	// about says what the command does, in a line: "" says nothing.
+	about string
+	// run does what the command does, with the run's context, once the
+	// command line has named it and its arguments have their values. It is
+	// nil for a command with subcommands, which the command line never names
+	// alone, and for the help subcommand, which is answered while the
+	// command line is read.
+	run func(ctx context.Context) error
 	// own are the arguments the command declares, in order; arguments adds
 	// those every command takes.
 	own []*argument
@@ -39,9 +43,10 @@ type command struct {
 	showsHelp bool
 }
 
-// newCommand returns the command that runner names, describes and runs,
-// taking arguments, its options in the order of their help.
-func newCommand(runner *cobra.Command, arguments ...*argument) *command {
+// newCommand returns the command called name, which about describes and
+// run runs, taking arguments, its options in the order of their help. run
+// is nil for a command that will have subcommands.
+func newCommand(name, about string, run func(context.Context) error, arguments ...*argument) *command {
 	order := 0
 	for _, arg := range arguments {
 		if !arg.isPositional() {
@@ -49,13 +54,14 @@ func newCommand(runner *cobra.Command, arguments ...*argument) *command {
 			order++
 		}
 	}
-	return &command{runner: runner, own: arguments, help: newHelpOption()}
+	return &command{name: name, about: about, run: run, own: arguments, help: newHelpOption()}
 }
 
-// newRoot returns the root of the tree, which runner runs: the program
-// itself, taking arguments, with a version to show.
-func newRoot(runner *cobra.Command, arguments ...*argument) *command {
-	root := newCommand(runner, arguments...)
+// newRoot returns the root of the tree, called name and described by
+// about: the program itself, taking arguments, with a version to show.
+// It runs only its subcommands.
+func newRoot(name, about string, arguments ...*argument) *command {
+	root := newCommand(name, about, nil, arguments...)
 	root.version = &argument{long: "version", short: 'V', help: "Print version", action: actionVersion,
 		displayOrder: builtInDisplayOrder}
 	return root
@@ -71,10 +77,8 @@ func newHelpOption() *argument {
 // the help of the command that the names lead to.
 func newHelpSubcommand() *command {
 	return &command{
-		runner: &cobra.Command{
-			Use:   helpSubcommandName,
-			Short: "Print this message or the help of the given subcommand(s)",
-		},
+		name:  helpSubcommandName,
+		about: "Print this message or the help of the given subcommand(s)",
 		own: []*argument{{valueName: "COMMAND", help: "Print help for the subcommand(s)",
 			action: actionAppend}},
 		showsHelp: true,
@@ -87,11 +91,6 @@ func (c *command) withSubcommands(subcommands ...*command) *command {
 	for _, subcommand := range append(subcommands, newHelpSubcommand()) {
 		subcommand.parent = c
 		c.subcommands = append(c.subcommands, subcommand)
-		// The help subcommand is answered while reading the command line;
-		// cobra never runs it.
-		if !subcommand.showsHelp {
-			c.runner.AddCommand(subcommand.runner)
-		}
 	}
 	return c
 }
@@ -184,20 +183,10 @@ func (c *command) longNames() []string {
 	return names
 }
 
-// name is the command's name: the first word of its runner's Use.
-func (c *command) name() string {
-	return c.runner.Name()
-}
-
-// about says what the command does, in a line: its runner's Short.
-func (c *command) about() string {
-	return c.runner.Short
-}
-
 // subcommand returns the subcommand called name, or nil when there is none.
 func (c *command) subcommand(name string) *command {
 	for _, subcommand := range c.subcommands {
-		if subcommand.name() == name {
+		if subcommand.name == name {
 			return subcommand
 		}
 	}
@@ -208,7 +197,7 @@ func (c *command) subcommand(name string) *command {
 func (c *command) subcommandNames() []string {
 	names := make([]string, len(c.subcommands))
 	for i, subcommand := range c.subcommands {
-		names[i] = subcommand.name()
+		names[i] = subcommand.name
 	}
 	return names
 }
@@ -222,18 +211,9 @@ func (c *command) hasSubcommands() bool {
 // binName is the command as a command line names it: satlink sms list.
 func (c *command) binName() string {
 	if c.parent == nil {
-		return c.name()
+		return c.name
 	}
-	return c.parent.binName() + " " + c.name()
-}
-
-// path returns the names of the subcommands from the root down to this
-// command, as cobra finds the command by them.
-func (c *command) path() []string {
-	if c.parent == nil {
-		return nil
-	}
-	return append(c.parent.path(), c.name())
+	return c.parent.binName() + " " + c.name
 }
 
 // hasLongHelp reports whether --help shows more than -h: whether any argument

@@ -55,6 +55,34 @@ func TestStrippingKeepsWhatAStreamWithoutStylesShows(t *testing.T) {
 	}
 }
 
+// What a terminal gets of text that strangers wrote: no sequence and no
+// control character but tab and line feed, whatever stripStyles keeps.
+func TestTextFromStrangersShowsWithoutControlsButTabAndLineFeed(t *testing.T) {
+	tests := []struct {
+		name, text, kept string
+	}{
+		{"nothing to strip", "Hello from orbit ✓", "Hello from orbit ✓"},
+		{"a title and a cleared screen", "\x1b]0;owned\x07\x1b[2J\x1b[1;1HFrom: +1", "From: +1"},
+		{"a clipboard write", "a\x1b]52;c;cm0gLXJmIH4K\x07b", "ab"},
+		{"tab and line feed", "a\tb\nc", "a\tb\nc"},
+		// The text would write over the start of its line.
+		{"a carriage return", "Hi\rFrom: +1", "HiFrom: +1"},
+		{"a line ending", "a\r\nb", "a\nb"},
+		{"other C0 controls and DEL", "a\a\b\v\f\x7fb", "ab"},
+		// Some terminals take U+009B for CSI: what follows it is left as
+		// characters.
+		{"C1 controls", "a\u009b2Jb\u0085c\u009d0;x\u009cd", "a2Jbc0;xd"},
+		{"the characters around the C1 controls", "~\u00a0é", "~\u00a0é"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := stripControls(test.text); got != test.kept {
+				t.Errorf("stripControls(%q) = %q, want %q", test.text, got, test.kept)
+			}
+		})
+	}
+}
+
 // The tests read command lines with the zero palette, so that they can say
 // what the text is: it must be what a stream that shows no styles gets.
 func TestStrippingTheStylesLeavesWhatTheZeroPaletteWrites(t *testing.T) {

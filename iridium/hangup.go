@@ -95,8 +95,9 @@ func (h *Handset) endCallByDroppingDTR() error {
 	}
 	// Data still flowing shows the drop changed nothing. What the handset
 	// says to the drop — NO CARRIER, or OK after AT&D1 — is dropped too, so
-	// that it cannot pass for ATH's answer.
-	if err := h.resynchronize(); err != nil {
+	// that it cannot pass for ATH's answer. A CONNECT among it is the far
+	// end's data: the call being ended is the only one.
+	if _, err := h.resynchronize(); err != nil {
 		return err
 	}
 	return h.hangUpWhileMaybeOnline()

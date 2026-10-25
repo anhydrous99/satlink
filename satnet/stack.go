@@ -219,6 +219,13 @@ func (s *stack) closeUDP(handle ipstack.SocketHandle) {
 	s.closingUDP = append(s.closingUDP, handle)
 }
 
+// udpTurnHasCome reports whether the turn on the line of the UDP socket
+// handle names, sending to peer, has come: none of its datagrams waits for
+// the line.
+func (s *stack) udpTurnHasCome(handle ipstack.SocketHandle, peer netip.AddrPort) bool {
+	return !s.device.isWaiting(udpFlow(s.udp(handle).Endpoint().Port, peer))
+}
+
 // maxUDPPayload returns the largest UDP payload that fits one packet;
 // larger ones would be dropped.
 func (s *stack) maxUDPPayload() int {

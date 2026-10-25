@@ -40,7 +40,7 @@ From a checkout, `go install ./cmd/satlink` does the same, and
 | `satlink sms list [unread]` | List stored messages |
 | `satlink sms read INDEX` / `delete INDEX` | Show or delete one message |
 | `satlink dial NUMBER` / `answer` / `hangup` | Voice calls. `hangup` also ends a data call left up |
-| `satlink at 'AT+CSQ'` | Send any AT command, raw |
+| `satlink at 'AT+CSQ'` | Send an AT command, raw. A line that can go online is refused: a data dial, `ATA`, `ATO`, `A/` or auto-answer (`ATS0=1`). So it is after another command (`ATE0D…`, `AT+CSQ D…`, `AT+CSQD…`). So are writes to S3 and S5, `=n`, which writes the register last referred to, and characters other than printable ASCII. An extended command that the ISU AT Command Reference does not define is read letter by letter, so `AT+BOGUS` is refused too. A space ends an extended command, so `AT+CKPD = 160` is refused, but `AT+CKPD=160` is sent. A call that comes up with the command's answer all the same is hung up at once. A key press that may answer a ringing call, such as `AT+CKPD=140` (the Green key), is sent: a call it answers may come up after `at` has exited, and bills by the minute until it is hung up. A response line that reads as `CONNECT` counts as a call's, even if it is message text, as `AT+SBDRT`'s may be |
 | `satlink monitor` | Print incoming SMS and `RING` events until interrupted |
 | `satlink net status` | Dial, show the negotiated addresses, hang up |
 | `satlink net resolve HOST` | Look up a host name over the link |
@@ -107,7 +107,9 @@ cost no airtime:
 
 **Another provider.** `--number` (or `SATLINK_DATA_NUMBER`) sets the data
 number. The default is Iridium's gateway, `008816000025`. `--username` and
-`--password` set PPP credentials; Iridium's gateway accepts any.
+`--password` set PPP credentials; Iridium's gateway accepts any. Prefer
+`SATLINK_PASSWORD` to `--password`: other users can read a command line in the
+process list. Help names the variable but never shows its value.
 
 **`net get`** allows 10 minutes for the request and the whole response. It
 stops reading once the body is as long as announced, and hangs up as soon as

@@ -5,20 +5,19 @@
 //
 // # Pull model
 //
-// The stack is driven in a pull model. A Device offers the stack a transmit
-// slot only when it can take a datagram, so the stack decides what to send,
-// new data or a retransmission, at the last possible moment, and nothing
-// waits in front of a slow satellite line to go stale. Stacks that push
-// datagrams into a link endpoint as soon as they exist (gVisor's netstack,
-// for one) cannot do that.
+// The stack is driven in a pull model: the Device never calls it. Each poll
+// asks the device for the datagrams it received, and for a transmit slot for
+// each datagram a socket has to send. The device takes every datagram it is
+// handed, so pacing a slow line is the device's job, as satnet's device paces
+// the satellite link.
 //
 // # Layers
 //
 // The stack is built in layers, each a package:
 //
-//   - wire reads and writes IPv4, TCP, UDP, ICMPv4 and DNS packets, at the
-//     level of raw header fields (IPv4Packet…) and of validated
-//     representations (IPv4Repr…).
+//   - wire reads and writes IPv4, TCP, UDP and DNS packets, and writes
+//     ICMPv4 errors, at the level of raw header fields (IPv4Packet…) and of
+//     validated representations (IPv4Repr…).
 //   - storage holds the ring and packet buffers sockets keep their data in.
 //   - socket holds what every socket shares: the Context the interface hands
 //     it, PollAt and the random source.
@@ -30,9 +29,12 @@
 //     sockets have to send.
 //
 // The stack never reads the clock and never blocks: every poll takes the
-// current time, and the caller decides when to poll (PollAt and PollDelay
-// say when it next has to). It is not safe for concurrent use; satnet guards
-// it with a mutex.
+// current time, and the caller decides when to poll. Interface.PollAt says
+// when it next has to, for a caller that polls only when needed, such as
+// the stack's tests, which skip their simulated clock ahead by it. satnet
+// and sim do not use it: they poll on their own schedule, satnet every
+// 20 ms. The stack is not safe for concurrent use; satnet guards it with a
+// mutex.
 //
 // # Supported subset
 //

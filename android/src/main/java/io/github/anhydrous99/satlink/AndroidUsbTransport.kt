@@ -6,6 +6,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.os.SystemClock
 import io.github.anhydrous99.satlink.mobile.ByteTransport
 import io.github.anhydrous99.satlink.mobile.Mobile
 
@@ -43,11 +44,19 @@ class AndroidUsbTransport private constructor(
         }
     }
 
-    /** [timeoutMillis] is at most Int.MAX_VALUE, the library makes sure, so it fits `bulkTransfer`. */
+    /**
+     * [timeoutMillis] is at most Int.MAX_VALUE, the library makes sure, so it fits `bulkTransfer`.
+     * Throws when the transfer fails, as every one does once the handset is unplugged:
+     * an empty array would have the library read again at once, keeping a CPU busy.
+     */
     override fun read(maxLen: Long, timeoutMillis: Long): ByteArray {
         if (pending.isEmpty()) {
-            // A negative result is how bulkTransfer reports a timeout.
+            val started = SystemClock.elapsedRealtime()
             val n = connection.bulkTransfer(inEndpoint, buffer, buffer.size, timeoutMillis.toInt())
+            // A negative result is how bulkTransfer reports a timeout, and a failure too.
+            if (n < 0 && failedEarly(timeoutMillis, SystemClock.elapsedRealtime() - started)) {
+                throw Exception("USB read failed ($n)")
+            }
             if (n <= 0) return ByteArray(0)
             pending = buffer.copyOf(n)
         }
@@ -93,6 +102,18 @@ class AndroidUsbTransport private constructor(
         private const val CONTROL_TIMEOUT_MS = 1000
         /** Long enough for the handset to notice: its DTR debounce (S25) is 50 ms. */
         private const val DTR_DROP_MS = 150L
+        /**
+         * A negative read result that comes back in under 1/[FAILURE_DIVISOR] of
+         * its timeout is a failure: a failed read comes back at once, a timed-out
+         * one at most a kernel clock tick (10 ms or less) early.
+         */
+        private const val FAILURE_DIVISOR = 4
+        /**
+         * The shortest read timeout that tells a failure from a timeout: a
+         * quarter of it is more than a clock tick short of it. A link reads
+         * with 20 ms timeouts.
+         */
+        private const val SHORTEST_JUDGED_TIMEOUT_MS = 20L
 
         /** True when [device] carries Iridium's USB vendor ID. */
         fun isIridiumHandset(device: UsbDevice): Boolean =
@@ -167,5 +188,13 @@ class AndroidUsbTransport private constructor(
             val output = eps.firstOrNull { it.direction == UsbConstants.USB_DIR_OUT } ?: return null
             return input to output
         }
+
+        /**
+         * True when a negative `bulkTransfer` result, [elapsedMillis] into a
+         * read of [timeoutMillis], is a failure. After a timeout shorter than
+         * [SHORTEST_JUDGED_TIMEOUT_MS], it is taken for a timeout.
+         */
+        private fun failedEarly(timeoutMillis: Long, elapsedMillis: Long): Boolean =
+            timeoutMillis >= SHORTEST_JUDGED_TIMEOUT_MS && elapsedMillis < timeoutMillis / FAILURE_DIVISOR
     }
 }

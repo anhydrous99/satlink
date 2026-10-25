@@ -1,11 +1,13 @@
 package iridium
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/anhydrous99/satlink/internal/asciicase"
+	"github.com/anhydrous99/satlink/internal/debugtext"
 )
 
 // Command execution: writing a command, and collecting its answer and its
@@ -69,6 +71,11 @@ type request struct {
 	// timeout does, with ErrCancelled: the attempt may still be in
 	// progress. nil for a command that cannot be cancelled.
 	cancellation *Cancellation
+	// reportsConnect has a CONNECT that the command cannot await fail it
+	// with ErrCall, its call left up for the caller to end, instead of
+	// being ended here (see unawaitedConnect): a data call's setup ends
+	// such a call itself, once, with the escape guard its settings give.
+	reportsConnect bool
 }
 
 // commandRun is a command between its write and its final result.
@@ -95,18 +102,30 @@ func (h *Handset) commandWithTimeout(command string, timeout time.Duration) (Res
 	return h.exec(request{command: command, timeout: timeout, completion: untilFinalResult})
 }
 
-// exec sends req's command and waits for what ends it.
+// exec sends req's command and waits for what ends it. A CONNECT already
+// received fails it unsent (see unawaitedConnect).
 func (h *Handset) exec(req request) (Response, error) {
-	if strings.ContainsAny(req.command, "\r\n") {
-		return Response{}, invalidArgument("command must not contain CR or LF")
+	if err := checkOneLine(req.command); err != nil {
+		return Response{}, err
 	}
 	// Anything complete in the buffer now predates this command.
-	h.queueCompleteLines()
+	if h.queueCompleteLines() {
+		return Response{}, h.unawaitedConnect(req, "before "+debugtext.Quote(req.command))
+	}
 	if err := h.writeCommandLine(req.command); err != nil {
 		return Response{}, err
 	}
 	run := &commandRun{request: req, ownPrefix: responsePrefix(req.command), sentAt: time.Now()}
 	return h.awaitResponse(run)
+}
+
+// checkOneLine refuses a command that holds CR or LF: it would be more than
+// one command line.
+func checkOneLine(command string) error {
+	if strings.ContainsAny(command, "\r\n") {
+		return invalidArgument("command must not contain CR or LF")
+	}
+	return nil
 }
 
 // writeCommandLine writes command and the CR that ends it, once
@@ -124,7 +143,7 @@ func (h *Handset) awaitResponse(run *commandRun) (Response, error) {
 	deadline := deadlineAfter(run.timeout)
 	for {
 		if result, ended := h.takeAnswerLines(run); ended {
-			return run.finish(result)
+			return h.finish(run, result)
 		}
 		if run.awaitsPrompt() && h.rx.takePrompt() {
 			if err := h.enterText(run); err != nil {
@@ -170,12 +189,15 @@ func (h *Handset) takeAnswerLines(run *commandRun) (FinalResult, bool) {
 		if !ok {
 			return FinalResult{}, false
 		}
+		result, isFinal := classifyFinalResult(line)
 		// The echo, whatever the case of its ASCII letters: Unicode case
-		// folding would take a line the handset never echoed for it.
-		if asciicase.EqualFold(line, run.command) {
+		// folding would take a line the handset never echoed for it. A
+		// CONNECT never passes for the echo of a raw line written as one:
+		// it may be a call's.
+		if asciicase.EqualFold(line, run.command) && (!isFinal || result.Kind != FinalResultConnect) {
 			continue
 		}
-		if result, isFinal := classifyFinalResult(line); isFinal {
+		if isFinal {
 			if run.completion.endsWith(result) {
 				return result, true
 			}
@@ -215,13 +237,60 @@ func (h *Handset) giveUp(run *commandRun) error {
 }
 
 // finish turns run's final result into its response or its error. A
-// CONNECT after a command that cannot take the handset online is an error:
-// a late CONNECT from an abandoned dial must not pass for an answer.
-func (run *commandRun) finish(result FinalResult) (Response, error) {
-	if result.Kind == FinalResultConnect && run.completion == untilFinalResult && !mayGoOnline(run.command) {
-		return Response{}, callError(fmt.Sprintf("unexpected CONNECT after %s: the handset is online", run.command))
+// command that cannot take the handset online fails on a CONNECT, as its
+// final result or received after it (see unawaitedConnect): a late one from
+// a command given up on, say, must not pass for an answer, nor one that
+// came with the answer be left unread.
+func (h *Handset) finish(run *commandRun, result FinalResult) (Response, error) {
+	if run.completion == untilFinalResult && !mayGoOnline(run.command) {
+		if result.Kind == FinalResultConnect {
+			return Response{}, h.unawaitedConnect(run.request, "during "+debugtext.Quote(run.command))
+		}
+		if h.queueCompleteLines() {
+			return Response{}, h.unawaitedConnect(run.request, "after "+debugtext.Quote(run.command))
+		}
 	}
 	return run.response(result)
+}
+
+// unawaitedConnect is the error of req, whose command did not await the
+// CONNECT that arrived when says. That call is ended (see
+// endCallThatConnected), unless req reports the CONNECT for its caller to
+// end the call.
+func (h *Handset) unawaitedConnect(req request, when string) error {
+	if req.reportsConnect {
+		return callError(wentOnline(when))
+	}
+	return h.endCallThatConnected(when)
+}
+
+// endCallThatConnected ends the data call of a CONNECT that no command of
+// ours awaited, which arrived when says: a call the handset answered on its
+// own, say, or one a command given up on set up. Nothing else would end it.
+// It returns ErrCall once that is done, and ErrCallMayStillBeUp if it
+// failed.
+func (h *Handset) endCallThatConnected(when string) error {
+	if err := h.endDataCall(DefaultEscapeGuard); err != nil {
+		return callMayStillBeUpError(fmt.Sprintf("%s, and the call could not be ended: %v", wentOnline(when), err))
+	}
+	return callError(wentOnline(when) + ", and the call was ended")
+}
+
+// wentOnline says that a CONNECT no command awaited arrived when says.
+func wentOnline(when string) string {
+	return fmt.Sprintf("a CONNECT arrived %s: the handset went online", when)
+}
+
+// callTrouble returns err, a command's, if it is ErrCall or
+// ErrCallMayStillBeUp, and nil otherwise. A method that can do without the
+// command's answer still fails with these: a call's result came instead,
+// or a data call came up meanwhile (see endCallThatConnected), and the
+// caller must hear of it.
+func callTrouble(err error) error {
+	if errors.Is(err, ErrCall) || errors.Is(err, ErrCallMayStillBeUp) {
+		return err
+	}
+	return nil
 }
 
 // response turns run's final result into the command's response, with the
@@ -247,15 +316,6 @@ func (run *commandRun) response(result FinalResult) (Response, error) {
 	default:
 		return Response{}, callError("NO DIALTONE")
 	}
-}
-
-// mayGoOnline reports whether command, in whatever case of its ASCII
-// letters, can legitimately end in CONNECT: a data dial (ATD without ';'),
-// answering (ATA) and returning online (ATO).
-func mayGoOnline(command string) bool {
-	command = asciicase.Upper(command)
-	isDataDial := strings.HasPrefix(command, dialCommand) && !strings.HasSuffix(command, voiceCallSuffix)
-	return isDataDial || command == answerCommand || strings.HasPrefix(command, returnOnlineCommand)
 }
 
 // awaitFinalResult waits up to timeout for the final result of something
@@ -298,11 +358,16 @@ func (h *Handset) takeFinalResult(until completion) (FinalResult, bool) {
 }
 
 // queueCompleteLines moves every complete line received so far to the URC
-// queue.
-func (h *Handset) queueCompleteLines() {
+// queue, up to a CONNECT, which it reports: a data call came up, and what
+// follows is its data.
+func (h *Handset) queueCompleteLines() (connected bool) {
 	for line, ok := h.rx.nextLine(); ok; line, ok = h.rx.nextLine() {
+		if result, isFinal := classifyFinalResult(line); isFinal && result.Kind == FinalResultConnect {
+			return true
+		}
 		h.urcs = append(h.urcs, line)
 	}
+	return false
 }
 
 // takeURCs empties the URC queue and returns what it held, oldest first.
@@ -313,11 +378,14 @@ func (h *Handset) takeURCs() []string {
 }
 
 // pollURCs waits up to timeout for unsolicited result codes and returns
-// every queued one, as soon as there is one.
+// every queued one, as soon as there is one. A CONNECT fails it, once its
+// call is ended (see endCallThatConnected); the queue stays for later.
 func (h *Handset) pollURCs(timeout time.Duration) ([]string, error) {
 	deadline := deadlineAfter(timeout)
 	for {
-		h.queueCompleteLines()
+		if h.queueCompleteLines() {
+			return nil, h.endCallThatConnected("while waiting for unsolicited result codes")
+		}
 		wait, ok := timeToWait(deadline)
 		if !ok || len(h.urcs) > 0 {
 			return h.takeURCs(), nil

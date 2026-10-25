@@ -15,68 +15,6 @@ import (
 // Receiving
 // =========================================================================
 
-func TestPeekSliceReadsTheBufferInEveryState(t *testing.T) {
-	t.Parallel()
-	for state, s := range socketsInEveryState(t) {
-		s.receiveBuffer.EnqueueSlice([]byte("abc"))
-		peeked := make([]byte, 8)
-
-		n := s.PeekSlice(peeked)
-
-		if string(peeked[:n]) != "abc" || s.ReceiveQueue() != 3 {
-			t.Errorf("%v: PeekSlice read %q and left %d octets; want \"abc\" and 3", state, peeked[:n], s.ReceiveQueue())
-		}
-		// What PeekSlice read is still there to receive.
-		received := make([]byte, 8)
-		if m := mustReceiveSlice(t, s, received); string(received[:m]) != "abc" {
-			t.Errorf("%v: ReceiveSlice after PeekSlice read %q, want \"abc\"", state, received[:m])
-		}
-	}
-}
-
-func TestPeekSliceReadsNothingWhereReceivingFails(t *testing.T) {
-	t.Parallel()
-	s := socketCloseWait(t)
-
-	n := s.PeekSlice(make([]byte, 8))
-	_, receiveErr := s.ReceiveSlice(make([]byte, 8))
-
-	if n != 0 || !errors.Is(receiveErr, ErrInvalidState) {
-		t.Errorf("PeekSlice = %d, ReceiveSlice error %v; want 0 and %v", n, receiveErr, ErrInvalidState)
-	}
-}
-
-func TestPeekReturnsBufferedDataWithoutDequeuingIt(t *testing.T) {
-	t.Parallel()
-	s := socketWithReceivedData(t)
-
-	peeked, err := s.Peek(4)
-
-	if err != nil || string(peeked) != "abcd" {
-		t.Errorf("Peek(4) = %q, %v; want \"abcd\", nil", peeked, err)
-	}
-	if s.ReceiveQueue() != 6 {
-		t.Errorf("ReceiveQueue = %d after Peek, want 6", s.ReceiveQueue())
-	}
-	if peeked, err := s.Peek(-1); err != nil || len(peeked) != 0 {
-		t.Errorf("Peek(-1) = %q, %v; want nothing", peeked, err)
-	}
-}
-
-func TestPeekFailsLikeReceiveSlice(t *testing.T) {
-	t.Parallel()
-	closed := socketClosed(t)
-	finished := socketCloseWait(t)
-	finished.finReceived = true
-
-	_, closedErr := closed.Peek(1)
-	_, finishedErr := finished.Peek(1)
-
-	if !errors.Is(closedErr, ErrInvalidState) || !errors.Is(finishedErr, ErrFinished) {
-		t.Errorf("Peek errors %v and %v, want %v and %v", closedErr, finishedErr, ErrInvalidState, ErrFinished)
-	}
-}
-
 func TestReceiveSliceReturnsZeroWhenNothingIsBuffered(t *testing.T) {
 	t.Parallel()
 	s := socketEstablished(t)
@@ -94,9 +32,9 @@ func TestReceiveConsumesWhatTheCallbackTakes(t *testing.T) {
 
 	taken := mustReceive(t, s, func(data []byte) int { return 2 })
 
-	if taken != 2 || s.ReceiveQueue() != 4 || s.remoteSeqNumber != remoteSeq.Add(1+2) {
+	if taken != 2 || s.receiveBuffer.Len() != 4 || s.remoteSeqNumber != remoteSeq.Add(1+2) {
 		t.Errorf("took %d, %d left, remote sequence %v; want 2, 4, %v",
-			taken, s.ReceiveQueue(), s.remoteSeqNumber, remoteSeq.Add(1+2))
+			taken, s.receiveBuffer.Len(), s.remoteSeqNumber, remoteSeq.Add(1+2))
 	}
 }
 
@@ -144,7 +82,7 @@ func TestDataArrivingWithASYNIsNeitherTakenNorAcknowledged(t *testing.T) {
 			t.Parallel()
 			s := test.handshake(t)
 			assertState(t, s, StateEstablished)
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 
 			send(t, s, dataFromRemote(0, early))
 
@@ -168,7 +106,7 @@ func TestTheEndOfTimeWaitDiscardsUnreadData(t *testing.T) {
 	receiveNothing(t, s.at(closeDelay))
 
 	assertState(t, s, StateClosed)
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 	if _, err := s.ReceiveSlice(make([]byte, len(response))); !errors.Is(err, ErrInvalidState) {
 		t.Errorf("ReceiveSlice after TIME-WAIT = %v, want %v", err, ErrInvalidState)
 	}

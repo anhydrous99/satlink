@@ -23,14 +23,7 @@ const (
 
 // EmitFunc sends one query datagram for Dispatch. ip.PayloadLen covers the
 // UDP header and payload, and payload is only valid until EmitFunc returns.
-//
-// An error means the query was not sent, typically because the device has no
-// room for it, and Dispatch returns it unchanged. The query keeps its
-// retransmission time and delay, so it is sent at a later poll. What
-// Dispatch decided before emitting stands: the server's 10 s timeout runs from
-// the query's first attempt to that server, refused or not; a move to the
-// next server, or a failure, is not undone.
-type EmitFunc func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) error
+type EmitFunc func(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte)
 
 // Accepts reports whether a UDP datagram is for the resolver: it comes from
 // port 53 of one of the servers, or from port 5353 (multicast DNS) of anyone,
@@ -80,18 +73,13 @@ func (s *Socket) Process(ip wire.IPv4Repr, header wire.UDPRepr, payload []byte) 
 // it at once with the delay back at 1 s; after the last server, the query
 // fails (at once, for a socket without servers). A query also fails when it
 // reaches a server that is unspecified or not IPv4, or when the interface has
-// no address to send from. Dispatch returns emit's error unchanged, or nil.
-func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) error {
+// no address to send from.
+func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) {
 	for _, q := range s.queries {
-		if !q.isPending() {
-			continue
-		}
-		sent, err := s.dispatchQuery(cx, q, emit)
-		if sent || err != nil {
-			return err
+		if q.isPending() && s.dispatchQuery(cx, q, emit) {
+			return
 		}
 	}
-	return nil
 }
 
 // PollAt returns the earliest retransmission time of the pending queries, or
@@ -110,33 +98,30 @@ func (s *Socket) PollAt() socket.PollAt {
 // dispatchQuery sends the pending query q if it is due, moving it on to the
 // next server first when the current one has had its time. It fails the
 // query instead when no usable server is left or the interface has no
-// address to send from. It reports whether it sent the query, and returns
-// emit's error.
-func (s *Socket) dispatchQuery(cx *socket.Context, q *query, emit EmitFunc) (bool, error) {
+// address to send from. It reports whether it sent the query.
+func (s *Socket) dispatchQuery(cx *socket.Context, q *query, emit EmitFunc) bool {
 	now := cx.Now()
 	pending := &q.pending
 	pending.moveOnAfterTimeout(now)
 	server, ok := s.serverFor(pending)
 	if !ok {
 		q.fail()
-		return false, nil
+		return false
 	}
 	if pending.isWaitingToRetransmit(now) {
-		return false, nil
+		return false
 	}
 	source, ok := cx.SourceAddress(server)
 	if !ok {
 		netlog.Trace("no source address for destination", "dst", server)
 		q.fail()
-		return false, nil
+		return false
 	}
 	ip, header, payload := pending.request(source, server)
 	netlog.Trace("sending octets", "octets", len(payload), "to", server, "port", header.SrcPort)
-	if err := emit(ip, header, payload); err != nil {
-		return false, err
-	}
+	emit(ip, header, payload)
 	pending.scheduleRetransmission(now)
-	return true, nil
+	return true
 }
 
 // serverFor returns the server to send pending to; false, when it has tried

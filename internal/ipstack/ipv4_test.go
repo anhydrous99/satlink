@@ -8,7 +8,9 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/anhydrous99/satlink/internal/ipstack/internal/netlog"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // unknownProtocol is a protocol the stack does not handle (0x0c, PUP).
@@ -202,16 +204,14 @@ func malformedDatagrams() map[string][]byte {
 	segment := wire.TCPPacket(wire.IPv4Packet(badTCPChecksum).Payload())
 	segment.SetChecksum(segment.Checksum() + 1)
 	return map[string][]byte{
-		"IPv6":                     {0x60, 0, 0, 0},
-		"a truncated header":       valid[:wire.IPv4HeaderLen-1],
-		"a bad header checksum":    changed(func(packet wire.IPv4Packet) { packet.SetChecksum(packet.Checksum() + 1) }),
-		"a fragment":               changed(func(packet wire.IPv4Packet) { packet.SetMoreFragments(true); packet.FillChecksum() }),
-		"a bad UDP checksum":       changed(func(packet wire.IPv4Packet) { packet.Payload()[wire.UDPHeaderLen] ^= 0xff }),
-		"a truncated UDP header":   asProtocol(wire.IPProtocolUDP, wire.IPv4HeaderLen+4),
-		"a truncated TCP header":   asProtocol(wire.IPProtocolTCP, uint16(len(valid))),
-		"a bad TCP checksum":       badTCPChecksum,
-		"a malformed ICMP message": asProtocol(wire.IPProtocolICMP, uint16(len(valid))),
-		"a short ICMP message":     asProtocol(wire.IPProtocolICMP, wire.IPv4HeaderLen+4),
+		"IPv6":                   {0x60, 0, 0, 0},
+		"a truncated header":     valid[:wire.IPv4HeaderLen-1],
+		"a bad header checksum":  changed(func(packet wire.IPv4Packet) { packet.SetChecksum(packet.Checksum() + 1) }),
+		"a fragment":             changed(func(packet wire.IPv4Packet) { packet.SetMoreFragments(true); packet.FillChecksum() }),
+		"a bad UDP checksum":     changed(func(packet wire.IPv4Packet) { packet.Payload()[wire.UDPHeaderLen] ^= 0xff }),
+		"a truncated UDP header": asProtocol(wire.IPProtocolUDP, wire.IPv4HeaderLen+4),
+		"a truncated TCP header": asProtocol(wire.IPProtocolTCP, uint16(len(valid))),
+		"a bad TCP checksum":     badTCPChecksum,
 	}
 }
 
@@ -309,9 +309,11 @@ func TestDatagramForAForeignMulticastGroupIsDropped(t *testing.T) {
 func TestEchoRequestGetsNoReply(t *testing.T) {
 	t.Parallel()
 	iface, sockets, device := setup(t)
-	echo := wire.ICMPv4Repr{Message: wire.ICMPv4EchoRequest, Identifier: 0x1234, SeqNumber: 1, Data: []byte("ping")}
-	header := ipv4Header(remoteAddr, localAddr, wire.IPProtocolICMP, echo.BufferLen())
-	device.deliver(ipv4Datagram(header, func(buffer []byte) { echo.Emit(wire.ICMPv4Packet(buffer), anyChecksums) }))
+	// Type 8 (echo request), code 0, its checksum, identifier 0x1234,
+	// sequence number 1, and "ping".
+	echo := []byte{0x08, 0x00, 0x06, 0xfa, 0x12, 0x34, 0x00, 0x01, 'p', 'i', 'n', 'g'}
+	header := ipv4Header(remoteAddr, localAddr, wire.IPProtocolICMP, len(echo))
+	device.deliver(ipv4Datagram(header, func(buffer []byte) { copy(buffer, echo) }))
 
 	result := iface.Poll(at(0), device, sockets)
 
@@ -319,6 +321,37 @@ func TestEchoRequestGetsNoReply(t *testing.T) {
 		t.Errorf("Poll = %v, want %v: every datagram counts", result, PollSocketStateChanged)
 	}
 	assertNothingSent(t, device)
+}
+
+func TestIncomingICMPIsDroppedUnread(t *testing.T) {
+	// No t.Parallel: logtest.Record replaces the process-wide logger.
+	sent := ipv4Header(localAddr, remoteAddr, wire.IPProtocolUDP, 600)
+	portUnreachable := func(quotedLen int) []byte {
+		return emitICMPv4(wire.ICMPv4Repr{Message: wire.ICMPv4DstUnreachable, Code: wire.ICMPv4PortUnreachable,
+			Header: sent, Data: make([]byte, quotedLen)})
+	}
+	messages := map[string][]byte{
+		// Routers quote the header and 8 octets of the payload (RFC 792).
+		"an error quoting 8 of 600 octets": portUnreachable(8),
+		// The stack's own errors quote as much as fits into IPv4MinMTU.
+		"an error quoting 528 of 600 octets": portUnreachable(528),
+		"a message shorter than its header":  {0x03, 0x03, 0x00, 0x00},
+	}
+	for name, message := range messages {
+		t.Run(name, func(t *testing.T) {
+			iface, sockets, device := setup(t)
+			logs := logtest.Record(t, "ipstack", netlog.LevelTrace)
+			header := ipv4Header(remoteAddr, localAddr, wire.IPProtocolICMP, len(message))
+			device.deliver(ipv4Datagram(header, func(buffer []byte) { copy(buffer, message) }))
+
+			iface.Poll(at(0), device, sockets)
+
+			assertNothingSent(t, device)
+			if got := logs(); len(got) != 0 {
+				t.Errorf("logged %v, want nothing", got)
+			}
+		})
+	}
 }
 
 func TestUnknownProtocolGetsProtocolUnreachable(t *testing.T) {
@@ -335,12 +368,10 @@ func TestUnknownProtocolGetsProtocolUnreachable(t *testing.T) {
 	if replyHeader.SrcAddr != localAddr || replyHeader.DstAddr != remoteAddr || !reply.isReply {
 		t.Errorf("reply %v (through the reply slot: %t), want one from %v to %v through it", replyHeader, reply.isReply, localAddr, remoteAddr)
 	}
-	if message.Type() != wire.ICMPv4DstUnreachable || message.Code() != wire.ICMPv4ProtoUnreachable {
-		t.Errorf("ICMP %v code %d, want %v code %d", message.Type(), message.Code(), wire.ICMPv4DstUnreachable, wire.ICMPv4ProtoUnreachable)
-	}
-	quoted := message.Data()
-	if !bytes.Equal(quoted[wire.IPv4HeaderLen:], payload) || wire.IPv4Packet(quoted).NextHeader() != unknownProtocol {
-		t.Errorf("the error quotes %x, want the datagram's header and payload", quoted)
+	want := emitICMPv4(wire.ICMPv4Repr{Message: wire.ICMPv4DstUnreachable, Code: wire.ICMPv4ProtoUnreachable,
+		Header: header, Data: payload})
+	if !bytes.Equal(message, want) {
+		t.Errorf("ICMP % x, want protocol unreachable quoting the datagram: % x", message, want)
 	}
 }
 
@@ -353,11 +384,11 @@ func TestUnmatchedUDPGetsPortUnreachable(t *testing.T) {
 	iface.Poll(at(0), device, sockets)
 
 	_, message := parseICMPv4(t, onlySent(t, device).datagram)
-	if message.Type() != wire.ICMPv4DstUnreachable || message.Code() != wire.ICMPv4PortUnreachable {
-		t.Errorf("ICMP %v code %d, want %v code %d", message.Type(), message.Code(), wire.ICMPv4DstUnreachable, wire.ICMPv4PortUnreachable)
-	}
-	if !bytes.Equal(message.Data(), datagram) {
-		t.Errorf("the error quotes %x, want the whole datagram %x", message.Data(), datagram)
+	header, payload := parseIPv4(t, datagram)
+	want := emitICMPv4(wire.ICMPv4Repr{Message: wire.ICMPv4DstUnreachable, Code: wire.ICMPv4PortUnreachable,
+		Header: header, Data: payload})
+	if !bytes.Equal(message, want) {
+		t.Errorf("ICMP % x, want port unreachable quoting the whole datagram: % x", message, want)
 	}
 }
 

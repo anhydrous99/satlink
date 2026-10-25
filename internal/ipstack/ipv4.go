@@ -52,11 +52,12 @@ func (i *Interface) isForThisHost(dst netip.Addr) bool {
 
 // processIPv4Payload hands the payload of a datagram for this host to its
 // protocol, answering a protocol the stack does not handle with an ICMP
-// protocol-unreachable error.
+// protocol-unreachable error. An ICMP message is dropped unread: the stack
+// has no ICMP sockets and does not answer echo requests.
 func (i *Interface) processIPv4Payload(sockets *SocketSet, header wire.IPv4Repr, payload []byte) (ipPacket, bool) {
 	switch header.NextHeader {
 	case wire.IPProtocolICMP:
-		return i.processICMPv4(payload)
+		return noPacket()
 	case wire.IPProtocolUDP:
 		return i.processUDP(sockets, header, payload)
 	case wire.IPProtocolTCP:
@@ -65,21 +66,6 @@ func (i *Interface) processIPv4Payload(sockets *SocketSet, header wire.IPv4Repr,
 		// Send back as much of the original payload as we can.
 		return i.icmpv4Reply(header, destinationUnreachable(wire.ICMPv4ProtoUnreachable, header, payload))
 	}
-}
-
-// processICMPv4 checks an ICMPv4 message and drops it. The stack has no ICMP
-// sockets and does not answer echo requests, so they go unanswered, like echo
-// replies and every other message.
-func (i *Interface) processICMPv4(payload []byte) (ipPacket, bool) {
-	packet, err := wire.NewICMPv4Packet(payload)
-	if err != nil {
-		traceMalformed("wire.NewICMPv4Packet")
-		return noPacket()
-	}
-	if _, err := wire.ParseICMPv4Repr(packet, i.checksums); err != nil {
-		traceMalformed("wire.ParseICMPv4Repr")
-	}
-	return noPacket()
 }
 
 // destinationUnreachable returns the ICMP error that reports a datagram with

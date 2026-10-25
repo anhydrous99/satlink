@@ -1013,7 +1013,7 @@ func TestACallAnEarlierSessionLeftUpIsEndedBeforeDialling(t *testing.T) {
 	control := simulator.Control()
 	earlier := simtest.InitializedHandset(t, simulator)
 	// Online, then abandoned as by a crashed app.
-	if _, err := earlier.CommandTimeout("ATD"+satnet.IridiumInternetNumber, timeout); err != nil {
+	if _, err := earlier.DialData(satnet.IridiumInternetNumber, linkConfig(t).Call); err != nil {
 		t.Fatal(err)
 	}
 	if !control.Stats().InDataCall {

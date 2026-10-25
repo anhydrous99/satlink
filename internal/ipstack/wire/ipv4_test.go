@@ -64,12 +64,8 @@ func TestIPv4PacketDeconstruct(t *testing.T) {
 	checkFields(t, []field{
 		{"Version", packet.Version(), uint8(4)},
 		{"HeaderLen", packet.HeaderLen(), 20},
-		{"DSCP", packet.DSCP(), uint8(0)},
-		{"ECN", packet.ECN(), uint8(0)},
 		{"TotalLen", packet.TotalLen(), uint16(30)},
-		{"ID", packet.ID(), uint16(0x102)},
 		{"MoreFragments", packet.MoreFragments(), true},
-		{"DontFragment", packet.DontFragment(), true},
 		{"FragmentOffset", packet.FragmentOffset(), uint16(0x203 * 8)},
 		{"HopLimit", packet.HopLimit(), uint8(0x1a)},
 		{"NextHeader", packet.NextHeader(), IPProtocolICMP},
@@ -307,10 +303,10 @@ func TestIPv4PacketDSCPAndECNShareAnOctet(t *testing.T) {
 	packet.SetECN(0x2)
 	packet.SetDSCP(0x15)
 
-	checkFields(t, []field{
-		{"DSCP", packet.DSCP(), uint8(0x15)},
-		{"ECN", packet.ECN(), uint8(0x2)},
-	})
+	// DSCP 0x15 in the high six bits, ECN 2 in the low two.
+	if got := packet[ipv4DSCPAndECNOffset]; got != 0x56 {
+		t.Errorf("DSCP and ECN octet = %#02x, want 0x56", got)
+	}
 }
 
 func TestIPv4PacketFlagsKeepTheFragmentOffset(t *testing.T) {
@@ -321,8 +317,9 @@ func TestIPv4PacketFlagsKeepTheFragmentOffset(t *testing.T) {
 	packet.SetMoreFragments(true)
 
 	packet.SetDontFragment(false)
-	if !packet.MoreFragments() || packet.DontFragment() || packet.FragmentOffset() != 0x1fff*8 {
-		t.Errorf("after clearing DF: DF %v MF %v offset %d", packet.DontFragment(), packet.MoreFragments(), packet.FragmentOffset())
+	// MF and the offset 0x1fff, without DF.
+	if got := packet.flagsAndOffset(); got != 0x3fff {
+		t.Errorf("after clearing DF: flags and offset %#04x, want 0x3fff", got)
 	}
 	packet.ClearFlags()
 	if packet.MoreFragments() || packet.FragmentOffset() != 0x1fff*8 {

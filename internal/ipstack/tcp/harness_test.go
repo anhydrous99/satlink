@@ -7,7 +7,7 @@ package tcp
 //
 // The tests are grouped in one file per state or feature. The tests of
 // behaviour beyond the states sit beside the code they test: socket_test.go, stream_test.go,
-// connection_test.go, process_test.go, dispatch_test.go and pull_model_test.go.
+// connection_test.go, process_test.go and dispatch_test.go.
 // fuzz_test.go holds the fuzz target.
 
 import (
@@ -374,7 +374,7 @@ func fixedISN(*socket.Context) wire.TCPSeqNumber {
 }
 
 // newTestContext returns the test context: at the epoch, random seed testRandomSeed, an IP MTU of testIPMTU, and the
-// addresses 192.168.1.1/24 and 127.0.0.1/8.
+// addresses of testIPAddrs.
 func newTestContext(t *testing.T) *socket.Context {
 	t.Helper()
 	return newTestContextWith(t, testRandomSeed, testIPMTU)
@@ -385,14 +385,19 @@ func newTestContext(t *testing.T) *socket.Context {
 func newTestContextWith(t *testing.T, randomSeed uint64, ipMTU int) *socket.Context {
 	t.Helper()
 	cx := socket.NewContext(instant(0), randomSeed, ipMTU)
-	addresses := []netip.Prefix{
+	if err := cx.SetIPAddrs(testIPAddrs()); err != nil {
+		t.Fatalf("SetIPAddrs(%v): %v", testIPAddrs(), err)
+	}
+	return cx
+}
+
+// testIPAddrs returns the addresses of the test context: 192.168.1.1/24 and
+// 127.0.0.1/8.
+func testIPAddrs() []netip.Prefix {
+	return []netip.Prefix{
 		netip.PrefixFrom(localAddr, 24),
 		netip.PrefixFrom(netip.AddrFrom4([4]byte{127, 0, 0, 1}), 8),
 	}
-	if err := cx.SetIPAddrs(addresses); err != nil {
-		t.Fatalf("SetIPAddrs(%v): %v", addresses, err)
-	}
-	return cx
 }
 
 // deliver hands segment to the socket, as the interface would, and returns
@@ -449,15 +454,11 @@ func dispatchCollecting(t *testing.T, s *testSocket) []wire.TCPRepr {
 	t.Helper()
 	s.cx.SetNow(instant(s.elapsed))
 	var sent []wire.TCPRepr
-	err := s.Dispatch(s.cx, func(ip wire.IPv4Repr, segment wire.TCPRepr) error {
+	s.Dispatch(s.cx, func(ip wire.IPv4Repr, segment wire.TCPRepr) {
 		checkOutgoingIPHeader(t, ip, segment)
 		segment.Payload = bytes.Clone(segment.Payload)
 		sent = append(sent, segment)
-		return nil
 	})
-	if err != nil {
-		t.Fatalf("Dispatch: %v", err)
-	}
 	return sent
 }
 

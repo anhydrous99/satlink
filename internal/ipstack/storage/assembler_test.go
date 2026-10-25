@@ -436,22 +436,20 @@ func TestAssemblerString(t *testing.T) {
 	}
 }
 
-func TestAssemblerPeekFrontAndIsEmpty(t *testing.T) {
+func TestAssemblerIsEmpty(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
-		assembler     Assembler
-		wantPeekFront int
-		wantEmpty     bool
+		assembler Assembler
+		wantEmpty bool
 	}{
-		"empty":           {assembler: Assembler{}, wantPeekFront: 0, wantEmpty: true},
-		"data at front":   {assembler: assemblerOf(contig{0, 4}), wantPeekFront: 4, wantEmpty: false},
-		"hole at front":   {assembler: assemblerOf(contig{2, 4}), wantPeekFront: 0, wantEmpty: false},
-		"front then more": {assembler: assemblerOf(contig{0, 4}, contig{2, 3}), wantPeekFront: 4, wantEmpty: false},
+		"empty":           {assembler: Assembler{}, wantEmpty: true},
+		"data at front":   {assembler: assemblerOf(contig{0, 4}), wantEmpty: false},
+		"hole at front":   {assembler: assemblerOf(contig{2, 4}), wantEmpty: false},
+		"front then more": {assembler: assemblerOf(contig{0, 4}, contig{2, 3}), wantEmpty: false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			assertCount(t, "PeekFront()", c.assembler.PeekFront(), c.wantPeekFront)
 			if got := c.assembler.IsEmpty(); got != c.wantEmpty {
 				t.Errorf("IsEmpty() = %v, want %v", got, c.wantEmpty)
 			}
@@ -467,15 +465,6 @@ func TestAssemblerAddOfNothingChangesNothing(t *testing.T) {
 	if err := assembler.Add(1, 0); err != nil || assembler != before {
 		t.Errorf("Add(1, 0) = %v and changed the assembler to %v", err, assembler.contigs)
 	}
-}
-
-func TestAssemblerClear(t *testing.T) {
-	t.Parallel()
-	assembler := fullAssembler(t)
-
-	assembler.Clear()
-
-	assertAssembler(t, assembler)
 }
 
 func TestAssemblerDataRangesStopsWhenAsked(t *testing.T) {

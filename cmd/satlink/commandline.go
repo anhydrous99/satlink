@@ -9,9 +9,9 @@ import (
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 )
 
-// Reading the command line. The parser is the CLI's own, rather than
-// cobra's or pflag's, so that help, error messages and option precedence
-// stay under this package's control. The rules:
+// Reading the command line. The parser is the CLI's own, so that help,
+// error messages and option precedence stay under this package's control.
+// The rules:
 //
 //   - Each command takes the tokens up to the name of its subcommand, which
 //     takes the rest.

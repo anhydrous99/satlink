@@ -135,25 +135,15 @@ func (s *Socket) closeIfTimeWaitIsOver(now time.Time) {
 }
 
 // emitDueSegment builds the segment that is due, emits it, and records it as
-// sent if emit took it.
-func (s *Socket) emitDueSegment(cx *socket.Context, tuple fourTuple, emit EmitFunc) error {
+// sent.
+func (s *Socket) emitDueSegment(cx *socket.Context, tuple fourTuple, emit EmitFunc) {
 	if s.state == StateListen {
 		// We never transmit anything in the LISTEN state.
-		return nil
+		return
 	}
 	out := s.buildTransmission(cx, tuple)
-	// Actually send the packet. If this succeeds, it means the packet is in
-	// the device buffer, and its transmission is imminent. If not, the line
-	// has no room for it now.
-	//
-	// Bailing out if the packet isn't placed in the device buffer allows us
-	// to not waste time waiting for the retransmit timer on packets that we
-	// know for sure will not be successfully transmitted.
-	if err := emit(out.ip, out.segment); err != nil {
-		return err
-	}
+	emit(out.ip, out.segment)
 	s.recordTransmission(cx.Now(), out)
-	return nil
 }
 
 // buildTransmission constructs the segment to send in the socket's state.

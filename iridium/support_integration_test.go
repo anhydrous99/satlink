@@ -83,6 +83,9 @@ type scripted struct {
 	// unplugsWhenPlayedOut makes every call fail once the script has played
 	// and every reply has been read.
 	unplugsWhenPlayedOut bool
+	// readsWhole has a read deliver all that has arrived, not replyChunk
+	// bytes at most.
+	readsWhole bool
 }
 
 var (
@@ -135,6 +138,15 @@ func (s *scripted) unpluggedOncePlayedOut() *scripted {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.unplugsWhenPlayedOut = true
+	return s
+}
+
+// inWholeReads has every read deliver all that has arrived, as one USB
+// transfer can carry a reply and what the handset sent straight after it.
+func (s *scripted) inWholeReads() *scripted {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.readsWhole = true
 	return s
 }
 
@@ -222,9 +234,13 @@ func (s *scripted) nextArrival(timeout time.Duration) (time.Duration, bool) {
 }
 
 // deliver moves into p what has arrived of the oldest replies, at most
-// replyChunk bytes, and returns how much that was.
+// replyChunk bytes unless the transport reads whole, and returns how much
+// that was.
 func (s *scripted) deliver(p []byte) int {
-	chunk := p[:min(len(p), replyChunk)]
+	chunk := p
+	if !s.readsWhole {
+		chunk = p[:min(len(p), replyChunk)]
+	}
 	delivered := 0
 	for delivered < len(chunk) && len(s.replies) > 0 && !s.replies[0].arrival.After(time.Now()) {
 		oldest := &s.replies[0]

@@ -23,6 +23,12 @@ var udpPeer = netip.AddrPortFrom(ipv4(192, 0, 2, 7), 7)
 // local port. The test's end closes it.
 func openUDPConn(t *testing.T, sharedEngine *shared) (*UDPConn, uint16) {
 	t.Helper()
+	return openUDPConnTo(t, sharedEngine, udpPeer)
+}
+
+// openUDPConnTo is openUDPConn for a socket talking to peer.
+func openUDPConnTo(t *testing.T, sharedEngine *shared, peer netip.AddrPort) (*UDPConn, uint16) {
+	t.Helper()
 	var (
 		conn *UDPConn
 		port uint16
@@ -34,7 +40,7 @@ func openUDPConn(t *testing.T, sharedEngine *shared) (*UDPConn, uint16) {
 		}
 		local := localUDPEndpoint(e.stack, handle)
 		port = local.Port()
-		conn = newUDPConn(sharedEngine, handle, local, udpPeer)
+		conn = newUDPConn(sharedEngine, handle, local, peer)
 		return nil
 	})
 	if err != nil {
@@ -68,6 +74,34 @@ func sentOverAReadyLine(sharedEngine *shared) [][]byte {
 		sent = drain(e.stack)
 	})
 	return sent
+}
+
+// pollWithTheLineBusy polls the stack of sharedEngine as the driver does
+// while the line is busy: what is urgent goes, and the rest waits.
+func pollWithTheLineBusy(sharedEngine *shared) {
+	sharedEngine.update(func(e *engine) {
+		e.stack.setLineReady(false)
+		e.stack.poll(time.Now())
+		drain(e.stack)
+	})
+}
+
+// writeWhileTheLineIsBusy writes up to attempts datagrams on conn, each by
+// a deadline shortWait away, polling the stack of sharedEngine after each
+// as the driver does, with the line busy. It returns how many were written,
+// and the error of the write that failed, if one did.
+func writeWhileTheLineIsBusy(t *testing.T, sharedEngine *shared, conn *UDPConn, attempts int) (int, error) {
+	t.Helper()
+	for written := range attempts {
+		if err := conn.SetWriteDeadline(time.Now().Add(shortWait)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := conn.Write([]byte("more")); err != nil {
+			return written, err
+		}
+		pollWithTheLineBusy(sharedEngine)
+	}
+	return attempts, nil
 }
 
 // fillUDPSendBuffer writes a datagram into each slot of conn's send buffer,
@@ -122,11 +156,55 @@ func TestAWriteWaitsForRoomInAFullUDPSendBuffer(t *testing.T) {
 	written := writeInBackground(conn, []byte("one more"))
 	sharedEngine.awaitWaitingCall(t, waitBudget)
 
-	// The stack hands what waits to the device, which makes room.
-	deliverAndPoll(sharedEngine)
+	// The stack hands what waits to the device, which makes room, and the
+	// line takes it, a datagram per slot.
+	for range udpSlots {
+		sentOverAReadyLine(sharedEngine)
+	}
 
 	if err := awaitResult(t, written); err != nil {
 		t.Errorf("the waiting Write = %v, want it taken once there was room", err)
+	}
+}
+
+func TestUDPWritesWaitForABusyLineOnceAFewDatagramsWaitForIt(t *testing.T) {
+	for name, peer := range map[string]netip.AddrPort{
+		"to an echo service": udpPeer,
+		// The app's, not one of the stack's own queries: it waits for the
+		// line as any data does.
+		"to a DNS server": netip.AddrPortFrom(lookupServer, dnsPort),
+	} {
+		t.Run(name, func(t *testing.T) {
+			sharedEngine := upEngine(t)
+			conn, _ := openUDPConnTo(t, sharedEngine, peer)
+
+			written, err := writeWhileTheLineIsBusy(t, sharedEngine, conn, 2*udpSlots)
+
+			var timedOut *Error
+			if !errors.As(err, &timedOut) || timedOut.Kind != ErrTimedOut || timedOut.Operation != operationUDPSend {
+				t.Fatalf("after %d datagrams, Write = %v; want the UDP send timed out", written, err)
+			}
+			if written > udpSlots {
+				t.Errorf("%d datagrams were taken for a busy line, want at most %d", written, udpSlots)
+			}
+		})
+	}
+}
+
+func TestAWaitingUDPWriteGoesOnceTheLineTakesTheDatagramBeforeIt(t *testing.T) {
+	sharedEngine := upEngine(t)
+	conn, _ := openUDPConn(t, sharedEngine)
+	if _, err := conn.Write([]byte("first")); err != nil {
+		t.Fatal(err)
+	}
+	pollWithTheLineBusy(sharedEngine)
+	written := writeInBackground(conn, []byte("second"))
+	sharedEngine.awaitWaitingCall(t, waitBudget)
+
+	sent := sentOverAReadyLine(sharedEngine)
+
+	if err := awaitResult(t, written); err != nil || len(sent) != 1 {
+		t.Errorf("once the line took %d datagrams, the waiting Write = %v; want the first taken, then the second", len(sent), err)
 	}
 }
 

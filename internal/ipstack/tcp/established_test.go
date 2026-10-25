@@ -11,18 +11,6 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// peekThenReceive peeks into a buffer of bufferLen octets and then
-// receives into another, and returns what
-// each of the two calls copied.
-func peekThenReceive(t *testing.T, s *testSocket, bufferLen int) (peeked, received []byte) {
-	t.Helper()
-	peeked = make([]byte, bufferLen)
-	peeked = peeked[:s.PeekSlice(peeked)]
-	received = make([]byte, bufferLen)
-	received = received[:mustReceiveSlice(t, s, received)]
-	return peeked, received
-}
-
 // logTransmitState logs where the socket stands in sending; go test shows it for a failed
 // test, or with -v.
 func logTransmitState(t *testing.T, s *testSocket) {
@@ -66,42 +54,6 @@ func TestEstablishedRecv(t *testing.T) {
 	receiveOnly(t, s, fromLocal(withSeq(localSeq.Add(1)), withAck(remoteSeq.Add(1+6)), withWindow(58)))
 	if got := s.receiveBuffer.DequeueMany(6); string(got) != "abcdef" {
 		t.Errorf("the receive buffer holds %q, want %q", got, "abcdef")
-	}
-}
-
-func TestPeekSlice(t *testing.T) {
-	t.Parallel()
-	const bufferLen = 10
-	s := socketEstablishedWithBufferSizes(t, bufferLen, bufferLen)
-	// Populate the receive buffer.
-	send(t, s, fromRemote(withSeq(remoteSeq.Add(1)), withAck(localSeq.Add(1)), withPayload([]byte("0123456"))))
-
-	// Peek into the receive buffer, then receive from it.
-	peeked, received := peekThenReceive(t, s, bufferLen)
-
-	// Beyond the assertion that both calls copy the same, the test
-	// checks that they copy the data, so that it cannot pass with nothing.
-	if !bytes.Equal(peeked, received) || string(received) != "0123456" {
-		t.Errorf("PeekSlice copied %q and ReceiveSlice %q, want %q from both", peeked, received, "0123456")
-	}
-}
-
-func TestPeekSliceBufferWrap(t *testing.T) {
-	t.Parallel()
-	const bufferLen = 10
-	sendBuffer := []byte("0123456789")
-	s := socketEstablishedWithBufferSizes(t, bufferLen, bufferLen)
-	// Leave "67" queued, then queue "01234", which wraps around the end of the
-	// storage.
-	s.receiveBuffer.EnqueueSlice(sendBuffer[:8])
-	s.receiveBuffer.DequeueMany(6)
-	s.receiveBuffer.EnqueueSlice(sendBuffer[:5])
-
-	peeked, received := peekThenReceive(t, s, bufferLen)
-
-	// As in TestPeekSlice, the test checks the data too.
-	if !bytes.Equal(peeked, received) || string(received) != "6701234" {
-		t.Errorf("PeekSlice copied %q and ReceiveSlice %q, want %q from both", peeked, received, "6701234")
 	}
 }
 

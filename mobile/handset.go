@@ -128,10 +128,6 @@ type SMSMessage struct {
 type CommandResponse struct {
 	// Lines are the information lines; never nil.
 	Lines *StringList
-	// Connected reports that the command ended in CONNECT rather than OK.
-	Connected bool
-	// ConnectMessage is what followed CONNECT, usually the data rate.
-	ConnectMessage string
 }
 
 // KnownProduct is a USB product the official Iridium driver supports.
@@ -166,11 +162,12 @@ func KnownProducts() *KnownProductList {
 // Until that call ends, however it ends, its methods fail with
 // SatlinkErrorHandsetBusy, and afterwards they work again. After a data
 // call that could not be ended — the link's, while closing or after failing
-// to come up, or one Answer took by mistake — the call may still be up, and
-// the handset is stranded: its methods fail with SatlinkErrorHangUpFailed
-// until Reinitialize succeeds. A fault inside the library while a link is
-// set up strands it too. Closing the handset meanwhile leaves its port to
-// the link until the call has ended (see Close).
+// to come up, one Answer took by mistake, or one whose CONNECT no command
+// awaited — the call may still be up, and the handset is
+// stranded: its methods fail with SatlinkErrorHangUpFailed until
+// Reinitialize succeeds. A fault inside the library while a link is set up
+// strands it too. Closing the handset meanwhile leaves its port to the link
+// until the call has ended (see Close).
 //
 // In Objective-C and Swift, make one with SatlinkMobileNewIridiumHandset or
 // SatlinkMobileOpenSerialHandset, never with the init it inherits from
@@ -200,7 +197,8 @@ type IridiumHandset struct {
 // NewIridiumHandset connects through a transport the app provides and
 // initialises the handset (echo off, verbose errors, SMS PDU mode), ending
 // a data call an earlier session left up. If the handset does not answer
-// and a data call it may be relaying could not be ended, it fails with
+// and a data call it may be relaying could not be ended, or a data call
+// that came up meanwhile could not be, it fails with
 // SatlinkErrorHangUpFailed.
 func NewIridiumHandset(transport ByteTransport) (handset *IridiumHandset, err error) {
 	defer recoverPanic(&err)
@@ -317,6 +315,35 @@ func callMayStillBeUpError(message string) *iridium.Error {
 
 // Command sends a raw AT command, such as "AT+CSQ", and waits up to
 // timeoutMillis for its final result.
+//
+// A command line that can take the handset online fails with
+// SatlinkErrorInvalidArgument before anything is sent. One does if it holds
+// a data dial (D without ';'), A (answer) or O (return online) anywhere
+// among its commands, as the handset reads them, or A/, which repeats the
+// last line. So "ATD123", "at d123", "ATE0D123", "AT+CSQ D123",
+// "AT+CSQD123" and "ATA0" are refused. So are auto-answer, "ATS0=1", the
+// writes to S3 and S5, which change how the handset reads the lines after,
+// and "=n", which writes the register last referred to. Each would leave a
+// data call up, billing, that nothing ends. An extended command that the
+// ISU AT Command Reference does not define is read letter by letter, and
+// refused if a letter can go online: "AT+BOGUS" is. A space ends an
+// extended command, and what follows is read as commands: "AT+CKPD=160" is
+// sent, but "AT+CKPD = 160" is refused. So is a line that holds a character
+// other than printable ASCII, such as a backspace, which can change the
+// line the handset runs. A link (EstablishLinkWithHandset) places a data
+// call and ends it.
+//
+// A CONNECT that arrives all the same with the command's answer, such as
+// that of a call the handset answered on its own, has its call hung up at
+// once, and Command fails with SatlinkErrorCall. One that arrives after
+// Command gave up or returned, as that of a call answered by a key press
+// ("AT+CKPD=140", the Green key) may, is hung up by the next method that
+// talks to the handset, which fails likewise; Reinitialize, run after it
+// arrived, hangs it up as a call left up, and succeeds. If that hang-up
+// fails, the method fails with SatlinkErrorHangUpFailed and the handset is
+// stranded: the call may still be up and billing, and Reinitialize ends it.
+// A response line that reads as CONNECT counts as a call's, even if it is
+// message text, as AT+SBDRT's may be.
 func (h *IridiumHandset) Command(command string, timeoutMillis int64) (response *CommandResponse, err error) {
 	defer recoverPanic(&err)
 	timeout := timeoutFromMillis(timeoutMillis)
@@ -326,11 +353,7 @@ func (h *IridiumHandset) Command(command string, timeoutMillis int64) (response 
 	if err != nil {
 		return nil, err
 	}
-	return &CommandResponse{
-		Lines:          &StringList{items: answer.Lines},
-		Connected:      answer.Connected,
-		ConnectMessage: answer.ConnectMessage,
-	}, nil
+	return &CommandResponse{Lines: &StringList{items: answer.Lines}}, nil
 }
 
 // Info reports manufacturer, model, firmware revision and IMEI.
@@ -467,10 +490,10 @@ func (h *IridiumHandset) Dial(number string) (err error) {
 	})
 }
 
-// Answer answers an incoming voice call. A data call answered by mistake is
-// ended again at once, and Answer fails with SatlinkErrorCall; if it cannot
-// be ended, with SatlinkErrorHangUpFailed, and the handset is stranded
-// until Reinitialize ends the call.
+// Answer answers an incoming voice call. A data call answered by mistake, or
+// found up already, is ended at once, and Answer fails with
+// SatlinkErrorCall; if it cannot be ended, with SatlinkErrorHangUpFailed,
+// and the handset is stranded until Reinitialize ends the call.
 func (h *IridiumHandset) Answer() (err error) {
 	defer recoverPanic(&err)
 	return h.perform((*iridium.Handset).Answer)
@@ -508,6 +531,13 @@ func (h *IridiumHandset) TakeEvents() (events *StringList) {
 // SatlinkErrorHandsetBusy while a link has the handset, and with
 // SatlinkErrorHangUpFailed while the handset is stranded (see
 // IridiumHandset).
+//
+// It is the method most likely to read the CONNECT of a data call that no
+// command awaited, such as one the handset answered on its own. It hangs
+// that call up and fails with SatlinkErrorCall; if the hang-up fails, it
+// fails with SatlinkErrorHangUpFailed and strands the handset: the call may
+// still be up and billing, and Reinitialize ends it. Any other method that
+// talks to the handset may read such a CONNECT and fail the same way.
 func (h *IridiumHandset) PollEvents(timeoutMillis int64) (events *StringList, err error) {
 	defer recoverPanic(&err)
 	timeout := timeoutFromMillis(timeoutMillis)
@@ -556,8 +586,8 @@ func withHandset[T any](h *IridiumHandset, query func(*iridium.Handset) (T, erro
 // perform runs operation on the handset, unless the handset cannot be used
 // now — a zero IridiumHandset, a closed one, a link has it, or it is
 // stranded — and reports its error as the app sees it. An operation that
-// leaves a data call that may still be up — Answer's, taken by mistake —
-// strands the handset.
+// leaves a data call that may still be up — Answer's, taken by mistake, or
+// one whose CONNECT no command awaited — strands the handset.
 func (h *IridiumHandset) perform(operation func(*iridium.Handset) error) error {
 	handset, err := made(h.handset, "IridiumHandset")
 	if err != nil {

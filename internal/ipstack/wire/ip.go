@@ -70,11 +70,6 @@ type ListenEndpoint struct {
 	Port uint16
 }
 
-// IsSpecified reports whether both the address and the port are set.
-func (e ListenEndpoint) IsSpecified() bool {
-	return e.Addr.IsValid() && e.Port != 0
-}
-
 // String formats the endpoint as "address:port", or "*:port" when the address
 // is open.
 func (e ListenEndpoint) String() string {

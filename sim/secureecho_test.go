@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // The TLS echo's sessions, which run crypto/tls in goroutines of their own. A TLSClient talks to a session directly here, its records
@@ -273,18 +275,18 @@ func TestASessionThatFailsEndsAndIgnoresTheRest(t *testing.T) {
 // reason. The test records the process-wide logger, so it does not run in
 // parallel.
 func TestAFailedSessionLogsItsReason(t *testing.T) {
-	recorder := recordLogs(t)
+	lines := logtest.Record(t, logPackage, slog.LevelDebug)
 	echo := newSecureEcho(newSecureEchoConfig())
 	echo.start(sessionServerEnd, sessionClientEnd)
 	t.Cleanup(echo.close)
 
 	echo.receive([]byte("GET / HTTP/1.0\r\n\r\n"))
 
-	want := logRecord{
-		level:   slog.LevelDebug,
-		message: "simulated internet: TLS echo failed: tls: first record does not look like a TLS handshake",
+	want := logtest.Line{
+		Level: slog.LevelDebug,
+		Text:  "simulated internet: TLS echo failed: tls: first record does not look like a TLS handshake",
 	}
-	if got := recorder.recorded(); !slices.Contains(got, want) {
+	if got := lines(); !slices.Contains(got, want) {
 		t.Errorf("records %v; want one of them %v", got, want)
 	}
 }

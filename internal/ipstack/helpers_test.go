@@ -136,19 +136,22 @@ func parseUDP(t *testing.T, datagram []byte) (wire.IPv4Repr, wire.UDPRepr, []byt
 	return header, udpHeader, packet.Payload()
 }
 
-// parseICMPv4 parses a datagram the interface sent that carries an ICMPv4
-// message, with its checksum verified.
-func parseICMPv4(t *testing.T, datagram []byte) (wire.IPv4Repr, wire.ICMPv4Packet) {
+// parseICMPv4 returns the header and the ICMPv4 message of a datagram the
+// interface sent, which must carry one.
+func parseICMPv4(t *testing.T, datagram []byte) (wire.IPv4Repr, []byte) {
 	t.Helper()
 	header, payload := parseIPv4(t, datagram)
 	if header.NextHeader != wire.IPProtocolICMP {
 		t.Fatalf("the interface sent %v, want an ICMP message", header)
 	}
-	packet, err := wire.NewICMPv4Packet(payload)
-	if err != nil || !packet.VerifyChecksum() {
-		t.Fatalf("the interface sent a malformed ICMP message (%v)", err)
-	}
-	return header, packet
+	return header, payload
+}
+
+// emitICMPv4 returns message as the interface sends it, checksum included.
+func emitICMPv4(message wire.ICMPv4Repr) []byte {
+	buffer := make([]byte, message.BufferLen())
+	message.Emit(wire.ICMPv4Packet(buffer), anyChecksums)
+	return buffer
 }
 
 // onlySent returns the one datagram the device sent since the last call; it
@@ -190,6 +193,12 @@ func assertNoPacket(t *testing.T, got ipPacket, ok bool) {
 	}
 }
 
+// icmpv4ReprsEqual reports whether a and b describe the same message, data
+// octets included.
+func icmpv4ReprsEqual(a, b wire.ICMPv4Repr) bool {
+	return a.Message == b.Message && a.Code == b.Code && a.Header == b.Header && bytes.Equal(a.Data, b.Data)
+}
+
 // packetsEqual reports whether two packets have the same header and payload,
 // payload octets included.
 func packetsEqual(a, b ipPacket) bool {
@@ -199,7 +208,7 @@ func packetsEqual(a, b ipPacket) bool {
 	switch want := b.payload.(type) {
 	case icmpv4Payload:
 		got, ok := a.payload.(icmpv4Payload)
-		return ok && got.message.Equal(want.message)
+		return ok && icmpv4ReprsEqual(got.message, want.message)
 	case udpPayload:
 		got, ok := a.payload.(udpPayload)
 		return ok && got.header == want.header && bytes.Equal(got.data, want.data)

@@ -108,34 +108,8 @@ func (s *Socket) checkReceivable() error {
 	return ErrInvalidState
 }
 
-// Peek returns up to size received octets without dequeuing them: the
-// largest contiguous run, which shares the buffer's storage and is valid only
-// until the socket is next used, by the application or by the interface's
-// next poll (a reset empties the buffer, which the next connection then
-// fills). A negative size peeks at nothing. Peek fails like ReceiveSlice.
-func (s *Socket) Peek(size int) ([]byte, error) {
-	if err := s.checkReceivable(); err != nil {
-		return nil, err
-	}
-	return s.receiveBuffer.Allocated(0, max(size, 0)), nil
-}
-
-// PeekSlice copies as many received octets into data as fit, without
-// dequeuing them, and returns how many it copied. Unlike Peek it reads the
-// buffer in any state.
-func (s *Socket) PeekSlice(data []byte) int {
-	return s.receiveBuffer.ReadAllocated(0, data)
-}
-
 // SendQueue returns how many octets wait in the transmit buffer: queued but
 // not yet acknowledged by the peer.
 func (s *Socket) SendQueue() int {
 	return s.transmitBuffer.Len()
-}
-
-// ReceiveQueue returns how many received octets wait to be read; more than
-// the next Receive or Peek may return, as those stop at the end of the
-// storage.
-func (s *Socket) ReceiveQueue() int {
-	return s.receiveBuffer.Len()
 }

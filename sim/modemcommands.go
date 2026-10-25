@@ -95,7 +95,7 @@ func (m *modem) report(q query, now time.Time) string {
 	case queryFastSignalQuality:
 		return fmt.Sprintf("+CSQF:%d", m.signalBars())
 	case queryClock:
-		return fmt.Sprintf(`+CCLK: "%v"`, timestampAt(now))
+		return fmt.Sprintf(`+CCLK: "%s"`, timestampAt(now))
 	case queryCallRelease:
 		return fmt.Sprintf("+CEER: %v", m.lastRelease)
 	case queryActivityStatus:

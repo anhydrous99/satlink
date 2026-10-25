@@ -281,8 +281,9 @@ func TestAnAcknowledgementDoesNotWaitBehindAnotherConnectionsData(t *testing.T) 
 	if _, ok := s.nextOutgoing(); ok {
 		t.Error("the upload did not wait for the line")
 	}
-	if got := s.tcp(chat).ReceiveQueue(); got != 5 {
-		t.Errorf("the chat received %d bytes, want 5", got)
+	received := make([]byte, segmentData)
+	if n, err := s.tcp(chat).ReceiveSlice(received); err != nil || string(received[:n]) != "hello" {
+		t.Errorf("the chat received %q, %v; want %q", received[:n], err, "hello")
 	}
 }
 
@@ -586,15 +587,33 @@ func TestTheSameAddressAgainCutsNothingOff(t *testing.T) {
 func TestAConnectionTheAppLetGoOfSendsNoKeepalives(t *testing.T) {
 	now := time.Now()
 	s := connectionsStack(t, now)
-	handle, _, _ := connected(t, s, now)
-	if s.tcp(handle).KeepAlive() == 0 {
-		t.Fatal("the connection sends no keepalives to begin with")
+	_, keptPort, _ := connected(t, s, now)
+	letGo, letGoPort, letGoFirst := connected(t, s, now)
+	s.closeTCP(letGo)
+	s.poll(now)
+	if fin := segmentOf(t, mustPop(t, s.device, "the app let go")); !fin.FIN() {
+		t.Fatalf("a segment without FIN went, from port %d", fin.SrcPort())
 	}
+	// The server acknowledges the FIN, which leaves nothing to send.
+	s.deliver(fromServer(letGoPort, serverFirst, letGoFirst+1, nil))
+	s.poll(now)
 
-	s.closeTCP(handle)
-
-	if keepalive := s.tcp(handle).KeepAlive(); keepalive != 0 {
-		t.Errorf("a keepalive every %v on a connection nobody reads", keepalive)
+	keptProbed := false
+	for range 2 {
+		// A line slot for a probe from each connection.
+		s.setLineReady(true)
+		s.poll(now.Add(s.tuning.TCPKeepalive))
+		for _, datagram := range drain(s) {
+			switch segmentOf(t, datagram).SrcPort() {
+			case keptPort:
+				keptProbed = true
+			case letGoPort:
+				t.Error("a keepalive on a connection nobody reads")
+			}
+		}
+	}
+	if !keptProbed {
+		t.Error("the connection the app kept sent no keepalive")
 	}
 }
 

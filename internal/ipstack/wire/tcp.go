@@ -51,10 +51,6 @@ const (
 	tcpFlagRST uint16 = 0x004
 	tcpFlagPSH uint16 = 0x008
 	tcpFlagACK uint16 = 0x010
-	tcpFlagURG uint16 = 0x020
-	tcpFlagECE uint16 = 0x040
-	tcpFlagCWR uint16 = 0x080
-	tcpFlagNS  uint16 = 0x100
 )
 
 // TCPControl is the control flag of a segment. A segment the stack
@@ -218,26 +214,6 @@ func (p TCPPacket) ACK() bool {
 	return p.hasFlag(tcpFlagACK)
 }
 
-// URG returns the URG flag.
-func (p TCPPacket) URG() bool {
-	return p.hasFlag(tcpFlagURG)
-}
-
-// ECE returns the ECE flag.
-func (p TCPPacket) ECE() bool {
-	return p.hasFlag(tcpFlagECE)
-}
-
-// CWR returns the CWR flag.
-func (p TCPPacket) CWR() bool {
-	return p.hasFlag(tcpFlagCWR)
-}
-
-// NS returns the NS flag.
-func (p TCPPacket) NS() bool {
-	return p.hasFlag(tcpFlagNS)
-}
-
 // HeaderLen returns the header length, options included, in octets.
 func (p TCPPacket) HeaderLen() int {
 	return int(p.dataOffsetAndFlags()>>tcpDataOffsetShift) * headerWordLen
@@ -248,27 +224,11 @@ func (p TCPPacket) WindowLen() uint16 {
 	return binary.BigEndian.Uint16(p[tcpWindowOffset:])
 }
 
-// Checksum returns the checksum field.
+// Checksum returns the checksum field. The stack checks it with
+// VerifyChecksum; the getter stays for the tests, which pin, corrupt and
+// rewrite the field.
 func (p TCPPacket) Checksum() uint16 {
 	return binary.BigEndian.Uint16(p[tcpChecksumOffset:])
-}
-
-// UrgentPointer returns the urgent pointer field.
-func (p TCPPacket) UrgentPointer() uint16 {
-	return binary.BigEndian.Uint16(p[tcpUrgentOffset:])
-}
-
-// SegmentLen returns the length of the segment in sequence space: the payload
-// plus one each for SYN and FIN.
-func (p TCPPacket) SegmentLen() int {
-	length := len(p) - p.HeaderLen()
-	if p.SYN() {
-		length++
-	}
-	if p.FIN() {
-		length++
-	}
-	return length
 }
 
 // Options returns the options octets between the fixed header and the payload.
@@ -337,26 +297,6 @@ func (p TCPPacket) SetPSH(set bool) {
 // SetACK sets the ACK flag.
 func (p TCPPacket) SetACK(set bool) {
 	p.setFlag(tcpFlagACK, set)
-}
-
-// SetURG sets the URG flag.
-func (p TCPPacket) SetURG(set bool) {
-	p.setFlag(tcpFlagURG, set)
-}
-
-// SetECE sets the ECE flag.
-func (p TCPPacket) SetECE(set bool) {
-	p.setFlag(tcpFlagECE, set)
-}
-
-// SetCWR sets the CWR flag.
-func (p TCPPacket) SetCWR(set bool) {
-	p.setFlag(tcpFlagCWR, set)
-}
-
-// SetNS sets the NS flag.
-func (p TCPPacket) SetNS(set bool) {
-	p.setFlag(tcpFlagNS, set)
 }
 
 // SetHeaderLen sets the header length, options included, in octets (a

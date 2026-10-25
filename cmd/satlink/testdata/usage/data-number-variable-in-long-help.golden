@@ -47,6 +47,7 @@ Options:
       --password <PASSWORD>
           PPP password (Iridium's gateway accepts any)
           
+          [env: SATLINK_PASSWORD]
           [default: ""]
 
   -v, --verbose...

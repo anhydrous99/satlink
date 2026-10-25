@@ -52,9 +52,9 @@ func TestListenerOnAnAddressAcceptsOnlySegmentsToIt(t *testing.T) {
 
 // A closed socket accepts nothing, not even a segment for the endpoints it
 // still holds: a socket closed after listening keeps its listen endpoint,
-// and one aborted, timed out or closed while connecting keeps its four-tuple
-// until its RST has gone. The tests of a closed socket offer a SYN to the
-// peer's address, which such a socket would refuse whatever its state.
+// and one aborted or closed while connecting keeps its four-tuple until its
+// RST has gone. The tests of a closed socket offer a SYN to the peer's
+// address, which such a socket would refuse whatever its state.
 func TestAClosedSocketAcceptsNothing(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -64,7 +64,6 @@ func TestAClosedSocketAcceptsNothing(t *testing.T) {
 	}{
 		{"closed after listening", socketClosedAfterListening, remoteSYN()},
 		{"aborted", socketAborted, dataFromRemote(0, "abc")},
-		{"timed out", socketTimedOutWhileTheLineIsBusy, dataFromRemote(0, "abc")},
 		{"closed while connecting", socketClosedWhileConnecting, remoteSYN(withAck(localSeq.Add(1)))},
 	}
 	for _, test := range tests {
@@ -94,14 +93,12 @@ func socketClosedAfterListening(t *testing.T) *testSocket {
 	return s
 }
 
-// socketTimedOutWhileTheLineIsBusy returns an established socket that timed
-// out while emit refused its RST.
-func socketTimedOutWhileTheLineIsBusy(t *testing.T) *testSocket {
+// socketAborted returns an established socket that was aborted, and is to
+// send its RST.
+func socketAborted(t *testing.T) *testSocket {
 	t.Helper()
 	s := socketEstablished(t)
-	s.SetTimeout(time.Second)
-	receiveNothing(t, s)
-	dispatchRefused(t, s.at(time.Second))
+	s.Abort()
 	return s
 }
 
@@ -199,7 +196,7 @@ func TestSegmentsTheStateDoesNotTakeAreDropped(t *testing.T) {
 			send(t, s, test.segment)
 
 			sanity(t, s, test.socket(t))
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 		})
 	}
 }
@@ -273,7 +270,7 @@ func TestDataWithoutAnACKIsDropped(t *testing.T) {
 
 	send(t, s, dataFromRemote(0, "abc", withoutAck()))
 
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 	receiveNothing(t, s)
 }
 
@@ -299,7 +296,7 @@ func TestTheDataOfARSTIsNotQueued(t *testing.T) {
 			send(t, s, dataFromRemote(0, "abc", withControl(wire.TCPControlRST)))
 
 			assertState(t, s, test.wantState)
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 		})
 	}
 }
@@ -532,7 +529,7 @@ func TestNoDataIsTakenBeforeTheSYNACKAnnouncesAWindow(t *testing.T) {
 	sendExpectingReply(t, s, dataFromRemote(0, "abc"), fromLocal(withSeq(localSeq), withAck(remoteSeq.Add(1))))
 
 	assertState(t, s, StateSynReceived)
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 }
 
 // The tests leave the edges of RFC 9293's acceptability test
@@ -564,7 +561,7 @@ func TestSegmentsAtTheReceiveWindowsEnd(t *testing.T) {
 				send(t, s, test.segment)
 			}
 
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), test.wantQueued)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), test.wantQueued)
 		})
 	}
 }
@@ -583,7 +580,7 @@ func TestScaledReceiveWindowTakesDataUpToItsScaledEnd(t *testing.T) {
 	sendExpectingReply(t, s, dataFromRemote(0, string(make([]byte, offsetPastTheField))),
 		ackFromLocal(offsetPastTheField+3, (bufferLen-offsetPastTheField-3)>>1))
 
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), offsetPastTheField+3)
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), offsetPastTheField+3)
 }
 
 // RFC 9293's acceptability test lets a zero window take an empty segment
@@ -676,7 +673,7 @@ func TestTheWindowOfASYNReachesNoFurtherThanTheBuffer(t *testing.T) {
 				t.Fatalf("the assembler holds %v: data beyond the receive buffer was taken", &s.assembler)
 			}
 			fillInOrder(t, s, bufferLen)
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), bufferLen)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), bufferLen)
 		})
 	}
 }
@@ -854,7 +851,7 @@ func assertWindowEndsBeforeItStarts(t *testing.T, s *testSocket) {
 func assertTookNothing(t *testing.T, s, fresh *testSocket) {
 	t.Helper()
 	assertState(t, s, fresh.state)
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), fresh.ReceiveQueue())
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), fresh.receiveBuffer.Len())
 	compareField(t, "SendQueue", s.SendQueue(), fresh.SendQueue())
 	compareField(t, "remoteWindowLen", s.remoteWindowLen, fresh.remoteWindowLen)
 	if !s.assembler.IsEmpty() {
@@ -980,7 +977,7 @@ func TestAFINAfterDataCutAtTheWindowsEndIsIgnoredInEveryStateThatTakesAFIN(t *te
 			if s.finReceived {
 				t.Error("the socket took the FIN")
 			}
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), defaultBufferLen)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), defaultBufferLen)
 		})
 	}
 }
@@ -997,7 +994,7 @@ func socketSynReceivedWithItsSYNACKSent(t *testing.T) *testSocket {
 // readQueued reads every octet the socket has received and not yet read.
 func readQueued(t *testing.T, s *testSocket) []byte {
 	t.Helper()
-	data := make([]byte, s.ReceiveQueue())
+	data := make([]byte, s.receiveBuffer.Len())
 	if received := mustReceiveSlice(t, s, data); received != len(data) {
 		t.Fatalf("ReceiveSlice read %d of the %d octets queued", received, len(data))
 	}
