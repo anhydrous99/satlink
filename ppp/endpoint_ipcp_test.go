@@ -95,16 +95,45 @@ func TestTheTwentyFirstIPCPNakInARowEndsTheLink(t *testing.T) {
 	})
 }
 
+func TestIPCPGivesUpOnAPeerWhoseAnswersNeverChangeTheRequest(t *testing.T) {
+	answers := []stallingAnswer{
+		{"an empty Configure-Nak", 3, ""},
+		{"an empty Configure-Reject", 4, ""},
+		// A Primary NBNS Server Address (130, RFC 1877), which a client never
+		// asks for.
+		{"a Configure-Nak of an option never proposed", 3, "82 06 0A 40 00 35"},
+		// Option 99 is none that IPCP defines.
+		{"a Configure-Reject of an unknown option", 4, "63 02"},
+	}
+	for _, answer := range answers {
+		t.Run(answer.name, func(t *testing.T) {
+			link := newTestLink(t, clientConfig(), serverConfig())
+			link.exchangeUntil(t, func() bool { return link.client.Phase() == PhaseNetwork })
+			// Twenty of them are taken, as many as Naks.
+			request := stallNegotiation(t, link.client, protocolIPCP, onlyRequest(t, link.client, protocolIPCP), answer, 20)
+
+			link.client.HandleInput(answer.to(t, protocolIPCP, request), link.now)
+			link.settle(t)
+
+			assertDownReason(t, link.client, DownReason{
+				Kind:     DownReasonNegotiationFailed,
+				Protocol: "IPCP",
+				Detail:   "the peer keeps refusing our request without naming a change we can make",
+			})
+		})
+	}
+}
+
 // nakIPCPRequests answers client's IPCP Configure-Requests with count Naks
 // in a row, as a server that stalls while it finds an address does, and
 // returns the request that answers the last. It fails the test unless
 // every Nak is answered with a new request.
 func nakIPCPRequests(t *testing.T, client *Endpoint, count int) packet {
 	t.Helper()
-	request := onlyIPCPRequest(t, client)
+	request := onlyRequest(t, client, protocolIPCP)
 	for range count {
 		client.HandleInput(framed(protocolIPCP, addressNakFor(request).encode()), testStart)
-		request = onlyIPCPRequest(t, client)
+		request = onlyRequest(t, client, protocolIPCP)
 	}
 	return request
 }
@@ -114,15 +143,4 @@ func nakIPCPRequests(t *testing.T, client *Endpoint, count int) packet {
 func addressNakFor(request packet) packet {
 	suggestion := encodeOptionList([]configOption{ipv4Option(ipcpOptionIPAddress, clientAddress)})
 	return packet{code: codeConfigureNak, identifier: request.identifier, data: suggestion}
-}
-
-// onlyIPCPRequest returns what client sent, failing the test unless it is
-// one IPCP Configure-Request.
-func onlyIPCPRequest(t *testing.T, client *Endpoint) packet {
-	t.Helper()
-	sent := controlPackets(client.TakeOutput(), protocolIPCP)
-	if len(sent) != 1 || sent[0].code != codeConfigureRequest {
-		t.Fatalf("sent %+v, want one IPCP ConfigureRequest", sent)
-	}
-	return sent[0]
 }

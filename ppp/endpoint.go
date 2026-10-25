@@ -275,9 +275,10 @@ const maxQueuedDatagrams = 64
 // copied into our Protocol-Reject.
 const protocolRejectCopyLimit = 64
 
-// ipcpNakTolerance is how many IPCP Naks are accepted in a row. Some
-// servers stall with repeated Naks while they find an address (pppd
-// tolerates 100), so allow more than for LCP.
+// ipcpNakTolerance is how many IPCP Naks are accepted in a row, and how
+// many answers that leave our request as it was. Some servers stall with
+// repeated Naks while they find an address (pppd tolerates 100), so allow
+// more than for LCP.
 const ipcpNakTolerance = 20
 
 // The names DownReason gives the negotiated protocols.
@@ -313,10 +314,7 @@ type Endpoint struct {
 	ipcp           *automaton[ipcpNegotiator]
 	// prober sends keepalive probes; nil without keepalive, or once the
 	// peer showed that it cannot answer them.
-	prober *prober
-	// lcpIdentifier numbers the LCP packets the endpoint sends itself:
-	// Protocol-Rejects, Echo-Requests and a last Terminate-Request.
-	lcpIdentifier     uint8
+	prober            *prober
 	ownProbesReturned int
 	outbox            outbox
 	output            []byte
@@ -352,9 +350,8 @@ func NewEndpoint(config Config) (*Endpoint, error) {
 		role:   config.Role,
 		timers: config.Timers,
 		phase:  PhaseDead,
-		// Every peer must accept 1500 bytes whatever MRU was negotiated
-		// (RFC 1661 §6.1).
-		decoder:  newFrameDecoder(int(max(config.MRU, DefaultMRU))),
+		// Sized to the largest frames LCP lets the peer send.
+		decoder:  newFrameDecoder(int(lcp.receiveLimit)),
 		encoding: conservativeEncoding(),
 		lcp:      newAutomaton(protocolLCP, lcp, config.Timers),
 		ipcp:     newAutomaton(protocolIPCP, ipcp, config.Timers).toleratingNaks(ipcpNakTolerance),
@@ -648,7 +645,7 @@ func (e *Endpoint) rejectProtocol(protocol uint16, information []byte) {
 	}
 	rejected := information[:min(len(information), protocolRejectCopyLimit)]
 	data := append(binary.BigEndian.AppendUint16(nil, protocol), rejected...)
-	e.outbox.push(protocolLCP, packet{code: codeProtocolReject, identifier: e.nextLCPIdentifier(), data: data})
+	e.outbox.push(protocolLCP, packet{code: codeProtocolReject, identifier: e.lcp.allocateIdentifier(), data: data})
 }
 
 // inNetworkPhase reports whether network-layer protocols may run.
@@ -822,7 +819,7 @@ func (e *Endpoint) abandonLink(reason DownReason) {
 	if e.phase == PhaseDead {
 		return
 	}
-	e.outbox.push(protocolLCP, packet{code: codeTerminateRequest, identifier: e.nextLCPIdentifier()})
+	e.outbox.push(protocolLCP, packet{code: codeTerminateRequest, identifier: e.lcp.allocateIdentifier()})
 	e.lcp.abandon()
 	e.onLinkFinished(reason)
 }
@@ -839,13 +836,6 @@ func (e *Endpoint) flushOutbox() {
 		e.output = appendFrame(e.output, waiting.protocol, waiting.packet.encode(), encoding)
 		e.stats.FramesSent++
 	}
-}
-
-// nextLCPIdentifier returns the identifier for the next LCP packet the
-// endpoint sends itself, wrapping around after 255.
-func (e *Endpoint) nextLCPIdentifier() uint8 {
-	e.lcpIdentifier++
-	return e.lcpIdentifier
 }
 
 // discard counts a packet dropped from a well-formed frame: malformed, or

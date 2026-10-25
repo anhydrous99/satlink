@@ -65,9 +65,9 @@ func (q *packetQueue) Receive(time.Time) ([]byte, ipstack.TransmitSlot, bool) {
 	return datagram, q.transmit, true
 }
 
-// Transmit always grants a slot: the queue has room for everything.
-func (q *packetQueue) Transmit(time.Time) (ipstack.TransmitSlot, bool) {
-	return q.transmit, true
+// Transmit gives the stack a slot: the queue has room for everything.
+func (q *packetQueue) Transmit(time.Time) ipstack.TransmitSlot {
+	return q.transmit
 }
 
 func (q *packetQueue) transmit(datagram []byte) {

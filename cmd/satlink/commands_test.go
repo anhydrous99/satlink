@@ -43,9 +43,20 @@ func TestCommandsPrintWhatTheirGoldenFilesHold(t *testing.T) {
 	}
 }
 
+// smsWithControls is an SMS as anyone may send one, in UCS-2: it retitles
+// the terminal, clears it, writes a sender of its own over the start of a
+// line, and clears that line with a C1 CSI.
+const smsWithControls = "Hi\x1b]0;owned\x07\x1b[2J\x1b[1;1H\rFrom: +1 (bank)\u009b2K\r\nPay now"
+
+// eventWithControls is a caller's number as the network passes it on, in
+// an event that retitles the terminal, erases its own line, writes over its
+// start, and sets a style with a C1 CSI.
+const eventWithControls = "+CLIP: \"\x1b]0;owned\x07+881631234567\x1b[2K\r+1 (bank)\u009b5m\",145"
+
 // handsetCases are the commands that talk to the handset itself.
 func handsetCases() []goldenCase {
 	twoMessages := world{handset: inboxHolding("+881631234567", "+881639876543")}
+	inboxWithControls := world{handset: inboxHoldingMessage("+881631234567", smsWithControls)}
 	twoPorts := world{ports: []serial.Port{
 		{Path: "/dev/ttyACM0", ProductID: 0x9575, Model: "Iridium 9575", SerialNumber: "300234010000000"},
 		{Path: "/dev/ttyACM1", ProductID: 0x1234},
@@ -57,10 +68,28 @@ func handsetCases() []goldenCase {
 		{name: "commands/status", args: []string{instant, "status"}},
 		{name: "commands/status-with-event", args: []string{instant, "status"},
 			world: world{handset: smsArrivingOn("AT+CSQF")}},
+		{name: "commands/status-with-event-control-characters", args: []string{instant, "status"},
+			world: world{handset: urcOn("AT+CSQF", eventWithControls)}},
+		// Every command that talks to the handset says how to end a call
+		// it could not.
+		{name: "commands/status-call-answered-during-it-left-up", args: []string{instant, "status"},
+			world: world{handset: answeringDuringUnplugged("AT+CSQF")}},
+		{name: "commands/status-call-answered-during-the-battery-left-up", args: []string{instant, "status"},
+			world: world{handset: answeringDuringUnplugged("AT+CBC")}},
+		{name: "commands/status-call-answered-during-the-registration-left-up", args: []string{instant, "status"},
+			world: world{handset: answeringDuringUnplugged("AT+CREG?")}},
+		{name: "commands/status-call-answered-while-readying-left-up", args: []string{instant, "status"},
+			world: world{handset: answeringDuringUnplugged("AT+CMEE=2")}},
+		{name: "commands/sms-send-call-answered-during-it-left-up",
+			args:  []string{instant, "sms", "send", "+881631234567", "hello from the field"},
+			world: world{handset: answeringDuringUnplugged("AT+CSCA?")}},
 		{name: "commands/sms-send", args: []string{instant, "sms", "send", "+881631234567", "hello from the field"}},
 		{name: "commands/sms-list", args: []string{instant, "sms", "list"}, world: twoMessages},
 		{name: "commands/sms-list-read", args: []string{instant, "sms", "list", "read"}, world: twoMessages},
 		{name: "commands/sms-read", args: []string{instant, "sms", "read", "2"}, world: twoMessages},
+		{name: "commands/sms-list-control-characters", args: []string{instant, "sms", "list"}, world: inboxWithControls},
+		{name: "commands/sms-read-control-characters", args: []string{instant, "sms", "read", "1"},
+			world: inboxWithControls},
 		{name: "commands/sms-read-missing", args: []string{instant, "sms", "read", "9"}},
 		{name: "commands/sms-delete", args: []string{instant, "sms", "delete", "1"}, world: twoMessages},
 		{name: "commands/dial", args: []string{instant, "dial", "+881631234567"}},
@@ -70,7 +99,18 @@ func handsetCases() []goldenCase {
 		{name: "commands/at", args: []string{instant, "at", "AT+CSQ"}},
 		{name: "commands/at-with-timeout", args: []string{instant, "at", "--timeout", "3", "AT+CGMI"}},
 		{name: "commands/at-with-attached-timeout", args: []string{instant, "at", "-t3", "AT+CGMI"}},
-		{name: "commands/at-refused", args: []string{instant, "at", "AT+BOGUS"}},
+		{name: "commands/at-refused", args: []string{instant, "at", "AT+XYZZY"}},
+		// A raw data dial would leave its call up: only net places data calls.
+		{name: "commands/at-data-dial-refused", args: []string{instant, "at", "ATD008816000025"}},
+		{name: "commands/at-spaced-data-dial-refused", args: []string{instant, "at", "AT D008816000025"}},
+		{name: "commands/at-chained-data-dial-refused", args: []string{instant, "at", chainedDataDial}},
+		// A backspace would take the ';' of this voice dial away.
+		{name: "commands/at-control-character-refused", args: []string{instant, "at", "ATD008816000025;\b"}},
+		// A call that comes up during a raw command all the same is hung up.
+		{name: "commands/at-call-answered-during-it-hung-up", args: []string{instant, "at", answeredDuring},
+			world: world{handset: answeringDuringTheCommand}},
+		{name: "commands/at-call-answered-during-it-left-up", args: []string{instant, "at", answeredDuring},
+			world: world{handset: answeringDuringTheCommandUnplugged}},
 		{name: "commands/list", args: []string{"list"}, world: twoPorts},
 		// list looks on USB whatever --simulate says.
 		{name: "commands/list-ignores-simulate", args: []string{instant, "list"}, world: twoPorts},
@@ -119,24 +159,39 @@ func netCases() []goldenCase {
 }
 
 func TestMonitorPrintsEventsUntilInterrupted(t *testing.T) {
-	args := []string{instant, "monitor"}
-	// The last of the handset's initialisation, so that the SMS arrives
+	// The last of the handset's initialisation, so that the event arrives
 	// before the monitoring starts.
-	env, _, stderr := world{handset: smsArrivingOn("AT+CMGF=0")}.environment(t, args)
-	// Long enough to see the event, and the end of a test that hangs.
-	ctx, giveUp := context.WithTimeout(context.Background(), 10*time.Second)
-	defer giveUp()
-	interrupting, cancel := context.WithCancel(ctx)
-	defer cancel()
-	stdout := &interruptingBuffer{interrupt: cancel}
-	env.stdout = stdout
-
-	status := run(interrupting, env)
-
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		t.Fatal("the monitor printed nothing within 10 s")
+	const lastCommand = "AT+CMGF=0"
+	tests := []struct {
+		name  string
+		world world
+	}{
+		{"commands/monitor", world{handset: smsArrivingOn(lastCommand)}},
+		{"commands/monitor-control-characters", world{handset: urcOn(lastCommand, eventWithControls)}},
+		// A call the handset answers on its own while monitored, and that
+		// cannot be ended, ends the monitoring.
+		{"commands/monitor-call-answered-left-up", world{handset: connectingOnceAnsweredUnplugged(lastCommand)}},
 	}
-	checkGolden(t, "commands/monitor", args, outcome{status: status, stdout: stdout.String(), stderr: stderr.String()})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := []string{instant, "monitor"}
+			env, _, stderr := test.world.environment(t, args)
+			// Long enough to see the event, and the end of a test that hangs.
+			ctx, giveUp := context.WithTimeout(context.Background(), 10*time.Second)
+			defer giveUp()
+			interrupting, cancel := context.WithCancel(ctx)
+			defer cancel()
+			stdout := &interruptingBuffer{interrupt: cancel}
+			env.stdout = stdout
+
+			status := run(interrupting, env)
+
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				t.Fatal("the monitor printed nothing within 10 s")
+			}
+			checkGolden(t, test.name, args, outcome{status: status, stdout: stdout.String(), stderr: stderr.String()})
+		})
+	}
 }
 
 func TestTheVerboseFlagsChooseTheLogLevel(t *testing.T) {

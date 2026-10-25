@@ -97,6 +97,10 @@ func defaultPeerLCPOptions() peerLCPOptions {
 type lcpNegotiator struct {
 	own  ownLCPOptions
 	peer peerLCPOptions
+	// receiveLimit is the largest information field we take from the peer:
+	// the endpoint's decoder is sized to it, so we never adopt a larger MRU
+	// that the peer suggests.
+	receiveLimit uint16
 	// authenticatesOnRequest is whether we agree to prove our identity when
 	// the peer asks (client role).
 	authenticatesOnRequest bool
@@ -123,7 +127,9 @@ func newServerLCP(mru uint16, receiveACCM uint32, demanded *Authentication) *lcp
 }
 
 // newLCP returns the policy both sides share: our MRU unless it is the
-// default, our receive ACCM, a magic number and header compression.
+// default, our receive ACCM, a magic number and header compression. We take
+// frames of our MRU, and of DefaultMRU whatever MRU was negotiated, as every
+// peer must (RFC 1661 §6.1).
 func newLCP(mru uint16, receiveACCM uint32) *lcpNegotiator {
 	own := ownLCPOptions{
 		accm:         receiveACCM,
@@ -137,7 +143,7 @@ func newLCP(mru uint16, receiveACCM uint32) *lcpNegotiator {
 	if mru != DefaultMRU {
 		own.mru = mru
 	}
-	return &lcpNegotiator{own: own, peer: defaultPeerLCPOptions()}
+	return &lcpNegotiator{own: own, peer: defaultPeerLCPOptions(), receiveLimit: max(mru, DefaultMRU)}
 }
 
 // transmitEncoding returns how to frame what we send, honouring what the
@@ -221,10 +227,7 @@ func (l *lcpNegotiator) applyNak(suggestions []configOption) error {
 func (l *lcpNegotiator) adopt(suggestion configOption) error {
 	switch suggestion.kind {
 	case lcpOptionMRU:
-		l.own.mru = 0
-		if mru, ok := suggestion.uint16Value(); ok && mru >= MinMRU {
-			l.own.mru = mru
-		}
+		l.adoptMRU(suggestion)
 	case lcpOptionACCM:
 		// Escape whatever else the peer needs escaped.
 		if extra, ok := suggestion.uint32Value(); ok {
@@ -241,6 +244,16 @@ func (l *lcpNegotiator) adopt(suggestion configOption) error {
 		return l.adoptAuthentication(suggestion.value)
 	}
 	return nil // anything else is a hint about an option we did not propose
+}
+
+// adoptMRU adopts the MRU the peer suggests if it carries an IPv4 packet
+// and we can take frames that large. Otherwise we propose none, leaving the
+// default.
+func (l *lcpNegotiator) adoptMRU(suggestion configOption) {
+	l.own.mru = 0
+	if mru, ok := suggestion.uint16Value(); ok && MinMRU <= mru && mru <= l.receiveLimit {
+		l.own.mru = mru
+	}
 }
 
 // adoptAuthentication adopts the protocol the peer suggests proving its

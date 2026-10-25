@@ -260,8 +260,8 @@ func TestKeepsSettingsAndRefusesUnknownCommands(t *testing.T) {
 			t.Errorf("%s: %v", accepted, err)
 		}
 	}
-	if _, err := handset.Command("AT+BOGUS"); !errors.Is(err, iridium.ErrCommandFailed) {
-		t.Errorf("AT+BOGUS: %v; want ErrCommandFailed", err)
+	if _, err := handset.Command("AT+XYZZY"); !errors.Is(err, iridium.ErrCommandFailed) {
+		t.Errorf("AT+XYZZY: %v; want ErrCommandFailed", err)
 	}
 	assertLines(t, handset, "AT+CEER", "+CEER: No report available")
 }

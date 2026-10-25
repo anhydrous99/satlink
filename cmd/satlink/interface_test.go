@@ -356,6 +356,25 @@ func TestHelpShowsVariablesHoldingControlCharacters(t *testing.T) {
 	}
 }
 
+// A password's variable is named in help, but its value is never shown:
+// help could be pasted where others read it.
+func TestHelpNamesThePasswordVariableWithoutItsValue(t *testing.T) {
+	secret := world{variables: map[string]string{passwordVariable: "hunter2"}}
+	for _, args := range [][]string{{"net", "-h"}, {"net", "--help"}, {"help", "net"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			t.Parallel()
+
+			got := runInProcess(t, secret, args...)
+
+			if got.status != exitSuccess || !strings.Contains(got.stdout, "[env: SATLINK_PASSWORD]") ||
+				strings.Contains(got.stdout+got.stderr, "hunter2") {
+				t.Errorf("exit status %d, help %q and errors %q; want help naming SATLINK_PASSWORD without its value",
+					got.status, got.stdout, got.stderr)
+			}
+		})
+	}
+}
+
 // environmentCases are command lines that environment variables stand in
 // for: shown in help with their values, counted as given, and set even when
 // empty.

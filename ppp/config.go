@@ -28,14 +28,17 @@ type Timers struct {
 	// request.
 	Restart time.Duration
 	// MaxConfigure is how many Configure-Requests are sent without an answer
-	// before giving up.
+	// before giving up. Authentication has the same limit: on the PAP
+	// requests, CHAP challenges and CHAP responses sent without an answer,
+	// and on the peer's CHAP challenges answered since its last Success.
 	MaxConfigure int
 	// MaxTerminate is how many Terminate-Requests are sent without an answer
 	// before giving up.
 	MaxTerminate int
 	// MaxFailure is how many Configure-Naks are sent before refusing an
 	// option outright, which stops a peer that ignores our suggestions from
-	// looping forever.
+	// looping forever. LCP gives up on a peer once more than MaxFailure of
+	// its Naks and Rejects have left our request as it was.
 	MaxFailure int
 }
 

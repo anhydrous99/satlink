@@ -2,7 +2,6 @@ package wire
 
 import (
 	"bytes"
-	"math"
 	"testing"
 )
 
@@ -53,15 +52,12 @@ func FuzzNewIPv4Packet(f *testing.F) {
 	})
 }
 
-// rewriteIPv4Header writes every header field of packet into rewritten.
+// rewriteIPv4Header writes every header field the package reads from packet
+// into rewritten.
 func rewriteIPv4Header(rewritten, packet IPv4Packet) {
 	rewritten.SetVersion(packet.Version())
 	rewritten.SetHeaderLen(packet.HeaderLen())
-	rewritten.SetDSCP(packet.DSCP())
-	rewritten.SetECN(packet.ECN())
 	rewritten.SetTotalLen(packet.TotalLen())
-	rewritten.SetID(packet.ID())
-	rewritten.SetDontFragment(packet.DontFragment())
 	rewritten.SetMoreFragments(packet.MoreFragments())
 	rewritten.SetFragmentOffset(packet.FragmentOffset())
 	rewritten.SetHopLimit(packet.HopLimit())
@@ -106,9 +102,6 @@ func FuzzNewTCPPacket(f *testing.F) {
 			t.Fatalf("header length %d, %d octets of options and %d of payload, in %d octets",
 				headerLen, len(packet.Options()), len(packet.Payload()), len(data))
 		}
-		if packet.SegmentLen() < len(packet.Payload()) || packet.SegmentLen() > len(packet.Payload())+2 {
-			t.Fatalf("SegmentLen %d for %d octets of payload", packet.SegmentLen(), len(packet.Payload()))
-		}
 		checkRewrite(t, packet, func(rewritten []byte) { rewriteTCPHeader(TCPPacket(rewritten), packet) })
 		filledIn := TCPPacket(bytes.Clone(data))
 		if filledIn.FillChecksum(testSrcAddr, testDstAddr); !filledIn.VerifyChecksum(testSrcAddr, testDstAddr) {
@@ -117,8 +110,8 @@ func FuzzNewTCPPacket(f *testing.F) {
 	})
 }
 
-// rewriteTCPHeader writes every field of the fixed header of packet into
-// rewritten.
+// rewriteTCPHeader writes every field of the fixed header that the package
+// reads from packet into rewritten.
 func rewriteTCPHeader(rewritten, packet TCPPacket) {
 	rewritten.SetSrcPort(packet.SrcPort())
 	rewritten.SetDstPort(packet.DstPort())
@@ -130,13 +123,8 @@ func rewriteTCPHeader(rewritten, packet TCPPacket) {
 	rewritten.SetRST(packet.RST())
 	rewritten.SetPSH(packet.PSH())
 	rewritten.SetACK(packet.ACK())
-	rewritten.SetURG(packet.URG())
-	rewritten.SetECE(packet.ECE())
-	rewritten.SetCWR(packet.CWR())
-	rewritten.SetNS(packet.NS())
 	rewritten.SetWindowLen(packet.WindowLen())
 	rewritten.SetChecksum(packet.Checksum())
-	rewritten.SetUrgentPointer(packet.UrgentPointer())
 }
 
 func FuzzParseTCPRepr(f *testing.F) {
@@ -248,53 +236,6 @@ func FuzzParseUDPRepr(f *testing.F) {
 	})
 }
 
-func FuzzNewICMPv4Packet(f *testing.F) {
-	addSeeds(f, icmpv4EchoPacketBytes(), icmpv4PortUnreachableBytes(), make([]byte, icmpv4HeaderLen), nil)
-	f.Fuzz(func(t *testing.T, data []byte) {
-		packet, err := NewICMPv4Packet(data)
-		if err != nil {
-			return
-		}
-		if packet.HeaderLen() != icmpv4HeaderLen || len(packet.Data()) != len(data)-icmpv4HeaderLen {
-			t.Fatalf("header length %d, %d octets of data, in %d octets", packet.HeaderLen(), len(packet.Data()), len(data))
-		}
-		checkRewrite(t, packet, func(rewritten []byte) {
-			message := ICMPv4Packet(rewritten)
-			message.SetType(packet.Type())
-			message.SetCode(packet.Code())
-			message.SetChecksum(packet.Checksum())
-			message.SetEchoIdentifier(packet.EchoIdentifier())
-			message.SetEchoSeqNumber(packet.EchoSeqNumber())
-		})
-		filledIn := ICMPv4Packet(bytes.Clone(data))
-		if filledIn.FillChecksum(); !filledIn.VerifyChecksum() {
-			t.Fatalf("% x fails verification after FillChecksum", []byte(filledIn))
-		}
-	})
-}
-
-func FuzzParseICMPv4Repr(f *testing.F) {
-	addSeeds(f, icmpv4EchoPacketBytes(), icmpv4PortUnreachableBytes())
-	f.Fuzz(func(t *testing.T, data []byte) {
-		packet := ICMPv4Packet(data)
-		verified, verifiedErr := ParseICMPv4Repr(packet, ChecksumCapabilities{})
-		repr, err := ParseICMPv4Repr(packet, ChecksumCapabilities{ICMPv4: ChecksumNone})
-		if verifiedErr == nil && (err != nil || !verified.Equal(repr)) {
-			t.Fatalf("verified %+v but unverified %+v, %v", verified, repr, err)
-		}
-		// A quoted header's total length has 16 bits.
-		if err != nil || repr.isError() && repr.Header.BufferLen() > math.MaxUint16 {
-			return
-		}
-		message := ICMPv4Packet(make([]byte, repr.BufferLen()))
-		repr.Emit(message, ChecksumCapabilities{})
-		reparsed, err := ParseICMPv4Repr(message, ChecksumCapabilities{})
-		if err != nil || !reparsed.Equal(repr) {
-			t.Fatalf("emitted %+v as % x, which parses as %+v, %v", repr, []byte(message), reparsed, err)
-		}
-	})
-}
-
 func FuzzNewDNSPacket(f *testing.F) {
 	addSeeds(f, dnsCNAMEResponseBytes(), make([]byte, dnsHeaderLen), nil)
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -312,8 +253,6 @@ func FuzzNewDNSPacket(f *testing.F) {
 			message.SetOpcode(packet.Opcode())
 			message.SetQuestionCount(packet.QuestionCount())
 			message.SetAnswerRecordCount(packet.AnswerRecordCount())
-			message.SetAuthorityRecordCount(packet.AuthorityRecordCount())
-			message.SetAdditionalRecordCount(packet.AdditionalRecordCount())
 		})
 	})
 }

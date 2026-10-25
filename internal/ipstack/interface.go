@@ -87,7 +87,7 @@ func (r PollIngressSingleResult) String() string {
 // requests are not answered.
 //
 // The stack does not fragment. A datagram to send that is larger than the
-// MTU is dropped once the device has granted its transmit slot, which goes
+// MTU is dropped once the device has handed out its transmit slot, which goes
 // unused, and it counts as sent: a UDP or DNS socket dequeues it, and Poll
 // runs another round of sending. Received datagrams are not checked against
 // the MTU.
@@ -158,11 +158,10 @@ func (i *Interface) SetAnyIP(anyIP bool) {
 }
 
 // Poll processes every datagram the device has received, then sends what the
-// sockets have to send for as long as the device grants transmit slots, at
-// time now. Sending goes in rounds, each offering every socket a turn in
-// slot order and ending early when the device refuses a slot, and Poll starts
-// another round as long as the last one sent something. It reports whether
-// any socket may have changed.
+// sockets have to send, at time now. Sending goes in rounds, each offering
+// every socket a turn in slot order, and Poll starts another round as long as
+// the last one sent something. It reports whether any socket may have
+// changed.
 //
 // Poll processes an unbounded number of datagrams if they arrive faster than
 // it handles them; PollIngressSingle bounds the work per call.
@@ -209,19 +208,4 @@ func (i *Interface) PollAt(now time.Time, sockets *SocketSet) (time.Time, bool) 
 		earliest = socket.Earliest(earliest, item.pollAt(i.cx))
 	}
 	return earliest.Deadline(now)
-}
-
-// PollDelay returns how long to wait, from now, before calling Poll again:
-// the time until PollAt, or zero if that has passed; false if only incoming
-// datagrams can change anything.
-func (i *Interface) PollDelay(now time.Time, sockets *SocketSet) (time.Duration, bool) {
-	pollAt, ok := i.PollAt(now, sockets)
-	switch {
-	case !ok:
-		return 0, false
-	case now.Before(pollAt):
-		return pollAt.Sub(now), true
-	default:
-		return 0, true
-	}
 }

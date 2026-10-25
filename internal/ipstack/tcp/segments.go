@@ -12,19 +12,9 @@ import (
 
 // EmitFunc sends one segment for Dispatch. ip.PayloadLen is the segment's
 // BufferLen, and segment.Payload shares the socket's transmit buffer, so the
-// segment must be serialized before EmitFunc returns.
-//
-// An error means the segment was not sent, typically because the device has
-// no room for it. The socket then does not record the segment as sent (the
-// sequence numbers, and the acknowledgement and window last advertised), take
-// an RTT sample, arm the retransmission timer, rewind the keep-alive or
-// zero-window-probe timer, stop the delayed-ACK timer, or forget the peer after
-// an abort's RST. What Dispatch decided before emitting stands: the start of
-// the timeout clock, an abort on timeout, a retransmission timeout's rewind and
-// backoff, and a fast retransmission's start. The next Dispatch therefore sends
-// the same segment, unless something changed in between; a refused fast
-// retransmission is not repeated.
-type EmitFunc func(ip wire.IPv4Repr, segment wire.TCPRepr) error
+// segment must be serialised before EmitFunc returns. The socket records the
+// segment as sent once EmitFunc returns.
+type EmitFunc func(ip wire.IPv4Repr, segment wire.TCPRepr)
 
 // Accepts reports whether a segment that arrived in datagram ip belongs to
 // this socket: it matches the connection's four-tuple or, while listening,
@@ -80,14 +70,12 @@ func (s *Socket) Process(cx *socket.Context, ip wire.IPv4Repr, segment wire.TCPR
 // Dispatch emits at most one segment that is due: a SYN, data, a FIN, an
 // ACK, a window update, a RST after Abort or a timeout, a keep-alive or a
 // zero window probe; it also runs the retransmission, keep-alive, TIME-WAIT
-// and timeout timers. It returns emit's error unchanged (see EmitFunc for
-// what a refused segment leaves undone), or nil, also when nothing was due.
-// A socket whose local address the interface no longer has is reset without
-// a RST.
-func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) error {
+// and timeout timers. A socket whose local address the interface no longer
+// has is reset without a RST.
+func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) {
 	tuple, ok := s.tuple.Get()
 	if !ok {
-		return nil
+		return
 	}
 	// Check if the interface still has our source IP address. If not (e.g.
 	// the interface's IP changed), reset the socket. We use reset instead of
@@ -96,16 +84,16 @@ func (s *Socket) Dispatch(cx *socket.Context, emit EmitFunc) error {
 	if !cx.HasIPAddr(tuple.local.Addr()) {
 		netlog.Debug("source IP address no longer available, closing socket")
 		s.reset()
-		return nil
+		return
 	}
 	now := cx.Now()
 	s.startTimeoutClock(now)
 	s.expireTimers(now)
 	if !s.hasSegmentDue(cx) {
 		s.closeIfTimeWaitIsOver(now)
-		return nil
+		return
 	}
-	return s.emitDueSegment(cx, tuple, emit)
+	s.emitDueSegment(cx, tuple, emit)
 }
 
 // PollAt returns when the socket next needs Dispatch: now when a segment is

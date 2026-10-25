@@ -5,13 +5,11 @@ import (
 	"time"
 )
 
-// The dates come from package time. The tests check them against known
-// moments, and against a day-by-day count from the epoch.
-
-const secondsPerDay = 24 * 60 * 60
+// The dates come from package time. The tests pin the layout at known
+// moments.
 
 func atUnixSeconds(seconds int64) string {
-	return timestampAt(time.Unix(seconds, 0)).String()
+	return timestampAt(time.Unix(seconds, 0))
 }
 
 func TestTimestampFormatsKnownMoments(t *testing.T) {
@@ -39,40 +37,4 @@ func TestAClockBefore1970ReadsAsTheEpoch(t *testing.T) {
 	if got := atUnixSeconds(-10); got != "70/01/01,00:00:00+00" {
 		t.Errorf("ten seconds before the epoch: %q", got)
 	}
-}
-
-func TestTimestampAgreesWithDayCountingForDecades(t *testing.T) {
-	t.Parallel()
-	expected := timestamp{year: 1970, month: 1, day: 1}
-
-	for days := range int64(60 * 366) {
-		if got := timestampAt(time.Unix(days*secondsPerDay, 0)); got != expected {
-			t.Fatalf("day %d: %v; want %v", days, got, expected)
-		}
-		expected = nextDay(expected)
-	}
-}
-
-// monthLengths are the days of each month of a common year.
-var monthLengths = [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-
-// nextDay counts one day on from day, the long way round.
-func nextDay(day timestamp) timestamp {
-	monthLength := monthLengths[day.month-1]
-	if day.month == 2 && isLeapYear(day.year) {
-		monthLength++
-	}
-	switch {
-	case day.day < monthLength:
-		day.day++
-	case day.month < 12:
-		day.month, day.day = day.month+1, 1
-	default:
-		day.year, day.month, day.day = day.year+1, 1, 1
-	}
-	return day
-}
-
-func isLeapYear(year int) bool {
-	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
 }

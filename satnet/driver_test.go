@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
+	"github.com/anhydrous99/satlink/internal/logtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
 )
@@ -52,13 +53,11 @@ func clientEndpoint(t *testing.T) *ppp.Endpoint {
 // endpoints talking straight to each other.
 const maxPPPRounds = 100
 
-// openEndpoint returns a PPP client endpoint open for IPv4, with the
-// default MTU: it came up with a server that talks straight to it and asks
-// for no authentication.
-func openEndpoint(t *testing.T) *ppp.Endpoint {
+// serverEndpoint returns a PPP server endpoint that has not opened: it
+// assigns the client clientSettings' address and asks for no
+// authentication.
+func serverEndpoint(t *testing.T) *ppp.Endpoint {
 	t.Helper()
-	now := time.Now()
-	client := clientEndpoint(t)
 	server, err := ppp.NewEndpoint(ppp.NewConfig(ppp.ServerRole(ppp.ServerConfig{
 		LocalAddress: ipv4(10, 64, 0, 1),
 		PeerAddress:  clientSettings().LocalAddress,
@@ -66,43 +65,60 @@ func openEndpoint(t *testing.T) *ppp.Endpoint {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.Open(now)
-	server.Open(now)
+	return server
+}
+
+// bringUp passes frames between client and server, which talk straight to
+// each other, at now, until the client is open for IPv4, failing the test
+// if it is not within maxPPPRounds.
+func bringUp(t *testing.T, client, server *ppp.Endpoint, now time.Time) {
+	t.Helper()
 	for range maxPPPRounds {
 		if client.Phase() == ppp.PhaseOpen {
-			return client
+			return
 		}
 		toServer, toClient := client.TakeOutput(), server.TakeOutput()
 		server.HandleInput(toServer, now)
 		client.HandleInput(toClient, now)
 	}
 	t.Fatal("PPP did not come up")
-	return nil
+}
+
+// openEndpoint returns a PPP client endpoint open for IPv4, with the
+// default MTU: it came up with a serverEndpoint.
+func openEndpoint(t *testing.T) *ppp.Endpoint {
+	t.Helper()
+	now := time.Now()
+	client, server := clientEndpoint(t), serverEndpoint(t)
+	client.Open(now)
+	server.Open(now)
+	bringUp(t, client, server, now)
+	return client
 }
 
 func TestADatagramPPPCannotSendIsDroppedAndLogged(t *testing.T) {
-	records := recordLogs(t, slog.LevelDebug)
+	records := logtest.Record(t, logPackage, slog.LevelDebug)
 	d := &driver{ppp: clientEndpoint(t)}
 
 	// PPP is not open: renegotiating, as far as the driver can tell.
 	d.sendDatagram(segment(1, wire.TCPControlPSH, "data"))
 
 	got := records()
-	if len(got) != 1 || got[0].level != slog.LevelDebug || got[0].message != "datagram dropped: the link is not open for IPv4" {
+	if len(got) != 1 || got[0].Level != slog.LevelDebug || got[0].Text != "datagram dropped: the link is not open for IPv4" {
 		t.Errorf("records %v", got)
 	}
 }
 
 func TestADatagramTooLargeForThePeerIsDroppedWithAWarning(t *testing.T) {
-	records := recordLogs(t, slog.LevelDebug)
+	records := logtest.Record(t, logPackage, slog.LevelDebug)
 	d := &driver{ppp: openEndpoint(t)}
 
 	// The stack sizes its packets to fit: one that does not is a bug worth
 	// a warning.
 	d.sendDatagram(make([]byte, ppp.DefaultMRU+1))
 
-	want := logRecord{slog.LevelWarn, logPackage, "datagram dropped: a 1501-byte datagram exceeds the peer's MRU of 1500"}
-	if got := records(); !slices.Equal(got, []logRecord{want}) {
+	want := logtest.Line{Level: slog.LevelWarn, Text: "datagram dropped: a 1501-byte datagram exceeds the peer's MRU of 1500"}
+	if got := records(); !slices.Equal(got, []logtest.Line{want}) {
 		t.Errorf("records %v, want %v", got, want)
 	}
 }
@@ -134,7 +150,7 @@ func TestDataLeavesForPPPOnlyWhenThePacedLineCanTakeIt(t *testing.T) {
 }
 
 func TestIPv4UpIsLogged(t *testing.T) {
-	records := recordLogs(t, slog.LevelInfo)
+	records := logtest.Record(t, logPackage, slog.LevelInfo)
 	d := &driver{ppp: clientEndpoint(t), tuning: DefaultTuning()}
 	now := time.Now()
 	settings := IPv4Settings{
@@ -147,16 +163,18 @@ func TestIPv4UpIsLogged(t *testing.T) {
 		t.Fatalf("ipv4Up failed: %v", reason)
 	}
 
-	want := logRecord{slog.LevelInfo, logPackage,
-		"IPv4 up: Ipv4Settings { local_address: 10.64.0.2, peer_address: Some(10.64.0.1), dns_servers: [10.64.0.1] }"}
-	if got := records(); !slices.Equal(got, []logRecord{want}) {
+	want := logtest.Line{
+		Level: slog.LevelInfo,
+		Text:  "IPv4 up: Ipv4Settings { local_address: 10.64.0.2, peer_address: Some(10.64.0.1), dns_servers: [10.64.0.1] }",
+	}
+	if got := records(); !slices.Equal(got, []logtest.Line{want}) {
 		t.Errorf("records %v, want %v", got, want)
 	}
 }
 
 func TestAnAddressTheStackCannotUseFailsIPCP(t *testing.T) {
 	// The "IPv4 up" line goes to the recorder rather than the test's output.
-	recordLogs(t, slog.LevelInfo)
+	logtest.Record(t, logPackage, slog.LevelInfo)
 	now := time.Now()
 	deadline := now.Add(time.Minute)
 	d := &driver{ppp: clientEndpoint(t), tuning: DefaultTuning(), negotiationDeadline: deadline}
@@ -178,7 +196,7 @@ func TestAnAddressTheStackCannotUseFailsIPCP(t *testing.T) {
 
 func TestALinkThatComesUpStopsWaitingForPPP(t *testing.T) {
 	// The "IPv4 up" line goes to the recorder rather than the test's output.
-	recordLogs(t, slog.LevelInfo)
+	logtest.Record(t, logPackage, slog.LevelInfo)
 	connected := time.Now()
 	deadline := connected.Add(DefaultTuning().NegotiationTimeout)
 	d := &driver{ppp: clientEndpoint(t), tuning: DefaultTuning(), connectedAt: connected, negotiationDeadline: deadline}
@@ -191,6 +209,96 @@ func TestALinkThatComesUpStopsWaitingForPPP(t *testing.T) {
 	// The deadline itself is the tightest case: PPP is late from then on.
 	if kind, reached := d.limitReached(e, deadline); reached {
 		t.Errorf("a link that came up reached %v at the negotiation deadline: it would hang up mid-transfer", kind)
+	}
+}
+
+// passAt takes in what PPP reports and checks the limits at now, as each of
+// the driver's passes does, and returns the limit reached, if any. It fails
+// the test should PPP end the link.
+func passAt(t *testing.T, d *driver, e *engine, now time.Time) (CloseReasonKind, bool) {
+	t.Helper()
+	if reason, closing := d.handlePPPEvents(e, now); closing {
+		t.Fatalf("PPP ended the link: %v", reason)
+	}
+	return d.limitReached(e, now)
+}
+
+// upDriver returns a driver, without limits, whose PPP came up and whose
+// engine, also returned, took in the news at connected.
+func upDriver(t *testing.T, connected time.Time) (*driver, *engine) {
+	t.Helper()
+	d := &driver{ppp: openEndpoint(t), tuning: DefaultTuning(), connectedAt: connected,
+		negotiationDeadline: connected.Add(DefaultTuning().NegotiationTimeout)}
+	e := testEngine(connected)
+	if kind, reached := passAt(t, d, e, connected); reached || !e.isUp() {
+		t.Fatalf("the link is not up: it reached %v", kind)
+	}
+	return d, e
+}
+
+// startRenegotiating has a new peer ask d's PPP to negotiate LCP afresh at
+// now, as a gateway whose PPP restarts does, and returns the peer.
+func startRenegotiating(t *testing.T, d *driver, now time.Time) *ppp.Endpoint {
+	t.Helper()
+	peer := serverEndpoint(t)
+	peer.Open(now)
+	d.ppp.HandleInput(peer.TakeOutput(), now)
+	if d.ppp.Phase() == ppp.PhaseOpen {
+		t.Fatal("PPP is still open once the peer asked to renegotiate")
+	}
+	return peer
+}
+
+func TestARenegotiationThatStallsEndsTheLinkAtTheNegotiationTimeout(t *testing.T) {
+	// The "IPv4 up" line goes to the recorder rather than the test's output.
+	logtest.Record(t, logPackage, slog.LevelInfo)
+	connected := time.Now()
+	d, e := upDriver(t, connected)
+	// An hour on, long after the first negotiation's deadline.
+	renegotiating := connected.Add(time.Hour)
+	deadline := renegotiating.Add(DefaultTuning().NegotiationTimeout)
+
+	// The peer asks to renegotiate, then never says another word.
+	startRenegotiating(t, d, renegotiating)
+
+	// A pass just before the deadline does not put it off.
+	for _, now := range []time.Time{renegotiating, deadline.Add(-time.Nanosecond)} {
+		if kind, reached := passAt(t, d, e, now); reached {
+			t.Fatalf("%v into the renegotiation, the link reached %v", now.Sub(renegotiating), kind)
+		}
+	}
+	kind, reached := passAt(t, d, e, deadline)
+	if !reached {
+		t.Fatal("the link outlived the renegotiation's deadline: it would carry nothing, and bill, for good")
+	}
+	if kind != CloseReasonNegotiationTimedOut {
+		t.Errorf("the link reached %v at the renegotiation's deadline, want %v", kind, CloseReasonNegotiationTimedOut)
+	}
+}
+
+func TestARenegotiationThatCompletesInTimeKeepsTheLinkUp(t *testing.T) {
+	// The "IPv4 up" lines go to the recorder rather than the test's output.
+	logtest.Record(t, logPackage, slog.LevelInfo)
+	connected := time.Now()
+	d, e := upDriver(t, connected)
+	renegotiating := connected.Add(time.Hour)
+	deadline := renegotiating.Add(DefaultTuning().NegotiationTimeout)
+	peer := startRenegotiating(t, d, renegotiating)
+	if kind, reached := passAt(t, d, e, renegotiating); reached {
+		t.Fatalf("the renegotiation's start reached %v", kind)
+	}
+
+	// Back up just in time.
+	upAgain := deadline.Add(-time.Nanosecond)
+	bringUp(t, d.ppp, peer, upAgain)
+
+	if kind, reached := passAt(t, d, e, upAgain); reached || !e.isUp() {
+		t.Fatalf("a link back up in time reached %v, or is no longer up", kind)
+	}
+	// The renegotiation's deadline is the tightest case: PPP would be late
+	// from then on.
+	if kind, reached := passAt(t, d, e, deadline); reached {
+		t.Errorf("a link back up reached %v at the renegotiation's deadline: it would hang up mid-transfer", kind)
 	}
 }
 

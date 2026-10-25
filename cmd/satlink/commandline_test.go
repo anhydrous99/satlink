@@ -1,11 +1,10 @@
 package main
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/spf13/cobra"
 )
 
 // fixture is a small tree to read command lines against, shaped as
@@ -28,15 +27,15 @@ const colourVariable = "FIXTURE_COLOUR"
 // newFixture returns a fixture whose arguments have their zero values.
 func newFixture() *fixture {
 	f := &fixture{}
-	leaf := newCommand(&cobra.Command{Use: "leaf", Short: "A leaf"},
+	leaf := newCommand("leaf", "A leaf", func(context.Context) error { return nil },
 		requiredPositional("FIRST", "", stringValue{target: &f.first}),
 		&argument{valueName: "REST", hasDefault: true, defaultValue: "none", value: stringValue{target: &f.rest}})
-	group := newCommand(&cobra.Command{Use: "group", Short: "A group"},
+	group := newCommand("group", "A group", nil,
 		&argument{long: "tag", valueName: "TAG", action: actionAppend, value: stringsValue{target: &f.tags}},
 		&argument{long: "size", valueName: "SIZE", hasDefault: true, defaultValue: "medium",
 			value: stringValue{target: &f.size}},
 	).withSubcommands(leaf)
-	f.root = newRoot(&cobra.Command{Use: "fixture", Short: "A fixture"},
+	f.root = newRoot("fixture", "A fixture",
 		&argument{long: "colour", short: 'c', valueName: "COLOUR", env: colourVariable, global: true,
 			value: &f.colour},
 		&argument{long: "loud", short: 'l', action: actionCount, global: true, value: countValue{target: &f.loudness}},

@@ -499,29 +499,45 @@ func preparationFailed(err error) outcome {
 
 // prepare makes sure the call could be ended, drops stale answers left by
 // commands that timed out — they would be read as answers to ours — then
-// makes DTR drops end calls and picks the bearer.
+// makes DTR drops end calls and picks the bearer. A CONNECT, among the
+// stale answers or after, fails it with ErrCall, for preparationFailed to
+// have that call ended: our commands would go into it as its data.
 func (h *Handset) prepare(settings DataCallSettings) error {
 	if err := validateEscapeGuard(settings.EscapeGuard); err != nil {
 		return err
 	}
-	if err := h.resynchronize(); err != nil {
+	switch connected, err := h.resynchronize(); {
+	case err != nil:
 		return err
+	case connected:
+		return callError(wentOnline("before the call was set up"))
 	}
-	// A handset left in a call never answers these, and their timeout is
-	// what has that call ended (see preparationFailed): bounded as a
-	// hang-up is.
-	timeout := h.hangUpTimeout()
 	if settings.EndCallWhenDTRDrops {
-		if _, err := h.commandWithTimeout(hangUpOnDTRDrop, timeout); err != nil {
+		if err := h.setUpCommand(hangUpOnDTRDrop); err != nil {
 			return err
 		}
 	}
 	if settings.Bearer != nil {
-		if _, err := h.commandWithTimeout(settings.Bearer.command(), timeout); err != nil {
+		if err := h.setUpCommand(settings.Bearer.command()); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// setUpCommand runs command, one of a data call's setup. A handset in a
+// call never answers it, and its timeout is what has that call ended:
+// bounded as a hang-up is. A CONNECT, during it or received with its
+// answer, fails it with ErrCall, leaving its call to the setup, which ends
+// it once, with the escape guard of its settings.
+func (h *Handset) setUpCommand(command string) error {
+	_, err := h.exec(request{
+		command:        command,
+		timeout:        h.hangUpTimeout(),
+		completion:     untilFinalResult,
+		reportsConnect: true,
+	})
+	return err
 }
 
 // validateEscapeGuard refuses a guard longer than any handset's, with which
@@ -595,10 +611,11 @@ func callRequest(command string, settings DataCallSettings, until completion) re
 }
 
 // hangUpVoiceCall hangs up a voice call answered instead of a data call —
-// OK to ATA means a voice call — straight away. Should ATH fail, the call is
-// still up and is ended as a data call is.
+// OK to ATA means a voice call — straight away. NO CARRIER means that it
+// had just ended. Should ATH fail otherwise, the call is still up, or a
+// data call came up after all, and is ended as a data call is.
 func (h *Handset) hangUpVoiceCall() outcome {
-	if err := h.hangUp(); err != nil {
+	if err := h.setUpCommand(hangUpCommand); err != nil && !isNoCarrier(err) {
 		return perhapsConnected(err)
 	}
 	return failed(callError("ATA answered a voice call, not a data call"))

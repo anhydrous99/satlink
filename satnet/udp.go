@@ -66,9 +66,11 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 	return read, err
 }
 
-// Write sends p as one datagram, waiting until the write deadline for
-// buffer space. A closing link would never send it: Write then fails with
-// ErrLinkDown. It fails with ErrDatagramTooLarge beyond
+// Write sends p as one datagram. It waits its turn on the line, as a
+// [TCPConn]'s data does: only a few datagrams queue, and then Write waits,
+// until the write deadline, for those written before to leave. So a writer
+// goes at the line's pace. A closing link would never send it: Write then
+// fails with ErrLinkDown. It fails with ErrDatagramTooLarge beyond
 // [UDPConn.MaxDatagramLen], and ErrTimedOut for operation "UDP send".
 func (c *UDPConn) Write(p []byte) (int, error) {
 	err := c.conn.wait(operationUDPSend, c.conn.writeUntil, func(e *engine) (bool, error) {
@@ -81,7 +83,8 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 }
 
 // queueDatagram is one attempt at queueing p as a datagram for conn's peer,
-// which is not over while the send buffer is full.
+// which is not over while the socket's turn on the line has yet to come or
+// its send buffer is full.
 func queueDatagram(e *engine, conn *connection, p []byte) (bool, error) {
 	// A closing link would never send it.
 	if err := e.checkUsable(); err != nil {
@@ -89,6 +92,11 @@ func queueDatagram(e *engine, conn *connection, p []byte) (bool, error) {
 	}
 	if limit := e.stack.maxUDPPayload(); len(p) > limit {
 		return true, &Error{Kind: ErrDatagramTooLarge, Len: len(p), Max: limit}
+	}
+	// The stack hands the device all the socket holds at every poll, line
+	// or no line: only this wait keeps the backlog in the app.
+	if !e.stack.udpTurnHasCome(conn.handle, conn.peer) {
+		return false, nil
 	}
 	err := e.stack.udp(conn.handle).SendSlice(p, udp.Metadata{Endpoint: conn.peer})
 	switch {

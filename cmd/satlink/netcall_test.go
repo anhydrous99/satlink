@@ -66,6 +66,8 @@ func TestTheResultIsTheOutcomeUnlessTheHangUpFailed(t *testing.T) {
 		{"the command failed", failed, nil, failed, ""},
 		{"the hang-up failed", nil, hangUpFailed, hangUpFailed, ""},
 		{"both failed", failed, hangUpFailed, hangUpFailed, "error: the command failed\n"},
+		{"both failed, the command with a server's control characters", errorFromAServer, hangUpFailed, hangUpFailed,
+			"error: " + errorFromAServerShown + "\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

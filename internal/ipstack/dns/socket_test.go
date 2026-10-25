@@ -62,7 +62,7 @@ func TestRefusedNameStartsNoQuery(t *testing.T) {
 	if sent := dispatchAt(t, s, cx, 0); len(sent) != 0 {
 		t.Errorf("Dispatch emitted %d queries, want none", len(sent))
 	}
-	if !s.PollAt().IsOnIngress() {
+	if !s.PollAt().Equal(socket.PollOnIngress()) {
 		t.Errorf("PollAt = %v, want on ingress", s.PollAt())
 	}
 }
@@ -149,7 +149,7 @@ func TestPollAtIsTheNextRetransmission(t *testing.T) {
 	cx := testContext(t)
 	s := NewSocket(testServers)
 
-	if !s.PollAt().IsOnIngress() {
+	if !s.PollAt().Equal(socket.PollOnIngress()) {
 		t.Errorf("PollAt without queries = %v, want on ingress", s.PollAt())
 	}
 	mustStartQuery(t, s, cx, "example.com")
@@ -185,60 +185,6 @@ func TestPollAtIsTheEarliestPendingQuery(t *testing.T) {
 		t.Errorf("PollAt after the first query completed = %v, want %v, the second one's", s.PollAt(), want)
 	}
 	assertCompleted(t, s, first, exampleAddress)
-}
-
-func TestTimeoutRunsFromTheFirstAttemptEvenWhenRefused(t *testing.T) {
-	t.Parallel()
-	cx := testContext(t)
-	s := NewSocket(testServers)
-	mustStartQuery(t, s, cx, "example.com")
-
-	var refused []sentQuery
-	if err := s.Dispatch(cx, recordingEmit(&refused, errRefused)); !errors.Is(err, errRefused) {
-		t.Fatalf("Dispatch with emit refused = %v, want %v", err, errRefused)
-	}
-	if want := socket.PollAtTime(time.Time{}); !s.PollAt().Equal(want) {
-		t.Errorf("PollAt after the refusal = %v, want the query still due", s.PollAt())
-	}
-
-	mustDispatchOne(t, s, cx, 500*time.Millisecond)
-	for _, sentAt := range []time.Duration{1500 * time.Millisecond, 3500 * time.Millisecond, 7500 * time.Millisecond} {
-		if query := mustDispatchOne(t, s, cx, sentAt); query.ip.DstAddr != firstServer {
-			t.Fatalf("at %v the query went to %v, want %v", sentAt, query.ip.DstAddr, firstServer)
-		}
-	}
-
-	// The first server's 10 s started with the refused attempt, at 0, not
-	// with the first one sent, at 0.5 s.
-	query := mustDispatchOne(t, s, cx, 10*time.Second+time.Millisecond)
-	if query.ip.DstAddr != secondServer {
-		t.Errorf("at 10.001 s the query went to %v, want %v", query.ip.DstAddr, secondServer)
-	}
-}
-
-func TestRefusedRetransmissionGoesAtTheNextDispatchWithTheSameDelay(t *testing.T) {
-	t.Parallel()
-	s, cx, _, _ := sentExampleQuery(t)
-
-	cx.SetNow(at(time.Second))
-	var refused []sentQuery
-	if err := s.Dispatch(cx, recordingEmit(&refused, errRefused)); !errors.Is(err, errRefused) {
-		t.Fatalf("Dispatch with emit refused = %v, want %v", err, errRefused)
-	}
-	if want := socket.PollAtTime(at(time.Second)); !s.PollAt().Equal(want) {
-		t.Errorf("PollAt after the refusal = %v, want %v, unchanged", s.PollAt(), want)
-	}
-
-	retransmission := mustDispatchOne(t, s, cx, 1100*time.Millisecond)
-
-	if !bytes.Equal(retransmission.message, refused[0].message) {
-		t.Errorf("retransmission %q differs from the refused one %q", retransmission.message, refused[0].message)
-	}
-	// The delay after the second attempt is still 2 s: the refusal did not
-	// double it.
-	if want := socket.PollAtTime(at(3100 * time.Millisecond)); !s.PollAt().Equal(want) {
-		t.Errorf("PollAt after the retransmission = %v, want %v", s.PollAt(), want)
-	}
 }
 
 func TestDispatchSendsOneQueryAtATime(t *testing.T) {
@@ -282,6 +228,18 @@ func TestAnswerCompletesTheQuery(t *testing.T) {
 	s, _, handle, query := sentExampleQuery(t)
 
 	answer(t, s, query, responseTo(query, aRecord(questionPointer, exampleAddress)).encode())
+
+	assertCompleted(t, s, handle, exampleAddress)
+}
+
+func TestAnswerForTheNameInAnotherCaseCompletesTheQuery(t *testing.T) {
+	t.Parallel()
+	cx := testContext(t)
+	s := NewSocket(testServers)
+	handle := mustStartQuery(t, s, cx, "Example.COM")
+	query := mustDispatchOne(t, s, cx, 0)
+
+	answer(t, s, query, responseTo(query, aRecord(exampleName, exampleAddress)).encode())
 
 	assertCompleted(t, s, handle, exampleAddress)
 }
@@ -370,6 +328,19 @@ func TestCNAMEIsFollowed(t *testing.T) {
 	assertCompleted(t, s, handle, exampleAddress, targetAddress)
 }
 
+func TestCNAMETargetInAnotherCaseIsFollowed(t *testing.T) {
+	t.Parallel()
+	s, _, handle, query := sentExampleQuery(t)
+	response := responseTo(query,
+		cnameRecord(questionPointer, []byte("\x03WWW\x07Example\x03NET\x00")),
+		aRecord(targetName, targetAddress),
+	)
+
+	answer(t, s, query, response.encode())
+
+	assertCompleted(t, s, handle, targetAddress)
+}
+
 func TestCNAMETargetBecomesTheQuerysName(t *testing.T) {
 	t.Parallel()
 	s, cx, handle, query := sentExampleQuery(t)
@@ -385,6 +356,29 @@ func TestCNAMETargetBecomesTheQuerysName(t *testing.T) {
 
 	if question := retransmission.message[headerLen:]; !bytes.Equal(question, questionSection(targetName, wire.DNSTypeA)) {
 		t.Errorf("the retransmission asks %q, want www.example.net", question)
+	}
+}
+
+func TestCNAMEWhoseTargetCannotBeCopiedLeavesTheQuerysName(t *testing.T) {
+	t.Parallel()
+	label := "\x3f" + strings.Repeat("a", maxLabelLen)
+	tests := map[string][]byte{
+		"a malformed target":       forwardPointer,
+		"a target over 255 octets": []byte(strings.Repeat(label, 4) + "\x00"),
+	}
+	for name, target := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s, cx, handle, query := sentExampleQuery(t)
+			answer(t, s, query, responseTo(query, cnameRecord(questionPointer, target)).encode())
+			assertPending(t, s, handle)
+
+			retransmission := mustDispatchOne(t, s, cx, time.Second)
+
+			if question := retransmission.message[headerLen:]; !bytes.Equal(question, questionSection(exampleName, wire.DNSTypeA)) {
+				t.Errorf("the retransmission asks %q, want example.com", question)
+			}
+		})
 	}
 }
 

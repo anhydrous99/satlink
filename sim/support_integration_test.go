@@ -489,8 +489,8 @@ func (d *clientDevice) Receive(time.Time) ([]byte, ipstack.TransmitSlot, bool) {
 	return datagram, d.transmit, true
 }
 
-func (d *clientDevice) Transmit(time.Time) (ipstack.TransmitSlot, bool) {
-	return d.transmit, true
+func (d *clientDevice) Transmit(time.Time) ipstack.TransmitSlot {
+	return d.transmit
 }
 
 func (d *clientDevice) transmit(datagram []byte) {

@@ -11,7 +11,6 @@
 package netlog
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/anhydrous99/satlink/internal/logtext"
@@ -26,19 +25,10 @@ const packageName = "ipstack"
 
 // Trace logs msg at LevelTrace.
 func Trace(msg string, args ...any) {
-	logAt(LevelTrace, msg, args)
+	logtext.Log(packageName, LevelTrace, msg, args...)
 }
 
 // Debug logs msg at slog.LevelDebug.
 func Debug(msg string, args ...any) {
-	logAt(slog.LevelDebug, msg, args)
-}
-
-func logAt(level slog.Level, msg string, args []any) {
-	logger := slog.Default()
-	ctx := context.Background()
-	if !logger.Enabled(ctx, level) {
-		return
-	}
-	logger.Log(ctx, level, msg, append([]any{logtext.PackageKey, packageName}, args...)...)
+	logtext.Log(packageName, slog.LevelDebug, msg, args...)
 }

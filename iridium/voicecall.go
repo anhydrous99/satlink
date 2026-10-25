@@ -1,6 +1,11 @@
 package iridium
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/anhydrous99/satlink/internal/debugtext"
+)
 
 // Voice calls: dialling, answering — ending the data calls that answering
 // may bring up by mistake — and hanging up. Everything here runs with the
@@ -21,9 +26,16 @@ func (h *Handset) dial(number string) error {
 
 // answer is Answer, with the handset's lock held.
 func (h *Handset) answer() error {
-	// A late answer to a command that timed out would pass for ATA's.
-	if err := h.resynchronize(); err != nil {
+	// A late answer to a command that timed out would pass for ATA's. ATA
+	// would go into a call that came up meanwhile, or one whose data never
+	// stop, as its data: that call is ended instead.
+	switch connected, err := h.resynchronize(); {
+	case errors.Is(err, ErrCall):
+		return h.endCallStillRelayed(err)
+	case err != nil:
 		return err
+	case connected:
+		return h.endCallThatConnected("before " + debugtext.Quote(answerCommand))
 	}
 	response, err := h.exec(request{command: answerCommand, timeout: dialTimeout, completion: untilFinalResult})
 	switch {
@@ -71,6 +83,16 @@ func (h *Handset) endAnsweredDataCall(ended error) error {
 		return callMayStillBeUpError(fmt.Sprintf("ATA answered a data call that could not be ended: %v", err))
 	}
 	return ended
+}
+
+// endCallStillRelayed ends the data call of a handset found relaying one,
+// which found says: it returns found once that is done, and
+// ErrCallMayStillBeUp if it failed.
+func (h *Handset) endCallStillRelayed(found error) error {
+	if err := h.endDataCall(DefaultEscapeGuard); err != nil {
+		return callMayStillBeUpError(fmt.Sprintf("the handset keeps sending data, and the call could not be ended: %v", err))
+	}
+	return found
 }
 
 // hangUp is HangUp, with the handset's lock held: ATH, within the hang-up

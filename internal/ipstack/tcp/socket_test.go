@@ -25,11 +25,11 @@ func TestNewSocketStartsClosedWithoutEndpoints(t *testing.T) {
 	if s.State() != StateClosed {
 		t.Errorf("State = %v, want %v", s.State(), StateClosed)
 	}
-	if s.LocalEndpoint().IsValid() || s.RemoteEndpoint().IsValid() || s.ListenEndpoint() != (wire.ListenEndpoint{}) {
-		t.Errorf("endpoints %v, %v, %v; want zero", s.LocalEndpoint(), s.RemoteEndpoint(), s.ListenEndpoint())
+	if s.LocalEndpoint().IsValid() || s.RemoteEndpoint().IsValid() || s.listenEndpoint != (wire.ListenEndpoint{}) {
+		t.Errorf("endpoints %v, %v, %v; want zero", s.LocalEndpoint(), s.RemoteEndpoint(), s.listenEndpoint)
 	}
-	if s.ReceiveCapacity() != 10 || s.SendCapacity() != 20 {
-		t.Errorf("capacities %d and %d, want 10 and 20", s.ReceiveCapacity(), s.SendCapacity())
+	if s.receiveBuffer.Capacity() != 10 || s.SendCapacity() != 20 {
+		t.Errorf("capacities %d and %d, want 10 and 20", s.receiveBuffer.Capacity(), s.SendCapacity())
 	}
 }
 
@@ -38,10 +38,10 @@ func TestNewSocketHasTheDefaultSettings(t *testing.T) {
 
 	s := NewSocket(NewSocketBuffer(10), NewSocketBuffer(20))
 
-	compareField(t, "NagleEnabled", s.NagleEnabled(), true)
-	compareField(t, "AckDelay", s.AckDelay(), 10*time.Millisecond)
-	compareField(t, "Timeout", s.Timeout(), 0)
-	compareField(t, "KeepAlive", s.KeepAlive(), 0)
+	compareField(t, "nagleEnabled", s.nagleEnabled, true)
+	compareField(t, "ackDelay", s.ackDelay, 10*time.Millisecond)
+	compareField(t, "timeout", s.timeout, 0)
+	compareField(t, "keepAlive", s.keepAlive, 0)
 }
 
 func TestDurationOptionsTakeZeroAndNegativeAsNone(t *testing.T) {
@@ -51,9 +51,9 @@ func TestDurationOptionsTakeZeroAndNegativeAsNone(t *testing.T) {
 		set  func(s *Socket, d time.Duration)
 		get  func(s *Socket) time.Duration
 	}{
-		{"timeout", (*Socket).SetTimeout, (*Socket).Timeout},
-		{"ACK delay", (*Socket).SetAckDelay, (*Socket).AckDelay},
-		{"keep-alive", (*Socket).SetKeepAlive, (*Socket).KeepAlive},
+		{"timeout", (*Socket).SetTimeout, func(s *Socket) time.Duration { return s.timeout }},
+		{"ACK delay", (*Socket).SetAckDelay, func(s *Socket) time.Duration { return s.ackDelay }},
+		{"keep-alive", (*Socket).SetKeepAlive, func(s *Socket) time.Duration { return s.keepAlive }},
 	}
 	settings := []struct {
 		set, want time.Duration
@@ -81,7 +81,7 @@ func TestSetNagleEnabledTurnsNagleOff(t *testing.T) {
 
 	s.SetNagleEnabled(false)
 
-	if s.NagleEnabled() {
+	if s.nagleEnabled {
 		t.Error("Nagle's algorithm is still on")
 	}
 }
@@ -211,8 +211,8 @@ func TestEndpointsAreZeroWithoutAConnection(t *testing.T) {
 		}
 		receiveNothing(t, s)
 	}
-	if listening.ListenEndpoint() != listenEnd {
-		t.Errorf("ListenEndpoint = %v, want %v", listening.ListenEndpoint(), listenEnd)
+	if listening.listenEndpoint != listenEnd {
+		t.Errorf("listenEndpoint = %v, want %v", listening.listenEndpoint, listenEnd)
 	}
 }
 
@@ -227,8 +227,8 @@ func TestTheListenEndpointIsForgottenWhenTheSocketResets(t *testing.T) {
 	}{
 		{"Connect", func(t *testing.T, s *testSocket) {
 			s.Close()
-			if s.ListenEndpoint() != listenEnd {
-				t.Fatalf("ListenEndpoint = %v after Close, want %v", s.ListenEndpoint(), listenEnd)
+			if s.listenEndpoint != listenEnd {
+				t.Fatalf("listenEndpoint = %v after Close, want %v", s.listenEndpoint, listenEnd)
 			}
 			if err := s.Connect(s.cx, remoteEnd, listenEnd); err != nil {
 				t.Fatalf("Connect: %v", err)
@@ -261,8 +261,8 @@ func TestTheListenEndpointIsForgottenWhenTheSocketResets(t *testing.T) {
 
 			test.reset(t, s)
 
-			if s.ListenEndpoint() != (wire.ListenEndpoint{}) {
-				t.Errorf("ListenEndpoint = %v after %s, want zero", s.ListenEndpoint(), test.name)
+			if s.listenEndpoint != (wire.ListenEndpoint{}) {
+				t.Errorf("listenEndpoint = %v after %s, want zero", s.listenEndpoint, test.name)
 			}
 		})
 	}

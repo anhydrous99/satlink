@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"net/netip"
 	"slices"
@@ -90,8 +91,8 @@ func parseDNSMessage(t *testing.T, message []byte) dnsMessage {
 		payload = rest
 	}
 	parsed.answers = parseDNSRecords(t, &payload, packet.AnswerRecordCount())
-	parsed.authorities = parseDNSRecords(t, &payload, packet.AuthorityRecordCount())
-	parsed.additionals = parseDNSRecords(t, &payload, packet.AdditionalRecordCount())
+	parsed.authorities = parseDNSRecords(t, &payload, recordCount(packet, dnsAuthorityCountOffset))
+	parsed.additionals = parseDNSRecords(t, &payload, recordCount(packet, dnsAdditionalCountOffset))
 	if len(payload) != 0 {
 		t.Fatalf("% x left over", payload)
 	}
@@ -114,6 +115,13 @@ func parseDNSRecords(t *testing.T, payload *[]byte, count uint16) []DNSRecord {
 	return records
 }
 
+// recordCount returns the record count at offset in the header of packet:
+// the package writes the counts of the authority and additional sections but
+// never reads them.
+func recordCount(packet DNSPacket, offset int) uint16 {
+	return binary.BigEndian.Uint16(packet[offset:])
+}
+
 // checkDNSHeader compares the header of a parsed message with the wanted
 // identifier, flags, response code and section counts.
 func checkDNSHeader(t *testing.T, packet DNSPacket, want dnsHeader) {
@@ -125,8 +133,8 @@ func checkDNSHeader(t *testing.T, packet DNSPacket, want dnsHeader) {
 		{"Rcode", packet.Rcode(), want.rcode},
 		{"QuestionCount", packet.QuestionCount(), want.counts[0]},
 		{"AnswerRecordCount", packet.AnswerRecordCount(), want.counts[1]},
-		{"AuthorityRecordCount", packet.AuthorityRecordCount(), want.counts[2]},
-		{"AdditionalRecordCount", packet.AdditionalRecordCount(), want.counts[3]},
+		{"authority record count", recordCount(packet, dnsAuthorityCountOffset), want.counts[2]},
+		{"additional record count", recordCount(packet, dnsAdditionalCountOffset), want.counts[3]},
 	})
 }
 

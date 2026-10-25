@@ -261,18 +261,6 @@ func (p DNSPacket) AnswerRecordCount() uint16 {
 	return binary.BigEndian.Uint16(p[dnsAnswerCountOffset:])
 }
 
-// AuthorityRecordCount returns the number of records in the authority
-// section.
-func (p DNSPacket) AuthorityRecordCount() uint16 {
-	return binary.BigEndian.Uint16(p[dnsAuthorityCountOffset:])
-}
-
-// AdditionalRecordCount returns the number of records in the additional
-// section.
-func (p DNSPacket) AdditionalRecordCount() uint16 {
-	return binary.BigEndian.Uint16(p[dnsAdditionalCountOffset:])
-}
-
 // SetTransactionID sets the identifier that matches a response to its query.
 func (p DNSPacket) SetTransactionID(id uint16) {
 	binary.BigEndian.PutUint16(p[dnsIDOffset:], id)

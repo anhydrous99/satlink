@@ -1,12 +1,14 @@
-// Package wire reads and writes the packets the stack speaks: IPv4, TCP, UDP,
-// ICMPv4 and DNS. It follows the design of smoltcp's wire module (see the
-// ipstack package documentation).
+// Package wire reads and writes the packets the stack speaks, IPv4, TCP, UDP
+// and DNS, and writes ICMPv4 errors. It follows the design of smoltcp's wire
+// module (see the ipstack package documentation).
 //
 // It works on two levels.
 //
 // The packet level gives structured access to the octets of a packet without
-// judging their content: IPv4Packet, TCPPacket, UDPPacket, ICMPv4Packet and
-// DNSPacket are byte slices with accessors and setters for every header field.
+// judging their content: IPv4Packet, TCPPacket, UDPPacket and DNSPacket are
+// byte slices with an accessor for each header field the stack reads and a
+// setter for each one it writes. ICMPv4Packet has only setters, as the stack
+// writes ICMP errors but reads no ICMP message.
 // Converting a slice, as in IPv4Packet(buffer), does not check the buffer;
 // the New… constructors do, and validate the length fields.
 // When parsing untrusted input, always use a New… constructor (or CheckLen):
@@ -17,15 +19,15 @@
 //
 // The representation level sheds everything the stack does not support, such
 // as impossible flag combinations, bad checksums and unknown options.
-// ParseIPv4Repr, ParseTCPRepr, ParseUDPRepr and ParseICMPv4Repr read an
-// IPv4Repr, TCPRepr, UDPRepr or ICMPv4Repr from a packet, and the Repr's Emit
-// writes it back. DNS is one-sided: DNSRepr is the query the stack sends,
-// which it only emits, and ParseDNSQuestion and ParseDNSRecord read a
-// response's question and records. The Parse… functions check the packet's
-// length themselves and never panic, whatever its content, and Emit never
-// panics as long as the buffer is exactly as long as the Repr says and its
-// addresses are IPv4. Slices in a parsed Repr, such as a payload or a name,
-// share the packet's storage.
+// ParseIPv4Repr, ParseTCPRepr and ParseUDPRepr read an IPv4Repr, TCPRepr or
+// UDPRepr from a packet, and the Repr's Emit writes it back. ICMPv4Repr, an
+// ICMP error, is only emitted. DNS is one-sided: DNSRepr is the query the
+// stack sends, which it only emits, and ParseDNSQuestion and ParseDNSRecord
+// read a response's question and records.
+// The Parse… functions check the packet's length themselves and never panic,
+// whatever its content, and Emit never panics as long as the buffer is
+// exactly as long as the Repr says and its addresses are IPv4. Slices in a
+// parsed Repr, such as a payload or a name, share the packet's storage.
 //
 // Addresses are netip.Addr values holding plain IPv4 addresses (Is4); the
 // stack compares them with ==, so IPv4-mapped IPv6 forms must be unmapped

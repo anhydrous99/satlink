@@ -124,6 +124,32 @@ func TestEveryEchoRequestCodeRejectAndProtocolRejectTakesANewIdentifier(t *testi
 	}
 }
 
+func TestEveryLCPPacketTheClientOriginatesTakesTheNextIdentifier(t *testing.T) {
+	link := establishedLink(t, serverConfig())
+
+	var sent []packet
+	for _, send := range []func(link *testLink){probeAfterASilence, sendAnUnknownCode, sendAnUnknownProtocol} {
+		send(link)
+		sent = append(sent, controlPackets(link.client.TakeOutput(), protocolLCP)...)
+	}
+	sent = append(sent, controlPackets(abandonForALoopedBackLine(link), protocolLCP)...)
+
+	type numbered struct {
+		code       code
+		identifier uint8
+	}
+	var got []numbered
+	for _, originated := range sent {
+		got = append(got, numbered{originated.code, originated.identifier})
+	}
+	// The client's one Configure-Request took 1, so no packet may take it
+	// again, whichever part of the endpoint sends it.
+	want := []numbered{{codeEchoRequest, 2}, {codeCodeReject, 3}, {codeProtocolReject, 4}, {codeTerminateRequest, 5}}
+	if !slices.Equal(got, want) {
+		t.Errorf("sent %v, want %v", got, want)
+	}
+}
+
 func TestInformationalLCPPacketsChangeNothing(t *testing.T) {
 	// Echo-Reply, Discard-Request, Identification and Time-Remaining, as
 	// RFC 1661 §5 and RFC 1570 number them.
@@ -249,6 +275,31 @@ func openServerWithTheLargestMRU(t *testing.T) *Endpoint {
 	return link.server
 }
 
+func TestAClientProposesNoMRURatherThanOneLargerThanItCanReceive(t *testing.T) {
+	link := newTestLink(t, withMRU(clientConfig(), 296), serverConfig())
+	request := onlyRequest(t, link.client, protocolLCP)
+	// A Configure-Nak (3) suggesting an MRU (1) of 4000, when the client
+	// takes 1500 at most.
+	nak := packet{code: 3, identifier: request.identifier, data: hexBytes(t, "01 04 0F A0")}
+
+	link.client.HandleInput(framed(protocolLCP, nak.encode()), link.now)
+
+	// Its ACCM (2), Magic-Number (5) and header compression (7, 8) alone.
+	again := onlyRequest(t, link.client, protocolLCP)
+	want := slices.Concat(hexBytes(t, "02 06 00 00 00 00 05 06"), magicNumberOf(link.client), hexBytes(t, "07 02 08 02"))
+	if !bytes.Equal(again.data, want) {
+		t.Fatalf("the request after the Nak holds % X, want % X", again.data, want)
+	}
+	link.server.HandleInput(framed(protocolLCP, again.encode()), link.now)
+	link.settle(t)
+	if link.client.Phase() != PhaseOpen {
+		t.Fatalf("the client's phase = %v, want Open", link.client.Phase())
+	}
+	if got := link.server.MTU(); got != 1500 {
+		t.Errorf("the server's MTU = %d, want the default, 1500", got)
+	}
+}
+
 func TestARequestWithAnOptionWeRejectDrawsOnlyTheReject(t *testing.T) {
 	client := mustEndpoint(t, clientConfig())
 	client.Open(testStart)
@@ -335,4 +386,57 @@ func TestTheLongestOptionAPeerCanSendIsRejectedWhole(t *testing.T) {
 
 	reject := packet{code: codeConfigureReject, identifier: 1, data: longest}
 	assertPackets(t, controlPackets(client.TakeOutput(), protocolLCP), []packet{reject})
+}
+
+func TestLCPGivesUpOnAPeerWhoseAnswersNeverChangeTheRequest(t *testing.T) {
+	answers := []stallingAnswer{
+		{"an empty Configure-Nak", 3, ""},
+		{"an empty Configure-Reject", 4, ""},
+		// Option 99 is none that LCP defines.
+		{"a Configure-Nak of an unknown option", 3, "63 02"},
+		// A client demands no authentication: it never proposes an
+		// Authentication-Protocol (3), here PAP (C0 23).
+		{"a Configure-Reject of an option never proposed", 4, "03 04 C0 23"},
+	}
+	for _, answer := range answers {
+		t.Run(answer.name, func(t *testing.T) {
+			client, request := negotiatingEndpoint(t, clientConfig())
+			// Max-Failure of them are taken: the peer may yet acknowledge.
+			request = stallNegotiation(t, client, protocolLCP, request, answer, DefaultTimers().MaxFailure)
+
+			client.HandleInput(answer.to(t, protocolLCP, request), testStart)
+
+			assertDownReason(t, client, DownReason{
+				Kind:     DownReasonNegotiationFailed,
+				Protocol: "LCP",
+				Detail:   "the peer keeps refusing our request without naming a change we can make",
+			})
+		})
+	}
+}
+
+func TestAnswersThatChangeOurRequestNeverCountAgainstMaxFailure(t *testing.T) {
+	// Without Max-Failure, one answer that left the request as it was would
+	// end the negotiation.
+	config := clientConfig()
+	config.Timers.MaxFailure = 0
+	client, request := negotiatingEndpoint(t, config)
+
+	// A peer that refuses the client's ACCM (2), Protocol-Field-Compression
+	// (7) and Address-and-Control-Field-Compression (8) one at a time.
+	for _, rejected := range []string{"02 06 00 00 00 00", "07 02", "08 02"} {
+		reject := packet{code: 4, identifier: request.identifier, data: hexBytes(t, rejected)}
+		client.HandleInput(framed(protocolLCP, reject.encode()), testStart)
+		request = onlyRequest(t, client, protocolLCP)
+	}
+	client.HandleInput(framed(protocolLCP, ackFor(request).encode()), testStart)
+	client.HandleInput(framed(protocolLCP, peerRequest(1).encode()), testStart)
+
+	// Only the Magic-Number (5) is left.
+	if want := append([]byte{5, 6}, magicNumberOf(client)...); !bytes.Equal(request.data, want) {
+		t.Errorf("the last request's options = % X, want % X", request.data, want)
+	}
+	if client.Phase() != PhaseNetwork {
+		t.Errorf("phase = %v, want Network", client.Phase())
+	}
 }

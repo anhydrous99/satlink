@@ -3,9 +3,9 @@ package ipstack_test
 // The loopback tests run the whole stack end to end: two interfaces joined by
 // an in-memory line, one the app's stack as satnet runs it, the other the
 // simulated internet as sim runs it, which answers for every address with
-// any-IP. Both devices work in the pull model, and the line can be busy or
-// lose chosen datagrams. Each test checks what the applications see and the
-// traffic that crossed the line.
+// any-IP. Both devices work in the pull model, and the line can lose chosen
+// datagrams. Each test checks what the applications see and the traffic that
+// crossed the line.
 
 import (
 	"bytes"
@@ -23,14 +23,8 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-const (
-	// timeWaitDuration is how long a TCP socket stays in TIME-WAIT.
-	timeWaitDuration = 10 * time.Second
-	// lineBusyTime is how long the busy-line test keeps the client's line
-	// busy: longer than the initial retransmission timeout of 1 s, as a
-	// satellite round trip of 1.5 to 3 s is.
-	lineBusyTime = 3 * time.Second
-)
+// timeWaitDuration is how long a TCP socket stays in TIME-WAIT.
+const timeWaitDuration = 10 * time.Second
 
 func TestLoopbackTCPCarriesBulkDataBothWaysAndClosesInOrder(t *testing.T) {
 	t.Parallel()
@@ -178,36 +172,6 @@ func assertLostSegmentWasSentAgain(t *testing.T, n *network) {
 	t.Errorf("%s never sent the lost %v again", lost.from.name, lostSegment)
 }
 
-func TestLoopbackBusyLineHoldsBackTheClientsTransmissionsButNotItsReplies(t *testing.T) {
-	t.Parallel()
-	n := newNetwork(t)
-	exchange := startBulkExchange(t, n)
-	n.runUntil(exchange.isEstablished, exchange.serve)
-	firstCrossingWhileBusy := len(n.crossings)
-	busyUntil := n.now.Add(lineBusyTime)
-	n.client.device.busyUntil = busyUntil
-
-	n.runUntil(exchange.isOver, exchange.serve)
-
-	exchange.assertDelivered(t)
-	if n.client.device.refusals == 0 {
-		t.Fatal("the busy line refused no transmit slot")
-	}
-	repliesWhileBusy := 0
-	for _, c := range n.crossings[firstCrossingWhileBusy:] {
-		if c.from != n.client || !c.at.Before(busyUntil) {
-			continue
-		}
-		if !c.isReply {
-			t.Errorf("the client sent %x through a transmit slot while its line was busy", c.datagram)
-		}
-		repliesWhileBusy++
-	}
-	if repliesWhileBusy == 0 {
-		t.Error("the client sent no reply while its line was busy, want its reply slots used")
-	}
-}
-
 func TestLoopbackUDPEchoAnswersFromTheAddressTheClientWroteTo(t *testing.T) {
 	t.Parallel()
 	n := newNetwork(t)
@@ -305,8 +269,13 @@ func TestLoopbackUDPToAPortWithoutASocketGetsPortUnreachable(t *testing.T) {
 		t.Errorf("%s answered from %v to %v (through the reply slot: %t), want the internet from %v to %v through it",
 			answer.from.name, header.SrcAddr, header.DstAddr, answer.isReply, echoHostAddr, clientAddr)
 	}
-	if message.Type() != wire.ICMPv4DstUnreachable || message.Code() != wire.ICMPv4PortUnreachable || !bytes.Equal(message.Data(), sent.datagram) {
-		t.Errorf("ICMP %v code %d quoting %x, want port unreachable quoting the client's datagram %x", message.Type(), message.Code(), message.Data(), sent.datagram)
+	sentHeader, sentPayload, _ := parseIPv4Datagram(sent.datagram)
+	portUnreachable := wire.ICMPv4Repr{Message: wire.ICMPv4DstUnreachable, Code: wire.ICMPv4PortUnreachable,
+		Header: sentHeader, Data: sentPayload}
+	want := make([]byte, portUnreachable.BufferLen())
+	portUnreachable.Emit(wire.ICMPv4Packet(want), wire.ChecksumCapabilities{})
+	if !bytes.Equal(message, want) {
+		t.Errorf("ICMP % x, want port unreachable quoting the client's datagram: % x", message, want)
 	}
 	if client.CanReceive() {
 		t.Error("the client's socket received something")
@@ -354,17 +323,13 @@ func mustParseTCP(t *testing.T, c crossing) (wire.IPv4Repr, wire.TCPRepr) {
 	return header, segment
 }
 
-// mustParseICMPv4 returns the header and message of c, which must carry a
-// well-formed ICMPv4 message.
-func mustParseICMPv4(t *testing.T, c crossing) (wire.IPv4Repr, wire.ICMPv4Packet) {
+// mustParseICMPv4 returns the header and the ICMPv4 message of c, which must
+// carry one.
+func mustParseICMPv4(t *testing.T, c crossing) (wire.IPv4Repr, []byte) {
 	t.Helper()
 	header, payload, ok := parseIPv4Datagram(c.datagram)
 	if !ok || header.NextHeader != wire.IPProtocolICMP {
 		t.Fatalf("%s sent %x, want an ICMP message", c.from.name, c.datagram)
 	}
-	message, err := wire.NewICMPv4Packet(payload)
-	if err != nil || !message.VerifyChecksum() {
-		t.Fatalf("%s sent a malformed ICMP message %x (%v)", c.from.name, payload, err)
-	}
-	return header, message
+	return header, payload
 }

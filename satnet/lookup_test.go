@@ -421,14 +421,17 @@ const firstLetterOfTheQuestion = dnsHeaderLen + 1
 // a name's IPv4 addresses never has: only class IN does.
 const chaosClass = 3
 
+// ipv4IdentificationLowOctet is where the low octet of the identification
+// field of an IPv4 header is (RFC 791 §3.1).
+const ipv4IdentificationLowOctet = 5
+
 // damageTheIPv4Identification flips a bit of the identification field of
 // datagram's IPv4 header, which only the header's checksum covers: the UDP
 // checksum leaves it out, and nothing else reads it. (Flipping every bit of
 // a field of zeros would not show: in one's complement, all ones is zero
 // too.)
 func damageTheIPv4Identification(datagram []byte) []byte {
-	packet := wire.IPv4Packet(datagram)
-	packet.SetID(packet.ID() ^ 1)
+	datagram[ipv4IdentificationLowOctet] ^= 1
 	return datagram
 }
 

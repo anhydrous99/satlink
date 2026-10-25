@@ -1,7 +1,6 @@
 package sim
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/anhydrous99/satlink/internal/logtext"
@@ -16,30 +15,16 @@ import (
 const logPackage = "sim"
 
 // logDebug logs msg at debug level.
-func logDebug(msg string, args ...any) {
-	logAt(slog.LevelDebug, msg, args)
+func logDebug(msg string) {
+	logtext.Log(logPackage, slog.LevelDebug, msg)
 }
 
 // logInfo logs msg at info level.
-func logInfo(msg string, args ...any) {
-	logAt(slog.LevelInfo, msg, args)
+func logInfo(msg string) {
+	logtext.Log(logPackage, slog.LevelInfo, msg)
 }
 
 // logWarn logs msg at warning level.
-func logWarn(msg string, args ...any) {
-	logAt(slog.LevelWarn, msg, args)
-}
-
-// logAt logs msg and args, slog key-value pairs, with the "pkg" attribute.
-// The logger is looked up at log time, so a handler installed after the
-// simulator was built still receives the record. When the level is disabled
-// no record is built, but msg is: the callers format their text before the
-// call, so a line costs its formatting even when it is not logged.
-func logAt(level slog.Level, msg string, args []any) {
-	logger := slog.Default()
-	ctx := context.Background()
-	if !logger.Enabled(ctx, level) {
-		return
-	}
-	logger.Log(ctx, level, msg, append([]any{logtext.PackageKey, logPackage}, args...)...)
+func logWarn(msg string) {
+	logtext.Log(logPackage, slog.LevelWarn, msg)
 }

@@ -2,8 +2,11 @@ package mobile
 
 import (
 	"errors"
+	"log/slog"
 	"slices"
 	"testing"
+
+	"github.com/anhydrous99/satlink/internal/logtest"
 )
 
 // acrossTheBoundary runs body as an exported function runs its own: a
@@ -38,7 +41,8 @@ func TestNoPanicLeavesTheErrorAlone(t *testing.T) {
 }
 
 func TestAMethodWithoutAnErrorSurvivesAPanicWithItsEmptyResult(t *testing.T) {
-	records := recordErrors(t)
+	// No t.Parallel: logtest.Record replaces the process-wide logger.
+	records := logtest.Record(t, logPackage, slog.LevelError)
 
 	list := func() (events *StringList) {
 		events = &StringList{}
@@ -49,8 +53,9 @@ func TestAMethodWithoutAnErrorSurvivesAPanicWithItsEmptyResult(t *testing.T) {
 	if list == nil || list.Len() != 0 {
 		t.Errorf("the method returned %v, want its empty list", list)
 	}
-	if logged, want := records(), "recovered a panic in a method under test: a bug"; !slices.Contains(logged, want) {
-		t.Errorf("logged %q, want %q", logged, want)
+	want := logtest.Line{Level: slog.LevelError, Text: "recovered a panic in a method under test: a bug"}
+	if logged := records(); !slices.Contains(logged, want) {
+		t.Errorf("logged %+v, want %+v", logged, want)
 	}
 }
 

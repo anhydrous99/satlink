@@ -72,21 +72,15 @@ func (s *Socket) Bind(local wire.ListenEndpoint) error {
 	return nil
 }
 
-// Close unbinds the socket and drops every datagram it holds, in both
-// directions.
-func (s *Socket) Close() {
-	s.endpoint = wire.ListenEndpoint{}
-	s.transmitBuffer.Clear()
-	s.receiveBuffer.Clear()
-}
-
 // IsOpen reports whether the socket is bound.
 func (s *Socket) IsOpen() bool {
 	return s.endpoint.Port != 0
 }
 
 // CanSend reports whether the transmit buffer has a free datagram slot;
-// there may still be no room for a particular payload.
+// there may still be no room for a particular payload. satnet and sim send
+// and learn from Send's error; the stack's tests watch a socket through
+// CanSend and CanReceive.
 func (s *Socket) CanSend() bool {
 	return !s.transmitBuffer.IsFull()
 }
@@ -94,28 +88,6 @@ func (s *Socket) CanSend() bool {
 // CanReceive reports whether a received datagram is waiting.
 func (s *Socket) CanReceive() bool {
 	return !s.receiveBuffer.IsEmpty()
-}
-
-// PacketReceiveCapacity returns how many datagrams the receive buffer holds.
-func (s *Socket) PacketReceiveCapacity() int {
-	return s.receiveBuffer.PacketCapacity()
-}
-
-// PacketSendCapacity returns how many datagrams the transmit buffer holds.
-func (s *Socket) PacketSendCapacity() int {
-	return s.transmitBuffer.PacketCapacity()
-}
-
-// PayloadReceiveCapacity returns how many payload octets the receive buffer
-// holds.
-func (s *Socket) PayloadReceiveCapacity() int {
-	return s.receiveBuffer.PayloadCapacity()
-}
-
-// PayloadSendCapacity returns how many payload octets the transmit buffer
-// holds.
-func (s *Socket) PayloadSendCapacity() int {
-	return s.transmitBuffer.PayloadCapacity()
 }
 
 // isOpenOrIPv4 reports whether addr may be a socket's local address: open

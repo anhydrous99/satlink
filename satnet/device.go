@@ -238,10 +238,9 @@ func (d *linkDevice) Receive(time.Time) ([]byte, ipstack.TransmitSlot, bool) {
 	return datagram, d.sort, true
 }
 
-// Transmit offers the stack a slot whenever it asks: what it hands over is
-// sorted there.
-func (d *linkDevice) Transmit(time.Time) (ipstack.TransmitSlot, bool) {
-	return d.sort, true
+// Transmit gives the stack a slot: what it hands over is sorted there.
+func (d *linkDevice) Transmit(time.Time) ipstack.TransmitSlot {
+	return d.sort
 }
 
 // sort is the device's transmit slot: an urgent datagram goes at once, any
@@ -389,6 +388,16 @@ func flowOf(datagram []byte) (flow, bool) {
 func tcpFlow(localPort uint16, peer netip.AddrPort) flow {
 	return flow{
 		protocol:        wire.IPProtocolTCP,
+		destination:     peer.Addr(),
+		sourcePort:      localPort,
+		destinationPort: peer.Port(),
+	}
+}
+
+// udpFlow returns the flow of our UDP socket on localPort, sending to peer.
+func udpFlow(localPort uint16, peer netip.AddrPort) flow {
+	return flow{
+		protocol:        wire.IPProtocolUDP,
 		destination:     peer.Addr(),
 		sourcePort:      localPort,
 		destinationPort: peer.Port(),

@@ -156,9 +156,9 @@ func TestListenOnAnotherEndpointWhileListeningIsRefused(t *testing.T) {
 
 		err := s.Listen(other)
 
-		if !errors.Is(err, ErrInvalidState) || s.ListenEndpoint() != listenEnd || !s.IsListening() {
+		if !errors.Is(err, ErrInvalidState) || s.listenEndpoint != listenEnd || !s.IsListening() {
 			t.Errorf("Listen(%v) while listening on %v = %v, now listening %v on %v; want %v, still on %v",
-				other, listenEnd, err, s.IsListening(), s.ListenEndpoint(), ErrInvalidState, listenEnd)
+				other, listenEnd, err, s.IsListening(), s.listenEndpoint, ErrInvalidState, listenEnd)
 		}
 	}
 }
@@ -248,7 +248,7 @@ func TestLosingTheLocalAddressEmptiesBothBuffers(t *testing.T) {
 
 	assertState(t, s, StateClosed)
 	compareField(t, "SendQueue", s.SendQueue(), 0)
-	compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+	compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 }
 
 // socketAbortedWithDataLeft returns a socket aborted with data in both of its
@@ -290,7 +290,7 @@ func TestAReusedSocketStartsWithNothingLeftOver(t *testing.T) {
 			}
 
 			compareField(t, "SendQueue", s.SendQueue(), 0)
-			compareField(t, "ReceiveQueue", s.ReceiveQueue(), 0)
+			compareField(t, "receiveBuffer.Len()", s.receiveBuffer.Len(), 0)
 			if !s.assembler.IsEmpty() {
 				t.Errorf("the assembler holds %v, want it empty", &s.assembler)
 			}

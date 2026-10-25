@@ -64,12 +64,6 @@ func (cx *Context) IPMTU() int {
 	return cx.ipMTU
 }
 
-// IPAddrs returns a copy of the interface's addresses, each with the prefix
-// length of its network.
-func (cx *Context) IPAddrs() []netip.Prefix {
-	return slices.Clone(cx.ipAddrs)
-}
-
 // SetIPAddrs replaces the interface's addresses. Each must be an IPv4
 // unicast address, or 0.0.0.0, with a valid prefix length; otherwise
 // SetIPAddrs returns an error wrapping ErrInvalidIPAddr that names the
@@ -82,12 +76,6 @@ func (cx *Context) SetIPAddrs(addrs []netip.Prefix) error {
 	}
 	cx.ipAddrs = slices.Clone(addrs)
 	return nil
-}
-
-// AnyIP reports whether the interface accepts datagrams for every address,
-// not only its own.
-func (cx *Context) AnyIP() bool {
-	return cx.anyIP
 }
 
 // SetAnyIP sets whether the interface accepts datagrams for every address.

@@ -100,7 +100,7 @@ func (e *Endpoint) probeKeepalive(now time.Time) {
 	switch e.prober.poll(now) {
 	case probeSend:
 		magicNumber := binary.BigEndian.AppendUint32(nil, e.lcp.negotiator.ownMagicNumber())
-		e.outbox.push(protocolLCP, packet{code: codeEchoRequest, identifier: e.nextLCPIdentifier(), data: magicNumber})
+		e.outbox.push(protocolLCP, packet{code: codeEchoRequest, identifier: e.lcp.allocateIdentifier(), data: magicNumber})
 	case probeGiveUp:
 		e.abandonLink(DownReason{Kind: DownReasonPeerUnresponsive})
 	}

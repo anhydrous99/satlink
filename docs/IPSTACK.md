@@ -20,10 +20,11 @@ logging they share. Each layer uses only the layers below it. `tcp`, `udp` and
 `dns` never import `ipstack`, and neither do their test helpers: `ipstack`
 imports those packages, so the import would form a cycle.
 
-The stack is pull-driven, as the `ipstack` package doc explains: the device
-offers a transmit slot only when it can take a datagram. [Layers and their
-contracts](#layers-and-their-contracts) spells out what this requires of each
-layer.
+The stack is pull-driven, as the `ipstack` package doc explains: each poll asks
+the device for what it received, and for a transmit slot for each datagram to
+send. The device takes every datagram, so pacing the line is its job. [Layers
+and their contracts](#layers-and-their-contracts) spells out what this requires
+of each layer.
 
 The design follows smoltcp 0.14. The package keeps smoltcp's 0BSD licence in
 `internal/ipstack/LICENSE-smoltcp`, and every package doc credits it. [Where the
@@ -42,8 +43,8 @@ datagrams. Everything else is left out on purpose:
 | IPv4 fragmentation and reassembly | The parser rejects fragments. A datagram to send that exceeds the IP MTU is dropped and logged at debug level. TCP never builds one, and satnet checks UDP sizes first. |
 | Multicast and IGMP | 224.0.0.1, the all-hosts group, is the only group. |
 | DHCP, raw sockets, ICMP sockets, mDNS | PPP assigns the address, and nothing else needs them. |
-| Echo replies (ping) | Nothing needs them. Incoming ICMP is parsed and dropped. Port and protocol unreachable errors are still sent, for unicast datagrams only. |
-| TCP congestion control | The pull model and satnet's pacing decide when to send. The peer's window and the MSS are the only limits on data in flight. |
+| Echo replies (ping) | Nothing needs them. Incoming ICMP is dropped unread. Port and protocol unreachable errors are still sent, for unicast datagrams only. |
+| TCP congestion control | satnet's device paces the line. The peer's window and the MSS are the only limits on data in flight. |
 | TCP timestamps | No consumer needs them. The stack never sends the option and ignores the peer's. `wire` still parses and emits it. |
 | A settable hop limit | Every datagram goes out with `wire.DefaultHopLimit`, 64. |
 | Routes and maintenance polls | Routes have no effect on a bare IP device. With nothing to fragment, nothing needs maintenance, and egress is a step of `Poll`. |
@@ -129,24 +130,14 @@ The code depends on these contracts between the layers.
      copy what they keep.
 3. **Egress: the sockets hand datagrams to the interface.** In slot order, the
    interface calls each socket's `Dispatch(cx, emit)`.
-   - `emit` asks the device for a transmit slot first. If the device refuses,
-     `emit` returns an unexported sentinel error and the egress round ends.
-   - A datagram larger than the MTU is dropped after its slot is granted. `emit`
-     returns nil, so the datagram counts as sent: a UDP or DNS socket dequeues
-     it, and the round counts as having sent something. Received datagrams are
-     never checked against the MTU.
-   - A socket returns `emit`'s error unchanged. It skips what comes after the
-     `emit` call, and keeps what it decided before:
-
-     | Socket | Skips on refusal | Keeps |
-     |---|---|---|
-     | TCP | Recording the segment as sent: the sequence, ACK and window sent, RTT sampling, arming the retransmission timer, the keep-alive and zero-window-probe rewinds, the delayed-ACK reset, and forgetting the tuple after an abort's RST | The start of the timeout clock, the abort on timeout, a retransmission timeout's rewind and backoff, and the cleared fast-retransmit flag |
-     | DNS | Updating the retransmission time and doubling the delay | The server's timeout, which runs from the first attempt, the move to the next server, and failures decided before emitting |
-     | UDP | The dequeue | — |
-
-   - The next `Dispatch` makes the same choice again, unless something changed
-     in between. A refused fast retransmission is the exception: it is not
-     repeated.
+   - `emit` asks the device for a transmit slot and puts the datagram in it.
+     It cannot fail: the device takes every datagram, and holds one its line
+     cannot take yet. Once `emit` returns, the socket records the datagram as
+     sent. A fast retransmission relies on that: it leaves the retransmission
+     timer idle, and its transmission arms the timer again.
+   - A datagram larger than the MTU is dropped once it has its slot. It counts
+     as sent: a UDP or DNS socket dequeues it, and the round counts as having
+     sent something. Received datagrams are never checked against the MTU.
    - The payload of an emitted `TCPRepr`, and the payload slice from UDP and
      DNS, alias socket storage. They are valid only during `emit`.
    - `Poll` repeats egress rounds while a round sends something.
@@ -171,8 +162,8 @@ The tests come in five kinds:
 - **Scenario tests** follow smoltcp's test scenarios, for the features the stack
   keeps. A TCP scenario test sits in the file for its state or feature.
 - **Behaviour tests** pin the Go API and what the consumers rely on.
-- **Pull-model tests** (`pull_model_test.go` in `ipstack` and in `tcp`) check
-  what a refused socket skips and keeps.
+- **Pull-model tests** (`pull_model_test.go`) check the rounds of sending, the
+  reply slots, and when the interface asks for a transmit slot.
 - **Loopback tests** (`loopback*_test.go`) run the whole stack end to end.
 - **Fuzz targets** cover every checked `wire` constructor and parser, and the
   TCP socket against a hostile peer. Each target's comment says what it checks,
@@ -199,8 +190,8 @@ Rules:
 **The loopback tests** join two interfaces over an in-memory line that stands in
 for the PPP link. The client is set up as satnet sets it up, and polled with
 `Poll`. The far end is set up as sim sets it up, with any-IP, and polled one
-datagram at a time with `PollIngressSingle`. The line can be made busy or lose
-chosen datagrams. The clock is simulated, so the tests run in milliseconds.
+datagram at a time with `PollIngressSingle`. The line can lose chosen
+datagrams. The clock is simulated, so the tests run in milliseconds.
 
 **Coverage.** The module's bar is 80% statement coverage per package. The
 stack's packages are at 99–100%, and a change should keep them there. Only
@@ -221,11 +212,11 @@ guards for states that cannot occur.
 - `IsUnspecified` is false for the zero `netip.Addr`. Where an address may be
   zero, check `Is4` first.
 - **Payload slices alias socket storage.** That covers what
-  `storage.PacketBuffer`, `udp.Socket` and `tcp.Socket` hand out, and the slice
-  a `SendWith` callback fills. Such a slice is valid only until the buffer or
-  socket is next used, and the interface's next poll counts as a use. Fill a
-  `Send` payload at once, and copy a received payload before using the socket
-  again, even to echo it. Go does not enforce this, so the caller must.
+  `storage.PacketBuffer`, `udp.Socket` and `tcp.Socket` hand out. Such a slice
+  is valid only until the buffer or socket is next used, and the interface's
+  next poll counts as a use. Fill a `Send` payload at once, and copy a received
+  payload before using the socket again, even to echo it. Go does not enforce
+  this, so the caller must.
 
 ## What the consumers rely on
 
@@ -237,11 +228,11 @@ Changing any of it means changing satnet or sim too.
 - `Receive` hands over a datagram with a reply slot, and the stack may answer
   through it at once. satnet makes the reply slot usable even when the line is
   busy.
-- Egress asks for a transmit slot only when a socket has a datagram ready. A
-  refusal ends the round, and the next poll chooses again.
-- A refusal does not hold up a timeout: a timed-out connection reports CLOSED at
-  once. satnet's connect wait and its clean-up of closing sockets depend on
-  that.
+- Egress asks for a transmit slot only when a socket has a datagram ready, and
+  the device takes every datagram. satnet's device holds what waits for the
+  line.
+- A timed-out connection reports CLOSED at the poll that finds the timeout.
+  satnet's connect wait and its clean-up of closing sockets depend on that.
 - `PollIngressSingle` processes one datagram and sends only its reply, through
   the reply slot. It never calls `Transmit`. The simulator calls it once per
   datagram, so each connection request in a burst finds a listener prepared for
@@ -323,7 +314,8 @@ Changing any of it means changing satnet or sim too.
   them.
 - An NXDOMAIN response fails every pending query it matches, not only the first.
   A CNAME replaces the query's name even when the rest of the response turns out
-  to be malformed.
+  to be malformed. A CNAME whose target is malformed or over 255 octets leaves
+  the name as it was.
 - Retransmission follows the schedule in the `dns` package doc. `PollAt` gives
   only the next retransmission time, not the server timeout. satnet's repeat
   filter recognises a retransmission by its unchanged transaction id.
@@ -375,6 +367,22 @@ a stream other than the one the peer sent. The stack handles each one.
   sends it again with the rest. This follows RFC 9293 §3.10.7.4, which trims a
   segment to the window "including SYN and FIN". A FIN right at the window's end
   is still taken.
+
+### DNS names in another case
+
+The DNS socket compares names without regard to the case of ASCII letters, as
+RFC 4343 asks. Every other octet must match exactly. smoltcp compares names
+octet for octet, so it fails a query whose answer spells a name in another
+case, such as a CNAME to `WWW.example.net` followed by the address of
+`www.example.net`.
+
+### A CNAME that cannot be copied
+
+smoltcp empties a query's name before it copies a CNAME's target into it. When
+the target is malformed or over 255 octets, the copy stops part way and leaves a
+name without its root label. The query stays pending and asks that malformed
+question, of the next server too, until it fails. The stack leaves the name as
+it was.
 
 ### smoltcp defects kept
 

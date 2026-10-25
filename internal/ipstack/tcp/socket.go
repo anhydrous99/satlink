@@ -129,12 +129,6 @@ func optionalDuration(d time.Duration) time.Duration {
 	return max(d, 0)
 }
 
-// Timeout returns the idle timeout set with SetTimeout; zero when there is
-// none.
-func (s *Socket) Timeout() time.Duration {
-	return s.timeout
-}
-
 // SetTimeout makes the socket abort the connection, sending a RST, once the
 // peer has been silent for timeout, whether the socket waits for an answer
 // or is idle: with keep-alive on, a live peer keeps answering, but without
@@ -146,12 +140,6 @@ func (s *Socket) SetTimeout(timeout time.Duration) {
 	s.timeout = optionalDuration(timeout)
 }
 
-// AckDelay returns the delayed-ACK duration set with SetAckDelay; zero when
-// ACKs are not delayed.
-func (s *Socket) AckDelay() time.Duration {
-	return s.ackDelay
-}
-
 // SetAckDelay makes the socket wait up to delay before sending a bare
 // acknowledgement, hoping it can ride on outgoing data instead; it is 10 ms
 // by default. Zero or negative sends acknowledgements at once.
@@ -159,22 +147,11 @@ func (s *Socket) SetAckDelay(delay time.Duration) {
 	s.ackDelay = optionalDuration(delay)
 }
 
-// NagleEnabled reports whether Nagle's algorithm is on.
-func (s *Socket) NagleEnabled() bool {
-	return s.nagleEnabled
-}
-
 // SetNagleEnabled turns Nagle's algorithm ("tinygram prevention") on or off;
 // it is on by default. While on, at most one segment smaller than the MSS is
 // in flight at a time. Turning it off is Linux's TCP_NODELAY.
 func (s *Socket) SetNagleEnabled(enabled bool) {
 	s.nagleEnabled = enabled
-}
-
-// KeepAlive returns the keep-alive interval set with SetKeepAlive; zero when
-// keep-alive is off.
-func (s *Socket) KeepAlive() time.Duration {
-	return s.keepAlive
 }
 
 // SetKeepAlive makes an idle socket send a keep-alive segment whenever it has
@@ -190,13 +167,6 @@ func (s *Socket) SetKeepAlive(interval time.Duration) {
 		// explicitly.
 		s.timer.setKeepAlive()
 	}
-}
-
-// ListenEndpoint returns the endpoint given to Listen. It is zero before
-// Listen, and after Connect, the end of TIME-WAIT or the loss of the local
-// address, which reset the socket.
-func (s *Socket) ListenEndpoint() wire.ListenEndpoint {
-	return s.listenEndpoint
 }
 
 // LocalEndpoint returns the local end of the connection's four-tuple, or the
@@ -274,11 +244,6 @@ func (s *Socket) CanSend() bool {
 // CanReceive reports whether the receive buffer holds data.
 func (s *Socket) CanReceive() bool {
 	return !s.receiveBuffer.IsEmpty()
-}
-
-// ReceiveCapacity returns the receive buffer's capacity, in octets.
-func (s *Socket) ReceiveCapacity() int {
-	return s.receiveBuffer.Capacity()
 }
 
 // SendCapacity returns the transmit buffer's capacity, in octets.

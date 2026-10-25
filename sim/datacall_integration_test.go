@@ -139,9 +139,7 @@ func TestACallDroppedByTheNetworkIsNoticed(t *testing.T) {
 func TestACallEscapedFromButNeverHungUpIsEndedByTheNextSession(t *testing.T) {
 	t.Parallel()
 	earlier, control := readyHandset(t, fastConfig())
-	if _, err := earlier.CommandTimeout("ATD"+iridiumInternetNumber, patience); err != nil {
-		t.Fatalf("the data call does not connect: %v", err)
-	}
+	dial(t, earlier)
 	// The hang-up stopped after the escape, as when the app is killed then:
 	// the handset holds the call in online-command mode.
 	transport := earlier.Transport()

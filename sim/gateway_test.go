@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/logtest"
 	"github.com/anhydrous99/satlink/ppp"
 )
 
@@ -106,7 +107,7 @@ func TestTheInternetComesWithIPv4AndGoesWithPPP(t *testing.T) {
 // This test records the process-wide logger, so it does not run in
 // parallel.
 func TestTheGatewayLogsIPv4Up(t *testing.T) {
-	recorder := recordLogs(t)
+	lines := logtest.Record(t, logPackage, slog.LevelDebug)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
 	if err != nil {
@@ -116,12 +117,12 @@ func TestTheGatewayLogsIPv4Up(t *testing.T) {
 
 	newPPPPair(t, g, now).awaitClientEvent(ppp.EventUp)
 
-	want := logRecord{
-		level: slog.LevelInfo,
-		message: "simulated gateway: IPv4 up, Ipv4Settings { local_address: 10.64.0.1, " +
+	want := logtest.Line{
+		Level: slog.LevelInfo,
+		Text: "simulated gateway: IPv4 up, Ipv4Settings { local_address: 10.64.0.1, " +
 			"peer_address: Some(10.64.0.2), dns_servers: [10.64.0.1] }",
 	}
-	if got := recorder.recorded(); !slices.Contains(got, want) {
+	if got := lines(); !slices.Contains(got, want) {
 		t.Errorf("records %v, want one of them %v", got, want)
 	}
 }
@@ -129,7 +130,7 @@ func TestTheGatewayLogsIPv4Up(t *testing.T) {
 // This test records the process-wide logger, so it does not run in
 // parallel.
 func TestTheGatewayLogsPPPDown(t *testing.T) {
-	recorder := recordLogs(t)
+	lines := logtest.Record(t, logPackage, slog.LevelDebug)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
 	if err != nil {
@@ -141,8 +142,8 @@ func TestTheGatewayLogsPPPDown(t *testing.T) {
 	pair.client.Close(now)
 	pair.awaitClientEvent(ppp.EventDown)
 
-	want := logRecord{level: slog.LevelInfo, message: "simulated gateway: PPP down, terminated by the peer"}
-	if got := recorder.recorded(); !slices.Contains(got, want) {
+	want := logtest.Line{Level: slog.LevelInfo, Text: "simulated gateway: PPP down, terminated by the peer"}
+	if got := lines(); !slices.Contains(got, want) {
 		t.Errorf("records %v, want one of them %v", got, want)
 	}
 }
@@ -153,7 +154,7 @@ func TestTheGatewayLogsPPPDown(t *testing.T) {
 // keeps the MTU keeps its connections. This test records the process-wide
 // logger, so it does not run in parallel.
 func TestTheGatewayLogsADatagramPPPCannotSend(t *testing.T) {
-	recorder := recordLogs(t)
+	lines := logtest.Record(t, logPackage, slog.LevelDebug)
 	now := time.Now()
 	g, err := startGateway(DefaultNetworkConfig(), nil, now)
 	if err != nil {
@@ -176,8 +177,8 @@ func TestTheGatewayLogsADatagramPPPCannotSend(t *testing.T) {
 	g.advance(now)
 
 	// The echo is 32 bytes: 20 of IPv4, 8 of UDP, and the 4 of the ping.
-	want := logRecord{level: slog.LevelDebug, message: "simulated gateway: dropped a 32-byte datagram: the link is not open for IPv4"}
-	if got := recorder.recorded(); !slices.Contains(got, want) {
+	want := logtest.Line{Level: slog.LevelDebug, Text: "simulated gateway: dropped a 32-byte datagram: the link is not open for IPv4"}
+	if got := lines(); !slices.Contains(got, want) {
 		t.Errorf("records %v, want one of them %v", got, want)
 	}
 }

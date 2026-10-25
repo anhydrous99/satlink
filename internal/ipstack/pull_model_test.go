@@ -1,9 +1,9 @@
 package ipstack
 
-// These tests pin the pull model the consumers rely on: the device decides
-// when the stack may send, a received datagram's reply slot is always used,
-// and what a refused socket had to send goes out at a later poll. "Layers and
-// their contracts" in docs/IPSTACK.md describes it.
+// These tests pin the pull model the consumers rely on: the rounds of
+// sending, the reply slot of a received datagram, and when the interface asks
+// for a transmit slot. "Layers and their contracts" in docs/IPSTACK.md
+// describes it.
 
 import (
 	"bytes"
@@ -12,24 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anhydrous99/satlink/internal/ipstack/tcp"
 	"github.com/anhydrous99/satlink/internal/ipstack/udp"
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
 // echoPort is the port of the UDP sockets of these tests.
 const echoPort = 7
-
-// connectingSocket returns a socket connecting from port 49500 to port 80 of
-// the peer, whose SYN leaves at the next poll.
-func connectingSocket(t *testing.T, iface *Interface) *tcp.Socket {
-	t.Helper()
-	client := newTCPSocket()
-	if err := client.Connect(iface.Context(), netip.AddrPortFrom(remoteAddr, 80), wire.ListenEndpoint{Port: 49500}); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-	return client
-}
 
 // queueDatagrams queues one datagram for the peer's echo port for each
 // payload.
@@ -56,54 +44,6 @@ func assertSentPayloads(t *testing.T, device *testingDevice, want ...string) {
 	}
 }
 
-// referenceSYN returns the SYN connectingSocket's socket sends when the
-// device grants its slot at once.
-func referenceSYN(t *testing.T) []byte {
-	t.Helper()
-	iface, sockets, device := setup(t)
-	sockets.AddTCP(connectingSocket(t, iface))
-	iface.Poll(at(0), device, sockets)
-	return onlySent(t, device).datagram
-}
-
-func TestRefusedTransmitEndsTheRoundAndTheSegmentGoesOutAtTheNextPoll(t *testing.T) {
-	t.Parallel()
-	want := referenceSYN(t)
-	iface, sockets, device := setup(t)
-	client := connectingSocket(t, iface)
-	sockets.AddTCP(client)
-	datagrams := newUDPSocket(t, wire.ListenEndpoint{Port: echoPort})
-	queueDatagrams(t, datagrams, "after the SYN")
-	sockets.AddUDP(datagrams)
-	device.refuseTransmit()
-
-	result := iface.Poll(at(0), device, sockets)
-
-	// The TCP socket's SYN was refused, and the round ended before the UDP
-	// socket's turn.
-	if result != PollNone || device.transmitRequests != 1 {
-		t.Errorf("Poll = %v after %d transmit requests, want %v after 1", result, device.transmitRequests, PollNone)
-	}
-	assertNothingSent(t, device)
-	if client.State() != tcp.StateSynSent || datagrams.SendQueue() == 0 {
-		t.Fatalf("after the refusal the client is %v with %d octets of datagrams queued", client.State(), datagrams.SendQueue())
-	}
-
-	device.grantTransmit()
-	iface.Poll(at(100*time.Millisecond), device, sockets)
-
-	sent := device.takeSent()
-	if len(sent) != 2 {
-		t.Fatalf("the next poll sent %d datagrams, want the SYN and the UDP datagram", len(sent))
-	}
-	if !bytes.Equal(sent[0].datagram, want) {
-		t.Errorf("the SYN sent at the next poll differs from one granted at once:\n got %x\nwant %x", sent[0].datagram, want)
-	}
-	if _, _, payload := parseUDP(t, sent[1].datagram); string(payload) != "after the SYN" {
-		t.Errorf("the second datagram carries %q, want the UDP socket's", payload)
-	}
-}
-
 func TestPollRunsRoundsWhileARoundSendsSomething(t *testing.T) {
 	t.Parallel()
 	iface, sockets, device := setup(t)
@@ -123,58 +63,10 @@ func TestPollRunsRoundsWhileARoundSendsSomething(t *testing.T) {
 	}
 }
 
-func TestRoundEndedByARefusalAfterSendingIsFollowedByAnother(t *testing.T) {
-	t.Parallel()
-	iface, sockets, device := setup(t)
-	first := newUDPSocket(t, wire.ListenEndpoint{Port: echoPort})
-	queueDatagrams(t, first, "first 1", "first 2")
-	second := newUDPSocket(t, wire.ListenEndpoint{Port: echoPort + 1})
-	queueDatagrams(t, second, "second 1")
-	sockets.AddUDP(first)
-	sockets.AddUDP(second)
-	device.transmitSlots = 1
-
-	result := iface.Poll(at(0), device, sockets)
-
-	// The first round sent one datagram and ended at the second socket's
-	// refusal; the next round asked again, for the first socket, and ended
-	// at once.
-	assertSentPayloads(t, device, "first 1")
-	if result != PollSocketStateChanged || device.transmitRequests != 3 {
-		t.Errorf("Poll = %v after %d transmit requests, want %v after 3", result, device.transmitRequests, PollSocketStateChanged)
-	}
-
-	device.grantTransmit()
-	iface.Poll(at(time.Millisecond), device, sockets)
-
-	assertSentPayloads(t, device, "first 2", "second 1")
-}
-
-func TestReplySlotIsUsedWhileTransmitRefuses(t *testing.T) {
-	t.Parallel()
-	iface, sockets, device := setup(t)
-	datagrams := newUDPSocket(t, wire.ListenEndpoint{Port: echoPort})
-	queueDatagrams(t, datagrams, "refused")
-	sockets.AddUDP(datagrams)
-	device.refuseTransmit()
-	device.deliver(tcpDatagram(remoteAddr, localAddr, syn(49500, 81)))
-
-	iface.Poll(at(0), device, sockets)
-
-	reply := onlySent(t, device)
-	if _, rst := parseTCP(t, reply.datagram); !reply.isReply || rst.Control != wire.TCPControlRST {
-		t.Errorf("sent %v (through the reply slot: %t), want the RST through it", rst, reply.isReply)
-	}
-	if datagrams.SendQueue() == 0 {
-		t.Error("the refused UDP datagram was dequeued")
-	}
-}
-
 func TestSocketsImmediateReplyGoesThroughTheReplySlot(t *testing.T) {
 	t.Parallel()
 	iface, sockets, device := setup(t)
 	established := establishedConnection(t, iface, sockets, device)
-	device.refuseTransmit()
 	// Data ten octets ahead of what the socket expects is out of order, so
 	// the socket acknowledges what it has at once.
 	outOfOrder := wire.TCPRepr{

@@ -116,9 +116,9 @@ After these errors a call may still be up. This is how to end it:
 
 | The app has | Thrown | End the call with |
 |---|---|---|
-| an `IridiumHandset`, lent with `establishLinkWithHandset` or not | `SatlinkErrorHangUpFailed` from `hangUp`, `establishLinkWithHandset` or `answer` (a data call answered by mistake). `SatlinkErrorInternal` from `establishLinkWithHandset`: a fault inside the library, after which no one knows whether a call is up | `handset.reinitialize()`. Until it succeeds, the handset's other methods throw `SatlinkErrorHangUpFailed`, and so does `reinitialize` while it cannot end the call |
+| an `IridiumHandset`, lent with `establishLinkWithHandset` or not | `SatlinkErrorHangUpFailed` from `hangUp`, `establishLinkWithHandset` or `answer` (a data call answered by mistake, or found up already). From any method that talks to the handset, `pollEvents` most likely, when it cannot end a data call whose `CONNECT` no command awaited: one the handset answered on its own, or one that came up during or after a raw `command`. `SatlinkErrorInternal` from `establishLinkWithHandset`: a fault inside the library, after which no one knows whether a call is up | `handset.reinitialize()`. Until it succeeds, the handset's other methods throw `SatlinkErrorHangUpFailed`, and so does `reinitialize` while it cannot end the call |
 | the transport, its link made with `Mobile.establishLink` | `SatlinkErrorHangUpFailed` from `hangUp` or `establishLink`. `SatlinkErrorInternal` from `establishLink` | a new `IridiumHandset` on the transport, still open, then its `hangUp()`. Making it ends a data call still up, and `hangUp` ends one its firmware cannot report |
-| only the transport, as `IridiumHandset(transport)` failed | `SatlinkErrorHangUpFailed`: the handset does not answer, and a data call it may be relaying could not be ended | a new `IridiumHandset` on the transport, later |
+| only the transport, as `IridiumHandset(transport)` failed | `SatlinkErrorHangUpFailed`: the handset does not answer, and a data call it may be relaying could not be ended. Or a data call that came up while the handset was readied could not be ended | a new `IridiumHandset` on the transport, later |
 
 The rules that go with the table:
 

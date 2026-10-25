@@ -42,22 +42,6 @@ func PollOnIngress() PollAt {
 	return PollAt{kind: pollOnIngress}
 }
 
-// IsNow reports whether the socket wants to be polled right away.
-func (p PollAt) IsNow() bool {
-	return p.kind == pollNow
-}
-
-// Time returns when the socket wants to be polled, and false unless p came
-// from PollAtTime.
-func (p PollAt) Time() (time.Time, bool) {
-	return p.at, p.kind == pollAtTime
-}
-
-// IsOnIngress reports whether the socket waits for something to arrive.
-func (p PollAt) IsOnIngress() bool {
-	return p.kind == pollOnIngress
-}
-
 // Deadline returns when to poll given the current time: now itself for
 // PollNow, the time for PollAtTime, and false for PollOnIngress, which sets
 // no deadline.

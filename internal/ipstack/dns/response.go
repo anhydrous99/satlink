@@ -105,7 +105,8 @@ func (pending *pendingQuery) readAnswers(response wire.DNSPacket, records []byte
 // takeRecord takes what an answer record for the query's name gives:
 // an A record's address, appended to addresses unless they are full, or
 // a CNAME's target, which becomes the query's name. It fails with
-// wire.ErrMalformed for a malformed target.
+// wire.ErrMalformed for a target that is malformed or longer than
+// MaxNameSize octets, and leaves the query's name as it was.
 func (pending *pendingQuery) takeRecord(response wire.DNSPacket, record wire.DNSRecord, addresses []netip.Addr) ([]netip.Addr, error) {
 	switch record.Data.Type {
 	case wire.DNSTypeA:

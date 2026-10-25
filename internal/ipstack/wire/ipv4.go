@@ -145,29 +145,9 @@ func (p IPv4Packet) HeaderLen() int {
 	return int(p[ipv4VersionAndIHLOffset]&ipv4IHLMask) * headerWordLen
 }
 
-// DSCP returns the Differentiated Services Code Point field.
-func (p IPv4Packet) DSCP() uint8 {
-	return p[ipv4DSCPAndECNOffset] >> ipv4DSCPShift
-}
-
-// ECN returns the Explicit Congestion Notification field.
-func (p IPv4Packet) ECN() uint8 {
-	return p[ipv4DSCPAndECNOffset] & ipv4ECNMask
-}
-
 // TotalLen returns the total length field: header and payload, in octets.
 func (p IPv4Packet) TotalLen() uint16 {
 	return binary.BigEndian.Uint16(p[ipv4TotalLenOffset:])
-}
-
-// ID returns the identification field, which groups fragments.
-func (p IPv4Packet) ID() uint16 {
-	return binary.BigEndian.Uint16(p[ipv4IDOffset:])
-}
-
-// DontFragment returns the "don't fragment" flag.
-func (p IPv4Packet) DontFragment() bool {
-	return p.flagsAndOffset()&ipv4DontFragmentFlag != 0
 }
 
 // MoreFragments returns the "more fragments" flag.
@@ -191,7 +171,9 @@ func (p IPv4Packet) NextHeader() IPProtocol {
 	return IPProtocol(p[ipv4ProtocolOffset])
 }
 
-// Checksum returns the header checksum field.
+// Checksum returns the header checksum field. The stack checks it with
+// VerifyChecksum; the getter stays for the tests, which pin, corrupt and
+// rewrite the field.
 func (p IPv4Packet) Checksum() uint16 {
 	return binary.BigEndian.Uint16(p[ipv4ChecksumOffset:])
 }

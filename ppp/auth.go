@@ -120,6 +120,10 @@ type authenticatee struct {
 	// 1994 §4.1). nil when there is none.
 	chapResponse *packet
 	retriesLeft  int
+	// challengesAnswered counts the CHAP challenges answered since the
+	// authenticator last sent its Success, so that one that keeps
+	// challenging without deciding cannot hold the link forever.
+	challengesAnswered int
 	// deadline is when to retransmit or give up; the zero Time when no
 	// timer is running.
 	deadline time.Time
@@ -165,8 +169,7 @@ func (a *authenticatee) start(now time.Time, out *outbox) {
 // receive answers a CHAP challenge, or reads the authenticator's decision.
 func (a *authenticatee) receive(received packet, now time.Time, out *outbox) outcome {
 	if a.protocol == AuthProtocolCHAPMD5 && received.code == chapChallenge {
-		a.answerChallenge(received, now, out)
-		return undecided
+		return a.answerChallenge(received, now, out)
 	}
 	result := a.outcomeOf(received)
 	if result.kind == outcomeUndecided {
@@ -174,6 +177,7 @@ func (a *authenticatee) receive(received packet, now time.Time, out *outbox) out
 	}
 	a.deadline = time.Time{}
 	a.chapResponse = nil
+	a.challengesAnswered = 0
 	if result.kind == outcomeSucceeded {
 		if a.accepted {
 			return undecided // a duplicate, or the answer to a re-challenge
@@ -220,11 +224,17 @@ func chapOutcome(reply packet) outcome {
 	}
 }
 
-// answerChallenge sends the Response to a CHAP challenge.
-func (a *authenticatee) answerChallenge(challenge packet, now time.Time, out *outbox) {
+// answerChallenge sends the Response to a CHAP challenge. Beyond
+// MaxConfigure challenges since the authenticator's last Success, it gives
+// up instead: the authenticator never completes authentication.
+func (a *authenticatee) answerChallenge(challenge packet, now time.Time, out *outbox) outcome {
 	value, _, ok := splitLengthPrefixed(challenge.data)
 	if !ok {
-		return
+		return undecided
+	}
+	a.challengesAnswered++
+	if a.challengesAnswered > a.timers.MaxConfigure {
+		return a.giveUp()
 	}
 	a.identifier = challenge.identifier
 	digest := chapDigest(challenge.identifier, []byte(a.credentials.Password), value)
@@ -235,6 +245,7 @@ func (a *authenticatee) answerChallenge(challenge packet, now time.Time, out *ou
 	}
 	a.retriesLeft = a.timers.MaxConfigure
 	a.sendCHAPResponse(now, out)
+	return undecided
 }
 
 // handleTimeout repeats our request or response, or gives up once the
@@ -247,6 +258,11 @@ func (a *authenticatee) handleTimeout(now time.Time, out *outbox) outcome {
 		a.repeat(now, out)
 		return undecided
 	}
+	return a.giveUp()
+}
+
+// giveUp stops the exchange, which the authenticator never completed.
+func (a *authenticatee) giveUp() outcome {
 	a.deadline = time.Time{}
 	a.chapResponse = nil
 	return failed("the peer never completed authentication")

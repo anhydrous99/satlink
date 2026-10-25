@@ -16,6 +16,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
+	"github.com/anhydrous99/satlink/satnet"
 	"github.com/anhydrous99/satlink/serial"
 	"github.com/anhydrous99/satlink/sim"
 )
@@ -200,6 +201,56 @@ func inboxHolding(senders ...string) func(*testing.T, sim.Config) iridium.Transp
 	}
 }
 
+// inboxHoldingMessage returns simulated handsets whose inbox holds one
+// message: text, from sender.
+func inboxHoldingMessage(sender, text string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
+		simulator := simtest.NewSimulator(t, config)
+		simtest.ReceiveSMS(t, simulator.Control(), sender, text)
+		return simulator
+	}
+}
+
+// urcOn returns simulated handsets that send urc, an unsolicited line of
+// any text, ahead of their reply to command.
+func urcOn(command, urc string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
+		return &urcOnCommand{Handset: simtest.NewSimulator(t, config), command: command, urc: urc}
+	}
+}
+
+// urcOnCommand is a simulated handset that sends urc ahead of its reply to
+// command, the first time command is written to it.
+type urcOnCommand struct {
+	*sim.Handset
+	command, urc string
+	mu           sync.Mutex
+	sent         bool
+	// unread is what is left to read of the line sent.
+	unread []byte
+}
+
+func (h *urcOnCommand) WriteAll(p []byte) error {
+	h.mu.Lock()
+	if !h.sent && bytes.HasPrefix(p, []byte(h.command)) {
+		h.sent = true
+		h.unread = []byte("\r\n" + h.urc + "\r\n")
+	}
+	h.mu.Unlock()
+	return h.Handset.WriteAll(p)
+}
+
+func (h *urcOnCommand) ReadTimeout(p []byte, timeout time.Duration) (int, error) {
+	h.mu.Lock()
+	count := copy(p, h.unread)
+	h.unread = h.unread[count:]
+	h.mu.Unlock()
+	if count > 0 {
+		return count, nil
+	}
+	return h.Handset.ReadTimeout(p, timeout)
+}
+
 // smsArrivingOn returns simulated handsets that receive an SMS as command
 // is written to them, so that its announcement comes during the command.
 func smsArrivingOn(command string) func(*testing.T, sim.Config) iridium.Transport {
@@ -229,6 +280,111 @@ func unplugged(t *testing.T, config sim.Config) iridium.Transport {
 	faulty := simtest.NewFaultyTransport(simtest.NewSimulator(t, config))
 	faulty.Unplugged.Store(true)
 	return faulty
+}
+
+// chainedDataDial is a command line that chains a data dial to Iridium's
+// internet gateway after another command, which a handset would dial.
+const chainedDataDial = "ATE0D" + satnet.IridiumInternetNumber
+
+// answeredDuring is the raw command during which answeringDuringTheCommand
+// answers a data call.
+const answeredDuring = "AT+CSQ"
+
+// answeringDuringTheCommand is a simulated handset that answers a data call
+// on its own while answeredDuring runs, as one set to answer after a ring
+// (ATS0=1) may: CONNECT comes instead of the command's answer.
+func answeringDuringTheCommand(t *testing.T, config sim.Config) iridium.Transport {
+	return newCallAnswerer(t, config, answeredDuring)
+}
+
+// answeringDuringTheCommandUnplugged is answeringDuringTheCommand, whose
+// cable is pulled as the hang-up's escape is written: nothing ends the call.
+func answeringDuringTheCommandUnplugged(t *testing.T, config sim.Config) iridium.Transport {
+	return answeringDuringUnplugged(answeredDuring)(t, config)
+}
+
+// answeringDuringUnplugged returns simulated handsets that answer a data
+// call on its own while command runs, and whose cable is pulled as the
+// hang-up's escape is written: nothing ends the call.
+func answeringDuringUnplugged(command string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
+		answerer := newCallAnswerer(t, config, command)
+		answerer.unplugOnEscape = true
+		return answerer
+	}
+}
+
+// callAnswerer is a faulty transport that writes during as a data dial,
+// which the simulator answers with the CONNECT of the call answered, and
+// pulls its cable on the escape if unplugOnEscape says so.
+type callAnswerer struct {
+	*simtest.FaultyTransport
+	during         string
+	unplugOnEscape bool
+}
+
+// newCallAnswerer returns a callAnswerer over a new simulated handset made
+// with config, answering a call during the command during.
+func newCallAnswerer(t *testing.T, config sim.Config, during string) *callAnswerer {
+	return &callAnswerer{FaultyTransport: simtest.NewFaultyTransport(simtest.NewSimulator(t, config)), during: during}
+}
+
+func (c *callAnswerer) WriteAll(data []byte) error {
+	if c.during != "" && string(data) == c.during+"\r" {
+		data = []byte("ATD" + satnet.IridiumInternetNumber + "\r")
+	}
+	if c.unplugOnEscape && string(data) == "+++" {
+		c.Unplugged.Store(true)
+	}
+	return c.FaultyTransport.WriteAll(data)
+}
+
+// connectingOnceAnsweredUnplugged returns simulated handsets that, once
+// they have answered command with OK, send the CONNECT of a data call they
+// answered on their own, and whose cable is pulled as the hang-up's escape
+// is written: nothing ends the call.
+func connectingOnceAnsweredUnplugged(command string) func(*testing.T, sim.Config) iridium.Transport {
+	return func(t *testing.T, config sim.Config) iridium.Transport {
+		answerer := newCallAnswerer(t, config, "")
+		answerer.unplugOnEscape = true
+		return &lateConnector{callAnswerer: answerer, command: command}
+	}
+}
+
+// lateConnector is a callAnswerer that sends a CONNECT unprompted once the
+// simulator has answered command with OK, on the first read that finds
+// nothing more from it.
+type lateConnector struct {
+	*callAnswerer
+	command string
+	mu      sync.Mutex
+	// answer is what the simulator has sent since command was written, nil
+	// before.
+	answer    []byte
+	connected bool
+}
+
+func (c *lateConnector) WriteAll(data []byte) error {
+	c.mu.Lock()
+	if string(data) == c.command+"\r" {
+		c.answer = []byte{}
+	}
+	c.mu.Unlock()
+	return c.callAnswerer.WriteAll(data)
+}
+
+func (c *lateConnector) ReadTimeout(p []byte, timeout time.Duration) (int, error) {
+	n, err := c.callAnswerer.ReadTimeout(p, timeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.answer != nil {
+		c.answer = append(c.answer, p[:n]...)
+	}
+	if n > 0 || err != nil || c.connected || !bytes.Contains(c.answer, []byte("\r\nOK\r\n")) {
+		return n, err
+	}
+	c.connected = true
+	return copy(p, "\r\nCONNECT 9600\r\n"), nil
 }
 
 // errBrokenStdin is why a brokenReader cannot be read.

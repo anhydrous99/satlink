@@ -3,8 +3,8 @@ package tcp
 // The fuzz target of the socket: a peer that
 // sends whatever segments it likes, an application that sends, receives,
 // closes and opens the socket again at any moment, and an interface that
-// polls the socket over a line that refuses segments at times, and whose
-// address changes now and then. go test runs its seeds; fuzz it with
+// polls the socket, and whose address changes now and then. go test runs its
+// seeds; fuzz it with
 //
 //	go test -run='^$' -fuzz='^FuzzSocketAgainstAHostilePeer$' -fuzztime=60s -parallel=2 ./internal/ipstack/tcp
 
@@ -140,11 +140,9 @@ const (
 const (
 	stepPeerSends byte = iota
 	stepDispatch
-	stepDispatchOverABusyLine
 	stepWait
 	stepAppSends
 	stepAppReceives
-	stepAppPeeks
 	stepAppCloses
 	stepAppAborts
 	stepAppOpens
@@ -157,11 +155,9 @@ const (
 var fuzzSteps = [stepCount]func(r *fuzzRun, script *scriptReader){
 	stepPeerSends:               (*fuzzRun).peerSends,
 	stepDispatch:                (*fuzzRun).dispatch,
-	stepDispatchOverABusyLine:   (*fuzzRun).dispatchOverABusyLine,
 	stepWait:                    (*fuzzRun).wait,
 	stepAppSends:                (*fuzzRun).appSends,
 	stepAppReceives:             (*fuzzRun).appReceives,
-	stepAppPeeks:                (*fuzzRun).appPeeks,
 	stepAppCloses:               (*fuzzRun).appCloses,
 	stepAppAborts:               (*fuzzRun).appAborts,
 	stepAppOpens:                (*fuzzRun).appOpens,
@@ -469,33 +465,11 @@ func (r *fuzzRun) peerACKAnchor(flags peerFlags) wire.TCPSeqNumber {
 	return r.s.localSeqNumber
 }
 
-// dispatch has the interface poll the socket over a free line.
+// dispatch has the interface poll the socket, and checks what it sends.
 func (r *fuzzRun) dispatch(*scriptReader) {
-	r.dispatchWith(r.emitOverAFreeLine)
-}
-
-// dispatchOverABusyLine has the interface poll the socket while the line is
-// busy, so that emit refuses the segment.
-func (r *fuzzRun) dispatchOverABusyLine(*scriptReader) {
-	r.dispatchWith(r.emitOverABusyLine)
-}
-
-func (r *fuzzRun) emitOverAFreeLine(ip wire.IPv4Repr, segment wire.TCPRepr) error {
-	r.checkSent(ip, segment)
-	return nil
-}
-
-func (r *fuzzRun) emitOverABusyLine(ip wire.IPv4Repr, segment wire.TCPRepr) error {
-	r.checkSent(ip, segment)
-	return errLineBusy
-}
-
-func (r *fuzzRun) dispatchWith(emit EmitFunc) {
 	r.s.cx.SetNow(r.now())
 	r.fastRetransmissionDue = r.s.pendingFastRetransmit || r.s.timer.kind == timerFastRetransmit
-	if err := r.s.Dispatch(r.s.cx, emit); err != nil && err != errLineBusy {
-		r.t.Fatalf("Dispatch = %v, want nil or emit's error", err)
-	}
+	r.s.Dispatch(r.s.cx, r.checkSent)
 }
 
 // wait moves the clock on by as long as the script's octet says
@@ -522,22 +496,10 @@ func (r *fuzzRun) appReceives(script *scriptReader) {
 	first := r.firstUnreadSeq()
 	data := make([]byte, int(script.next())*r.payloadUnit)
 	received, err := r.s.ReceiveSlice(data)
-	if errors.Is(err, ErrFinished) && r.s.ReceiveQueue() != 0 {
-		r.t.Fatalf("ReceiveSlice reported the end of the stream with %d octets unread", r.s.ReceiveQueue())
+	if errors.Is(err, ErrFinished) && r.s.receiveBuffer.Len() != 0 {
+		r.t.Fatalf("ReceiveSlice reported the end of the stream with %d octets unread", r.s.receiveBuffer.Len())
 	}
 	r.checkReceived(first, data[:received])
-}
-
-// appPeeks has the application peek at as many units as the script says,
-// with Peek and with PeekSlice, and checks what it sees.
-func (r *fuzzRun) appPeeks(script *scriptReader) {
-	first := r.firstUnreadSeq()
-	length := int(script.next()) * r.payloadUnit
-	if peeked, err := r.s.Peek(length); err == nil {
-		r.checkReceived(first, peeked)
-	}
-	copied := make([]byte, length)
-	r.checkReceived(first, copied[:r.s.PeekSlice(copied)])
 }
 
 func (r *fuzzRun) appCloses(*scriptReader) {
@@ -561,11 +523,10 @@ func (r *fuzzRun) appOpens(script *scriptReader) {
 // addressLeavesAndReturns has the interface lose its address while it polls
 // the socket, and get it back, as when PPP renegotiates: a connection from
 // the address is reset.
-func (r *fuzzRun) addressLeavesAndReturns(*scriptReader) {
-	addresses := r.s.cx.IPAddrs()
+func (r *fuzzRun) addressLeavesAndReturns(script *scriptReader) {
 	r.setIPAddrs([]netip.Prefix{netip.PrefixFrom(otherAddr, 24)})
-	r.dispatchWith(r.emitOverAFreeLine)
-	r.setIPAddrs(addresses)
+	r.dispatch(script)
+	r.setIPAddrs(testIPAddrs())
 }
 
 func (r *fuzzRun) setIPAddrs(addresses []netip.Prefix) {
@@ -827,7 +788,7 @@ func fuzzSeeds() []fuzzSeed {
 		{1 | configConnect | configNagleOff, lossAndRecoveryScript()},
 		{0, zeroWindowScript()},
 		{configKeepAlive | configTimeout, keepAliveAndTimeoutScript()},
-		{1 | configConnect | configACKDelay, busyLineScript()},
+		{1 | configConnect | configACKDelay, delayedACKScript()},
 		{3 | configConnect, simultaneousCloseThenReuseScript()},
 		{configConnect, peerSYNBeforeTheSocketsOwnScript()},
 		{configConnect, closeBeforeThePeersSYNScript()},
@@ -985,15 +946,20 @@ func keepAliveAndTimeoutScript() []byte {
 	return b.script
 }
 
-// busyLineScript has the line refuse a connecting socket's segments now and
-// then.
-func busyLineScript() []byte {
+// delayedACKScript has a connecting socket that delays its ACKs send data
+// and receive some: it holds back the ACK of the peer's first segment until
+// the delay has passed, and acknowledges at once when more than an MSS of
+// data waits.
+func delayedACKScript() []byte {
 	var b scriptBuilder
-	b.step(stepDispatchOverABusyLine).step(stepDispatch)
+	b.step(stepDispatch)
 	b.peer(seedSegment{control: peerSYN, flags: peerFlagACK | peerFlagACKAll, window: 4096})
-	b.step(stepAppSends, 100).step(stepDispatchOverABusyLine).step(stepDispatch).step(stepDispatchOverABusyLine)
+	b.step(stepAppSends, 100).step(stepDispatch).step(stepDispatch)
 	b.peer(seedSegment{control: peerPSH, flags: peerFlagACK, window: 4096, payloadUnits: 20})
-	b.waitSeconds(1).step(stepDispatchOverABusyLine).step(stepDispatch).step(stepAppReceives, 20)
+	b.step(stepDispatch).waitSeconds(1).step(stepDispatch).step(stepAppReceives, 20)
+	b.peer(seedSegment{control: peerPSH, flags: peerFlagACK | peerFlagACKAll, window: 4096, payloadUnits: 40})
+	b.peer(seedSegment{control: peerPSH, flags: peerFlagACK | peerFlagACKAll, window: 4096, payloadUnits: 40})
+	b.step(stepDispatch).step(stepAppReceives, 80)
 	return b.script
 }
 

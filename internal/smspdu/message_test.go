@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // withoutServiceCentre returns the PDU of tpdu with the empty service
@@ -199,24 +200,53 @@ func TestEightBitDataReadsAsUTF8(t *testing.T) {
 	}
 }
 
+// refusedPDUs are PDUs that do not hold together, by what is wrong with
+// them, and the error Decode refuses each with.
+var refusedPDUs = map[string]struct {
+	pdu  string
+	want error
+}{
+	"empty":                         {"", errTruncated},
+	"cut in the service centre":     {"0791886126", errTruncated},
+	"cut in the timestamp":          {"00040281110000624012", errTruncated},
+	"user data shorter than TP-UDL": {"000402811100006240122201000005E834", errTruncated},
+	"a header longer than the data": {"0044028111000462401222010000030A0102", errBadHeader},
+	"a GSM 7-bit header too long":   {"0044028111000062401222010000020A01", errBadHeader},
+	// TP-UDHI set, TP-DCS UCS-2 and TP-UDL 0: no octet for TP-UDHL.
+	"an empty user data that announces a header": {"00440281110008624012220100000000", errBadHeader},
+}
+
 func TestAPDUThatDoesNotHoldTogetherIsRefused(t *testing.T) {
-	tests := map[string]struct {
-		pdu  string
-		want error
-	}{
-		"empty":                         {"", errTruncated},
-		"cut in the service centre":     {"0791886126", errTruncated},
-		"cut in the timestamp":          {"00040281110000624012", errTruncated},
-		"user data shorter than TP-UDL": {"000402811100006240122201000005E834", errTruncated},
-		"a header longer than the data": {"0044028111000462401222010000030A0102", errBadHeader},
-		"a GSM 7-bit header too long":   {"0044028111000062401222010000020A01", errBadHeader},
-	}
-	for name, test := range tests {
+	for name, test := range refusedPDUs {
 		octets, _ := hex.DecodeString(test.pdu)
 		if _, err := Decode(octets); !errors.Is(err, test.want) {
 			t.Errorf("%s: %v, want %v", name, err, test.want)
 		}
 	}
+}
+
+// FuzzDecode checks that no PDU makes Decode panic, since anyone may send
+// a handset an SMS, and that every string it decodes is valid UTF-8.
+func FuzzDecode(f *testing.F) {
+	// The published SMS-DELIVER decodes, so that its strings are checked
+	// even when the fuzzer does not run.
+	published, _ := hex.DecodeString("07917283010010F5040BC87238880900F10000993092516195800AE8329BFD4697D9EC37")
+	f.Add(published)
+	for _, refused := range refusedPDUs {
+		octets, _ := hex.DecodeString(refused.pdu)
+		f.Add(octets)
+	}
+	f.Fuzz(func(t *testing.T, pdu []byte) {
+		message, err := Decode(pdu)
+		if err != nil {
+			return
+		}
+		for _, text := range []string{message.Address, message.Timestamp, message.Text} {
+			if !utf8.ValidString(text) {
+				t.Fatalf("% X decodes as %+q", pdu, message)
+			}
+		}
+	})
 }
 
 func TestAStatusReportIsNotAMessage(t *testing.T) {

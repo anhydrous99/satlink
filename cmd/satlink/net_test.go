@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/anhydrous99/satlink/satnet"
-	"github.com/spf13/cobra"
 )
 
 // noVariables is an environment in which no variable is set.
@@ -30,12 +29,12 @@ func parseNet(t *testing.T, commandLine []string, lookupEnv func(string) (string
 		parsed = arguments
 		return nil
 	})
-	root := newRoot(&cobra.Command{Use: programName}).withSubcommands(net)
+	root := newRoot(programName, "").withSubcommands(net)
 	named, exit := parseCommandLine(root, append([]string{"net"}, commandLine...), surroundings{lookupEnv: lookupEnv})
 	if exit != nil {
 		return netArguments{}, exit
 	}
-	if err := named.runner.RunE(named.runner, nil); err != nil {
+	if err := named.run(t.Context()); err != nil {
 		t.Fatalf("satlink net %s: %v", strings.Join(commandLine, " "), err)
 	}
 	return parsed, nil
@@ -262,6 +261,32 @@ func TestTheDataNumberComesFromTheEnvironmentUnlessGiven(t *testing.T) {
 
 			if exit != nil || arguments.number != test.number {
 				t.Errorf("%q dials %q (%v), want %q", test.commandLine, arguments.number, exit, test.number)
+			}
+		})
+	}
+}
+
+func TestThePasswordComesFromTheEnvironmentUnlessGiven(t *testing.T) {
+	tests := []struct {
+		name        string
+		commandLine []string
+		password    string
+	}{
+		{"from the environment", []string{"status"}, "hunter2"},
+		{"given", []string{"--password", "letmein", "status"}, "letmein"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lookupEnv := func(key string) (string, bool) {
+				return "hunter2", key == passwordVariable
+			}
+
+			arguments, exit := parseNet(t, test.commandLine, lookupEnv)
+			config, err := arguments.linkConfig()
+
+			if exit != nil || err != nil || config.Credentials.Password != test.password {
+				t.Errorf("%q gives the link the password %q (%v, %v), want %q", test.commandLine,
+					config.Credentials.Password, exit, err, test.password)
 			}
 		})
 	}

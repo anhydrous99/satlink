@@ -34,21 +34,6 @@ type contig struct {
 	dataSize int
 }
 
-// Clear forgets every recorded run.
-func (a *Assembler) Clear() {
-	a.contigs = [AssemblerMaxSegmentCount]contig{}
-}
-
-// PeekFront returns the length of the run at the very start of the buffer,
-// without removing it; 0 when the buffer starts with a hole.
-func (a *Assembler) PeekFront() int {
-	front := a.contigs[0]
-	if front.hasHole() {
-		return 0
-	}
-	return front.dataSize
-}
-
 // IsEmpty reports whether no data is recorded.
 func (a *Assembler) IsEmpty() bool {
 	return !a.contigs[0].hasData()

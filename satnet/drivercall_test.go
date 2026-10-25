@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anhydrous99/satlink/internal/logtest"
 	"github.com/anhydrous99/satlink/internal/simtest"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/ppp"
@@ -262,7 +263,7 @@ func TestPPPOutputAfterNoCarrierIsDroppedWithoutFailingTheLink(t *testing.T) {
 
 // lastRecord returns the last of records, failing the test if there is
 // none.
-func lastRecord(t *testing.T, records []logRecord) logRecord {
+func lastRecord(t *testing.T, records []logtest.Line) logtest.Line {
 	t.Helper()
 	if len(records) == 0 {
 		t.Fatal("nothing was logged")
@@ -271,7 +272,7 @@ func lastRecord(t *testing.T, records []logRecord) logRecord {
 }
 
 func TestAHangUpIsLogged(t *testing.T) {
-	records := recordLogs(t, slog.LevelInfo)
+	records := logtest.Record(t, logPackage, slog.LevelInfo)
 	handset, _ := simtest.NewHandset(t, simtest.SimulatorConfig())
 	link, err := Establish(handset, testLinkConfig())
 	if err != nil {
@@ -282,14 +283,14 @@ func TestAHangUpIsLogged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := logRecord{slog.LevelInfo, logPackage, "link closed: closed by the app"}
+	want := logtest.Line{Level: slog.LevelInfo, Text: "link closed: closed by the app"}
 	if got := lastRecord(t, records()); got != want {
 		t.Errorf("logged %v, want %v", got, want)
 	}
 }
 
 func TestAHangUpThatCannotBeConfirmedIsLoggedAsAWarning(t *testing.T) {
-	records := recordLogs(t, slog.LevelWarn)
+	records := logtest.Record(t, logPackage, slog.LevelWarn)
 	faulty := simtest.NewFaultyTransport(simtest.NewSimulator(t, simtest.SimulatorConfig()))
 	link, err := Establish(simtest.InitializedHandset(t, faulty), testLinkConfig())
 	if err != nil {
@@ -306,7 +307,7 @@ func TestAHangUpThatCannotBeConfirmedIsLoggedAsAWarning(t *testing.T) {
 	if err := link.Close(); !errors.As(err, &closeErr) || closeErr.Err == nil {
 		t.Fatalf("Close() = %v, want the hang-up's failure", err)
 	}
-	want := logRecord{slog.LevelWarn, logPackage, "link closed (handset I/O failed: transport error: unplugged), " +
+	want := logtest.Line{Level: slog.LevelWarn, Text: "link closed (handset I/O failed: transport error: unplugged), " +
 		"but the hang-up was not confirmed, so the call may still be up: " + closeErr.Err.Error()}
 	if got := lastRecord(t, records()); got != want {
 		t.Errorf("logged %v, want %v", got, want)

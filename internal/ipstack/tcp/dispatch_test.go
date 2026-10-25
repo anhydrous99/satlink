@@ -22,31 +22,16 @@ import (
 // SYN|ACK at once.
 func TestAPeersSYNBeforeTheSocketsOwnIsAnsweredAtOnce(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name string
-		// before is what happens to the socket's own SYN before the peer's
-		// arrives.
-		before func(t *testing.T, s *testSocket)
-	}{
-		{"SYN not dispatched", func(*testing.T, *testSocket) {}},
-		{"SYN refused by emit", func(t *testing.T, s *testSocket) { dispatchRefused(t, s) }},
+	s := socketClosed(t)
+	if err := s.Connect(s.cx, remoteEnd, listenEnd); err != nil {
+		t.Fatalf("Connect: %v", err)
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			s := socketClosed(t)
-			if err := s.Connect(s.cx, remoteEnd, listenEnd); err != nil {
-				t.Fatalf("Connect: %v", err)
-			}
-			test.before(t, s)
 
-			send(t, s, remoteSYN())
+	send(t, s, remoteSYN())
 
-			assertState(t, s, StateSynReceived)
-			assertPollAt(t, s, socket.PollNow())
-			receive(t, s, synACK())
-		})
-	}
+	assertState(t, s, StateSynReceived)
+	assertPollAt(t, s, socket.PollNow())
+	receive(t, s, synACK())
 }
 
 // A SYN|ACK that answers a SYN announcing a zero window, from a socket

@@ -40,13 +40,20 @@ go test -run='^$' -fuzz='^FuzzSocketAgainstAHostilePeer$' -fuzztime=60s -paralle
 ```sh
 gofmt -l .
 go vet ./...
-go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+go install honnef.co/go/tools/cmd/staticcheck@latest
+staticcheck ./...
+GOOS=linux GOARCH=386 CGO_ENABLED=0 staticcheck -checks SA1027 ./...
 go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -over 15 .
 go test -race -cover ./...
 ```
 
-[CI](.github/workflows/ci.yml) runs them on every pull request: the first four
-on Linux, and the tests on Linux, macOS and Windows. Run them locally first.
+`go install` puts `staticcheck` in `go env GOBIN`, or in
+`$(go env GOPATH)/bin` when GOBIN is unset; that directory must be on your
+`PATH`. The second staticcheck run checks 64-bit atomics as 32-bit platforms
+align them; [concurrency](docs/DESIGN.md#concurrency) says why.
+
+[CI](.github/workflows/ci.yml) runs them on every pull request: the tests on
+Linux, macOS and Windows, and the rest on Linux. Run them locally first.
 
 ## Code
 

@@ -12,7 +12,7 @@ import (
 )
 
 // queueDevice is a device that holds datagrams in two queues: those received,
-// and those sent. It always has room to send.
+// and those sent.
 type queueDevice struct {
 	received, sent [][]byte
 }
@@ -26,8 +26,8 @@ func (d *queueDevice) Receive(time.Time) ([]byte, ipstack.TransmitSlot, bool) {
 	return datagram, d.send, true
 }
 
-func (d *queueDevice) Transmit(time.Time) (ipstack.TransmitSlot, bool) {
-	return d.send, true
+func (d *queueDevice) Transmit(time.Time) ipstack.TransmitSlot {
+	return d.send
 }
 
 func (d *queueDevice) send(datagram []byte) {

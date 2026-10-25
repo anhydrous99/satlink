@@ -239,18 +239,22 @@ func TestDropsMRUAndCompressionOnceRejected(t *testing.T) {
 	})
 }
 
-func TestAdoptsAnMRUSuggestionThatCarriesIPv4(t *testing.T) {
+func TestAdoptsAnMRUSuggestionThatCarriesIPv4AndThatItCanReceive(t *testing.T) {
 	tests := []struct {
 		name       string
+		configured uint16
 		suggestion configOption
 		want       uint16
 	}{
-		{"500", option(lcpOptionMRU, 0x01, 0xF4), 500},
-		{"the smallest that does, 68", option(lcpOptionMRU, 0x00, 0x44), 68},
+		{"500", 1500, option(lcpOptionMRU, 0x01, 0xF4), 500},
+		{"the smallest that carries IPv4, 68", 1500, option(lcpOptionMRU, 0x00, 0x44), 68},
+		// Every peer takes 1500 whatever MRU was negotiated (RFC 1661 §6.1).
+		{"1500, with 576 configured", 576, option(lcpOptionMRU, 0x05, 0xDC), 1500},
+		{"the 4000 configured", 4000, option(lcpOptionMRU, 0x0F, 0xA0), 4000},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			lcp := testClientLCP()
+			lcp := newClientLCP(test.configured, 0)
 
 			if err := lcp.applyNak([]configOption{test.suggestion}); err != nil {
 				t.Fatal(err)
@@ -258,6 +262,30 @@ func TestAdoptsAnMRUSuggestionThatCarriesIPv4(t *testing.T) {
 
 			if lcp.own.mru != test.want {
 				t.Errorf("MRU = %d, want %d", lcp.own.mru, test.want)
+			}
+		})
+	}
+}
+
+func TestProposesNoMRUInsteadOfASuggestionLargerThanItCanReceive(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured uint16
+		suggestion configOption
+	}{
+		{"1501, with 576 configured", 576, option(lcpOptionMRU, 0x05, 0xDD)},
+		{"4001, with 4000 configured", 4000, option(lcpOptionMRU, 0x0F, 0xA1)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lcp := newClientLCP(test.configured, 0)
+
+			if err := lcp.applyNak([]configOption{test.suggestion}); err != nil {
+				t.Fatal(err)
+			}
+
+			if lcp.own.mru != 0 {
+				t.Errorf("MRU = %d, want none proposed, leaving the default", lcp.own.mru)
 			}
 		})
 	}

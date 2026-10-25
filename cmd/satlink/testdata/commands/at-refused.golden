@@ -1,5 +1,5 @@
-$ satlink --simulate=instant at AT+BOGUS
+$ satlink --simulate=instant at AT+XYZZY
 exit status 1
 --- stdout
 --- stderr
-error: handset returned ERROR for "AT+BOGUS"
+error: handset returned ERROR for "AT+XYZZY"

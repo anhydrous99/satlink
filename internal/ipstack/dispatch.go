@@ -5,7 +5,7 @@ import (
 	"github.com/anhydrous99/satlink/internal/ipstack/wire"
 )
 
-// dispatchIP serializes packet and sends it through slot. The stack does not
+// dispatchIP serialises packet and sends it through slot. The stack does not
 // fragment, so a datagram larger than the IP MTU is dropped, and the slot left
 // unused.
 func (i *Interface) dispatchIP(slot TransmitSlot, packet ipPacket) {

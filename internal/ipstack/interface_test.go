@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"errors"
 	"net/netip"
-	"slices"
 	"testing"
 	"time"
 
@@ -309,16 +308,13 @@ func TestSourceAddressChangeResetsTCPWithoutRST(t *testing.T) {
 	assertNothingSent(t, device)
 }
 
-func TestPollAtAndPollDelay(t *testing.T) {
+func TestPollAt(t *testing.T) {
 	t.Parallel()
 	iface, sockets, device := setup(t)
 	polled := pollTimes{iface: iface, sockets: sockets}
 
 	if _, ok := iface.PollAt(at(0), sockets); ok {
 		t.Error("PollAt of an empty set has a deadline")
-	}
-	if _, ok := iface.PollDelay(at(0), sockets); ok {
-		t.Error("PollDelay of an empty set has a delay")
 	}
 
 	client := newTCPSocket()
@@ -332,8 +328,6 @@ func TestPollAtAndPollDelay(t *testing.T) {
 	// initial RTO of 1 s.
 	iface.Poll(at(0), device, sockets)
 	polled.assertPollAt(t, at(300*time.Millisecond), at(time.Second))
-	polled.assertPollDelay(t, at(300*time.Millisecond), 700*time.Millisecond)
-	polled.assertPollDelay(t, at(2*time.Second), 0)
 
 	// A datagram waiting to be sent asks for a poll now.
 	datagrams := newUDPSocket(t, wire.ListenEndpoint{Port: 7})
@@ -342,7 +336,6 @@ func TestPollAtAndPollDelay(t *testing.T) {
 	}
 	sockets.AddUDP(datagrams)
 	polled.assertPollAt(t, at(300*time.Millisecond), at(300*time.Millisecond))
-	polled.assertPollDelay(t, at(300*time.Millisecond), 0)
 }
 
 func TestPollAtOfANewDNSQueryIsThePast(t *testing.T) {
@@ -356,7 +349,6 @@ func TestPollAtOfANewDNSQueryIsThePast(t *testing.T) {
 	polled := pollTimes{iface: iface, sockets: sockets}
 
 	polled.assertPollAt(t, at(time.Minute), time.Time{})
-	polled.assertPollDelay(t, at(time.Minute), 0)
 }
 
 // pollTimes asks an interface when its sockets need the next poll.
@@ -371,15 +363,6 @@ func (p pollTimes) assertPollAt(t *testing.T, now, want time.Time) {
 	got, ok := p.iface.PollAt(now, p.sockets)
 	if !ok || !got.Equal(want) {
 		t.Errorf("PollAt(%v) = %v, %t; want %v", now.Sub(time.Time{}), got.Sub(time.Time{}), ok, want.Sub(time.Time{}))
-	}
-}
-
-// assertPollDelay checks that PollDelay at now is want.
-func (p pollTimes) assertPollDelay(t *testing.T, now time.Time, want time.Duration) {
-	t.Helper()
-	got, ok := p.iface.PollDelay(now, p.sockets)
-	if !ok || got != want {
-		t.Errorf("PollDelay(%v) = %v, %t; want %v", now.Sub(time.Time{}), got, ok, want)
 	}
 }
 
@@ -413,8 +396,8 @@ func TestNewInterfaceMakesItsContext(t *testing.T) {
 	if !cx.Now().Equal(now) || cx.IPMTU() != 576 {
 		t.Errorf("the context is at %v with an IP MTU of %d, want %v and 576", cx.Now(), cx.IPMTU(), now)
 	}
-	if len(cx.IPAddrs()) != 0 || cx.AnyIP() {
-		t.Errorf("a new interface has addresses %v and any-IP %t, want none and off", cx.IPAddrs(), cx.AnyIP())
+	if address, ok := cx.IPv4Addr(); ok || cx.HasIPAddr(foreignAddr) {
+		t.Errorf("a new interface has the address %v, or takes %v as its own; want no address and any-IP off", address, foreignAddr)
 	}
 }
 
@@ -463,7 +446,6 @@ func TestFragmentIdentifierIsTheFirstUint16ThatIsNotZero(t *testing.T) {
 func TestSetIPAddrsRefusesAddressesThatCannotBeTheInterfaces(t *testing.T) {
 	t.Parallel()
 	iface, _, _ := setup(t)
-	before := iface.Context().IPAddrs()
 	for _, prefix := range []string{"224.0.0.1/4", "255.255.255.255/32", "2001:db8::1/64"} {
 		err := iface.SetIPAddrs([]netip.Prefix{netip.PrefixFrom(localAddr, 24), netip.MustParsePrefix(prefix)})
 
@@ -471,8 +453,10 @@ func TestSetIPAddrsRefusesAddressesThatCannotBeTheInterfaces(t *testing.T) {
 			t.Errorf("SetIPAddrs with %s = %v, want %v", prefix, err, socket.ErrInvalidIPAddr)
 		}
 	}
-	if after := iface.Context().IPAddrs(); !slices.Equal(after, before) {
-		t.Errorf("the addresses changed to %v, want %v", after, before)
+	// Every refused list holds localAddr but not loopbackAddr, so a change
+	// would drop one of the two.
+	if cx := iface.Context(); !cx.HasIPAddr(localAddr) || !cx.HasIPAddr(loopbackAddr) {
+		t.Error("a refused list of addresses replaced the interface's")
 	}
 }
 
@@ -482,7 +466,7 @@ func TestSetAnyIPSetsTheContexts(t *testing.T) {
 
 	iface.SetAnyIP(true)
 
-	if !iface.Context().AnyIP() || !iface.Context().HasIPAddr(foreignAddr) {
+	if !iface.Context().HasIPAddr(foreignAddr) {
 		t.Error("with any-IP on, the context does not take every address as the interface's")
 	}
 }

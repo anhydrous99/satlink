@@ -63,6 +63,54 @@ func nakOf(request packet) packet {
 	return answerOf(codeConfigureNak, request)
 }
 
+// stallingAnswer is an answer a peer can stall a negotiation with: it names
+// nothing the requester can change, so the same request goes out again.
+type stallingAnswer struct {
+	name string
+	// code is the answer's, Configure-Nak (3) or -Reject (4): written out,
+	// so that the tests check packet.go's constants instead of trusting
+	// them.
+	code byte
+	// options are the answer's options, as hex octets.
+	options string
+}
+
+// to returns the answer to request, framed for the line as a packet of
+// protocol.
+func (s stallingAnswer) to(t *testing.T, protocol uint16, request packet) []byte {
+	t.Helper()
+	answer := packet{code: code(s.code), identifier: request.identifier, data: hexBytes(t, s.options)}
+	return framed(protocol, answer.encode())
+}
+
+// stallNegotiation gives endpoint answer to its request of protocol count
+// times, starting with request, and fails the test unless endpoint asks
+// again each time with the same options under a new identifier. It returns
+// endpoint's last request.
+func stallNegotiation(t *testing.T, endpoint *Endpoint, protocol uint16, request packet, answer stallingAnswer, count int) packet {
+	t.Helper()
+	for range count {
+		endpoint.HandleInput(answer.to(t, protocol, request), testStart)
+		again := onlyRequest(t, endpoint, protocol)
+		if !bytes.Equal(again.data, request.data) || again.identifier == request.identifier {
+			t.Fatalf("asked again with %v after %v, want the same options under a new identifier", again, request)
+		}
+		request = again
+	}
+	return request
+}
+
+// onlyRequest returns what endpoint sent of protocol, failing the test
+// unless it is one Configure-Request.
+func onlyRequest(t *testing.T, endpoint *Endpoint, protocol uint16) packet {
+	t.Helper()
+	sent := controlPackets(endpoint.TakeOutput(), protocol)
+	if len(sent) != 1 || sent[0].code != codeConfigureRequest {
+		t.Fatalf("sent %+v of protocol %#04x, want one ConfigureRequest", sent, protocol)
+	}
+	return sent[0]
+}
+
 // assertOptions fails the test unless got holds want's options, in order.
 func assertOptions(t *testing.T, got, want []configOption) {
 	t.Helper()

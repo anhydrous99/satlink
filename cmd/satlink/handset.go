@@ -45,6 +45,9 @@ func (o *globalOptions) arguments() []*argument {
 // withHandset opens the simulated handset, or the serial port given or
 // discovered, readies it for commands and lets use have it. It closes the
 // handset again whatever happens — a panic included, as the panic unwinds.
+// When readying it fails leaving a call that may still be up, it says how
+// to end that call (warnIfCallMayStillBeUp); use's own failures are its to
+// report.
 func (c *cli) withHandset(use func(*iridium.Handset) error) error {
 	transport, err := c.openTransport()
 	if err != nil {
@@ -53,23 +56,23 @@ func (c *cli) withHandset(use func(*iridium.Handset) error) error {
 	handset := iridium.NewHandset(transport)
 	defer closeHandset(handset)
 	if err := handset.Initialize(); err != nil {
+		warnIfCallMayStillBeUp(c.streams.stderr, err)
 		return err
 	}
 	return use(handset)
 }
 
 // reportingEvents returns use followed, when it succeeds, by the unsolicited
-// result codes the handset sent meanwhile, on standard error.
+// result codes the handset sent meanwhile, on standard error (printEvents).
+// When use fails leaving a call that may still be up, it says how to end
+// that call (warnIfCallMayStillBeUp).
 func (c *cli) reportingEvents(use func(*iridium.Handset) error) func(*iridium.Handset) error {
 	return func(handset *iridium.Handset) error {
 		if err := use(handset); err != nil {
+			warnIfCallMayStillBeUp(c.streams.stderr, err)
 			return err
 		}
-		p := printer{w: c.streams.stderr}
-		for _, urc := range handset.TakeURCs() {
-			p.printf("(event) %s\n", urc)
-		}
-		return p.err
+		return printEvents(c.streams.stderr, "(event) ", handset.TakeURCs())
 	}
 }
 

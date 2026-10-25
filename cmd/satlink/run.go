@@ -21,8 +21,9 @@ const (
 // status: exitSuccess, exitFailure when the command failed, exitUsage when
 // the command line does not parse, exitInterrupted when an interruption
 // asked a net call to stop, or exitPanicked when the run panicked. The
-// command line is read by parseCommandLine; cobra then runs the command it
-// names. Every call builds a fresh command tree, so runs share nothing.
+// command line is read by parseCommandLine; the command it names then runs
+// with ctx, once the logger is installed. Every call builds a fresh command
+// tree, so runs share nothing.
 func run(ctx context.Context, env environment) (status int) {
 	// Log lines come from the link's goroutines while commands write.
 	stderr := &syncWriter{w: env.stderr}
@@ -42,10 +43,8 @@ func run(ctx context.Context, env environment) (status int) {
 	if exit != nil {
 		return endBeforeRunning(exit, env, stderr)
 	}
-	// Only the command's path is left for cobra to find it by. A copy, never
-	// nil: given nil, cobra would read os.Args instead.
-	root.runner.SetArgs(append([]string{}, named.path()...))
-	return c.finish(root.runner.ExecuteContext(ctx))
+	c.installLogger()
+	return c.finish(named.run(ctx))
 }
 
 // finish ends a run whose command returned err, and returns the exit
@@ -55,8 +54,7 @@ func run(ctx context.Context, env environment) (status int) {
 func (c *cli) finish(err error) int {
 	c.log.flush()
 	if err != nil {
-		// Best effort: standard error may be the reason it failed.
-		_, _ = fmt.Fprintf(c.streams.stderr, "error: %v\n", err)
+		reportError(c.streams.stderr, err)
 	}
 	c.interruptions.stop()
 	switch {
@@ -75,6 +73,15 @@ func (c *cli) panicked(value any) int {
 	reportPanic(c.streams.stderr, value)
 	c.interruptions.stop()
 	return exitPanicked
+}
+
+// reportError writes err to stderr. An error may carry a stranger's words,
+// such as the names in a server's certificate, so it shows without their
+// control characters (stripControls).
+func reportError(stderr io.Writer, err error) {
+	// Best effort: standard error may be the reason the command failed, and
+	// the exit status says that it did.
+	_, _ = fmt.Fprintf(stderr, "error: %s\n", stripControls(err.Error()))
 }
 
 // reportPanic writes a recovered panic and where it happened to stderr. Three

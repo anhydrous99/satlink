@@ -3,6 +3,7 @@ package main
 import (
 	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -251,4 +252,23 @@ func isPrintable(b byte, action vtAction) bool {
 	default:
 		return false
 	}
+}
+
+// stripControls returns text that strangers wrote as a terminal can show it
+// without obeying it: an SMS, which anyone may send, an event the network
+// reports, a server's response head, or an error that carries a server's
+// words. Like stripStyles, it drops the sequences that ESC starts, and of the
+// control characters it keeps only tab and line feed. Carriage return goes,
+// as it would let the text write over the start of its line. So do the C1
+// controls, which some terminals obey: U+009B as CSI, for one.
+//
+// What the user asks for raw passes as it comes: net get's body, what net
+// tcp relays, and the response to satlink at.
+func stripControls(text string) string {
+	return strings.Map(func(character rune) rune {
+		if unicode.IsControl(character) && character != '\t' && character != '\n' {
+			return -1
+		}
+		return character
+	}, stripStyles(text))
 }

@@ -361,7 +361,8 @@ func TestEachOpeningStartsItsCountsAfresh(t *testing.T) {
 
 // assertNaksTolerated Naks count of a's requests in a row, starting with
 // request, and fails the test unless a takes each Nak and asks again; it
-// returns a's last request.
+// returns a's last request. The Naks change nothing in the request, so
+// they are fruitless answers too.
 func assertNaksTolerated(t *testing.T, a *testAutomaton, request packet, count int) packet {
 	t.Helper()
 	var out outbox

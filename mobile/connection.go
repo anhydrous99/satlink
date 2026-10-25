@@ -311,7 +311,8 @@ type UDPConnection struct {
 	conn *satnet.UDPConn
 }
 
-// Send sends one datagram, waiting up to timeoutMillis for buffer space.
+// Send sends one datagram, waiting up to timeoutMillis for its turn on the
+// line: only a few datagrams queue.
 func (c *UDPConnection) Send(datagram []byte, timeoutMillis int64) (err error) {
 	defer recoverPanic(&err)
 	conn, err := made(c.conn, "UDPConnection")

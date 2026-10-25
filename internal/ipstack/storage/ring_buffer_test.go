@@ -49,11 +49,9 @@ func assertCount(t *testing.T, what string, got, want int) {
 func dequeueDotting(t *testing.T, ring *RingBuffer[byte], count int) {
 	t.Helper()
 	for range count {
-		octet, err := ring.DequeueOne()
-		if err != nil {
-			t.Fatalf("DequeueOne: %v", err)
+		if err := ring.DequeueOneWith(func(octet *byte) error { *octet = '.'; return nil }); err != nil {
+			t.Fatalf("DequeueOneWith: %v", err)
 		}
-		*octet = '.'
 	}
 }
 
@@ -144,11 +142,9 @@ func TestRingBufferEnqueueDequeueOneWith(t *testing.T) {
 	assertFillState(t, ring, true, false)
 }
 
-func TestRingBufferEnqueueDequeueOne(t *testing.T) {
+func TestRingBufferEnqueueOne(t *testing.T) {
 	t.Parallel()
 	ring := NewRingBuffer[int](5)
-	_, err := ring.DequeueOne()
-	assertOneWithFails(t, "DequeueOne on an empty ring", err, ErrEmpty)
 
 	for i := range 5 {
 		element, err := ring.EnqueueOne()
@@ -161,22 +157,12 @@ func TestRingBufferEnqueueDequeueOne(t *testing.T) {
 		}
 	}
 	assertFillState(t, ring, false, true)
-	_, err = ring.EnqueueOne()
+	_, err := ring.EnqueueOne()
 	assertOneWithFails(t, "EnqueueOne on a full ring", err, ErrFull)
 
 	for want := range 5 {
-		element, err := ring.DequeueOne()
-		if err != nil {
-			t.Fatalf("DequeueOne: %v", err)
-		}
-		assertCount(t, "dequeued element", *element, want)
-		if ring.IsFull() {
-			t.Errorf("full after dequeuing %d", want)
-		}
+		assertCount(t, "dequeued element", mustDequeueOneWith(t, ring), want)
 	}
-	_, err = ring.DequeueOne()
-	assertOneWithFails(t, "DequeueOne on an emptied ring", err, ErrEmpty)
-	assertFillState(t, ring, true, false)
 }
 
 // enqueueStep is one call of EnqueueManyWith in a test: the size of the free
@@ -392,27 +378,6 @@ func TestRingBufferAllocated(t *testing.T) {
 	assertBytes(t, "Allocated(4, 8)", ring.Allocated(4, 8), "ijkl")
 }
 
-func TestRingBufferReadAllocated(t *testing.T) {
-	t.Parallel()
-	ring := newDottedRing(12)
-	copy(ring.EnqueueMany(12), "abcdefghijkl")
-
-	data := make([]byte, 6)
-	assertCount(t, "ReadAllocated(0)", ring.ReadAllocated(0, data), 6)
-	assertBytes(t, "read", data, "abcdef")
-
-	copy(ring.DequeueMany(6), "ABCDEF")
-	copy(ring.EnqueueMany(3), "mno")
-
-	data = make([]byte, 6)
-	assertCount(t, "ReadAllocated(3)", ring.ReadAllocated(3, data), 6)
-	assertBytes(t, "read", data, "jklmno")
-
-	data = make([]byte, 6)
-	assertCount(t, "ReadAllocated(6)", ring.ReadAllocated(6, data), 3)
-	assertBytes(t, "read", data, "mno\x00\x00\x00")
-}
-
 func TestRingBufferWithNoCapacity(t *testing.T) {
 	t.Parallel()
 	noCapacity := NewRingBuffer[byte](0)
@@ -469,9 +434,7 @@ func TestRingBufferOneWithKeepsTheElementWhenTheCallbackFails(t *testing.T) {
 		t.Fatalf("DequeueOneWith: %v, want the callback's error", err)
 	}
 	assertLen(t, ring, 1)
-	if got, _ := ring.DequeueOne(); *got != 7 {
-		t.Errorf("dequeued %d, want 7", *got)
-	}
+	assertCount(t, "dequeued element", mustDequeueOneWith(t, ring), 7)
 }
 
 func TestRingBufferSlicesCannotGrowIntoTheStorage(t *testing.T) {
@@ -504,7 +467,6 @@ func TestRingBufferRandomAccessGetsNothingPastTheEndOfItsArea(t *testing.T) {
 		{"Unallocated", func(ring *RingBuffer[byte], offset int) int { return len(ring.Unallocated(offset, 4)) }, window},
 		{"WriteUnallocated", func(ring *RingBuffer[byte], offset int) int { return ring.WriteUnallocated(offset, []byte("wxyz")) }, window},
 		{"Allocated", func(ring *RingBuffer[byte], offset int) int { return len(ring.Allocated(offset, 4)) }, length},
-		{"ReadAllocated", func(ring *RingBuffer[byte], offset int) int { return ring.ReadAllocated(offset, make([]byte, 4)) }, length},
 	}
 	for _, test := range tests {
 		for _, step := range []struct {

@@ -343,17 +343,22 @@ func TestTheFinalResponsesHeadGoesToStandardErrorAndItsBodyToStandardOutput(t *t
 		err            string
 	}{
 		{"complete", "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", responseEnding{kind: endingComplete},
-			"HTTP/1.0 200 OK\r\nContent-Length: 5\n", "hello", ""},
+			"HTTP/1.0 200 OK\nContent-Length: 5\n", "hello", ""},
 		{"after an interim response", "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.0 200 OK\r\n\r\nhello", closed,
 			"HTTP/1.0 200 OK\n", "hello", ""},
 		{"cut short", "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhel", closed,
-			"HTTP/1.0 200 OK\r\nContent-Length: 5\n", "hel", "the response ended after 3 of 5 bytes"},
+			"HTTP/1.0 200 OK\nContent-Length: 5\n", "hel", "the response ended after 3 of 5 bytes"},
+		// A clipboard write, a cleared screen, a line written over from its
+		// start, and a C1 CSI; the body, asked for raw, keeps its own.
+		{"control characters", "HTTP/1.0 200 OK\r\nX-Evil: \x1b]52;c;cm0gLXJmIH4K\x07\x1b[2J\rServer: fake\u009b2J\r\n" +
+			"Content-Length: 7\r\n\r\n\x1b[31mhi", closed,
+			"HTTP/1.0 200 OK\nX-Evil: Server: fake2J\nContent-Length: 7\n", "\x1b[31mhi", ""},
 		{"head unfinished", "HTTP/1.0 200 OK\r\nContent-Ty", closed,
 			"", "", "the response ended after 27 bytes, before its headers did"},
 		{"not HTTP", "SSH-2.0-OpenSSH_9.6\r\n\r\nhello", closed,
 			"SSH-2.0-OpenSSH_9.6\n", "", "the reply is not an HTTP response"},
 		{"framed as HTTP/1.0 cannot be", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello", closed,
-			"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\n", "",
+			"HTTP/1.1 200 OK\nTransfer-Encoding: chunked\n", "",
 			`the reply uses Transfer-Encoding "chunked", which HTTP/1.0 does not allow`},
 	}
 	for _, test := range tests {

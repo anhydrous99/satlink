@@ -62,8 +62,8 @@ type helpPage struct {
 func renderHelp(cmd *command, length helpLength, lookupEnv func(string) (string, bool), p palette) string {
 	page := helpPage{command: cmd, long: length == longHelp && cmd.hasLongHelp(), lookupEnv: lookupEnv, palette: p}
 	var sections []string
-	if cmd.about() != "" {
-		sections = append(sections, cmd.about())
+	if cmd.about != "" {
+		sections = append(sections, cmd.about)
 	}
 	sections = append(sections, p.header("Usage:")+" "+fullUsage(cmd, p))
 	if cmd.hasSubcommands() {
@@ -83,11 +83,11 @@ func renderHelp(cmd *command, length helpLength, lookupEnv func(string) (string,
 func (p helpPage) subcommands() string {
 	width := shortestSubcommandWidth
 	for _, subcommand := range p.command.subcommands {
-		width = max(width, displayWidth(subcommand.name()))
+		width = max(width, displayWidth(subcommand.name))
 	}
 	lines := make([]string, len(p.command.subcommands))
 	for i, subcommand := range p.command.subcommands {
-		lines[i] = helpIndent + padded(p.palette.literal(subcommand.name()), width+helpGap) + subcommand.about()
+		lines[i] = helpIndent + padded(p.palette.literal(subcommand.name), width+helpGap) + subcommand.about
 	}
 	return strings.Join(lines, "\n")
 }
@@ -173,15 +173,13 @@ func (p helpPage) argumentHelp(arg *argument) string {
 	}
 }
 
-// valueSources says where else arg's value may come from: "[env: X=value]"
-// with the variable's current value, read lossily, "[default:
-// value]", and "[possible values: a, b]" unless long help lists them one per
-// line.
+// valueSources says where else arg's value may come from: its environment
+// variable, "[default: value]", and "[possible values: a, b]" unless long
+// help lists them one per line.
 func (p helpPage) valueSources(arg *argument) string {
 	var sources []string
 	if arg.env != "" {
-		text, _ := p.lookupEnv(arg.env)
-		sources = append(sources, "[env: "+arg.env+"="+lossy(text)+"]")
+		sources = append(sources, p.environmentSource(arg))
 	}
 	if arg.takesValue() && arg.hasDefault {
 		sources = append(sources, "[default: "+quotedIfBlank(arg.defaultValue)+"]")
@@ -197,6 +195,16 @@ func (p helpPage) valueSources(arg *argument) string {
 		return strings.Join(sources, "\n")
 	}
 	return strings.Join(sources, " ")
+}
+
+// environmentSource names arg's environment variable: "[env: X=value]" with
+// its current value, read lossily, or "[env: X]" when the value is a secret.
+func (p helpPage) environmentSource(arg *argument) string {
+	if arg.hidesEnvValue {
+		return "[env: " + arg.env + "]"
+	}
+	text, _ := p.lookupEnv(arg.env)
+	return "[env: " + arg.env + "=" + lossy(text) + "]"
 }
 
 // listsPossibleValues reports whether the page lists arg's possible values

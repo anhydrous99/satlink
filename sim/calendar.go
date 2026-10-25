@@ -1,36 +1,14 @@
 package sim
 
-import (
-	"fmt"
-	"time"
-)
+import "time"
 
-// Calendar timestamps as the handset prints them, in UTC:
-// yy/MM/dd,hh:mm:ss+00.
+// clockLayout is the handset's calendar time as a time.Format layout:
+// yy/MM/dd,hh:mm:ss, then the time zone in quarter hours. The simulated
+// clock keeps UTC, so the zone is always the literal +00.
+const clockLayout = "06/01/02,15:04:05+00"
 
-// timestamp is a moment in UTC, as +CCLK and SMS headers show it.
-type timestamp struct {
-	year, month, day     int
-	hour, minute, second int
-}
-
-// timestampAt returns the wall-clock time of moment in UTC, to the second;
-// a clock set before 1970 reads as the epoch.
-func timestampAt(moment time.Time) timestamp {
-	utc := time.Unix(max(moment.Unix(), 0), 0).UTC()
-	return timestamp{
-		year:   utc.Year(),
-		month:  int(utc.Month()),
-		day:    utc.Day(),
-		hour:   utc.Hour(),
-		minute: utc.Minute(),
-		second: utc.Second(),
-	}
-}
-
-// String returns the timestamp with a two-digit year, then UTC's zero
-// offset in quarter hours.
-func (ts timestamp) String() string {
-	return fmt.Sprintf("%02d/%02d/%02d,%02d:%02d:%02d+00",
-		ts.year%100, ts.month, ts.day, ts.hour, ts.minute, ts.second)
+// timestampAt returns moment as +CCLK shows it, in UTC to the second; a
+// clock set before 1970 reads as the epoch.
+func timestampAt(moment time.Time) string {
+	return time.Unix(max(moment.Unix(), 0), 0).UTC().Format(clockLayout)
 }

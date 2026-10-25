@@ -11,7 +11,6 @@ import (
 
 	"github.com/anhydrous99/satlink/internal/utf8lossy"
 	"github.com/anhydrous99/satlink/satnet"
-	"github.com/spf13/cobra"
 )
 
 // `satlink net get`: an HTTP/1.0 GET over the link, the response's head on
@@ -38,7 +37,7 @@ type getAction struct {
 // read, so that a bad URL never costs a call.
 func getCommand(start func(netAction) error) *command {
 	var action getAction
-	return netSubcommand(&cobra.Command{Use: "get", Short: "Fetch an http:// or https:// URL and print its body"},
+	return netSubcommand("get", "Fetch an http:// or https:// URL and print its body",
 		start, func() netAction { return action }, requiredPositional("URL", "http:// or https:// URL to fetch", urlValue{target: &action.url}))
 }
 
@@ -59,9 +58,10 @@ func (g getAction) execute(link netLink, s streams) error {
 }
 
 // printHTTPResponse prints the final response of response, which ending
-// ended: its head on standard error, then its body on standard output. It
-// fails, after printing what arrived, when the body may be incomplete, and
-// when the response cannot be used.
+// ended: its head on standard error, without the server's control
+// characters (stripControls), then its body on standard output, as it came.
+// It fails, after printing what arrived, when the body may be incomplete,
+// and when the response cannot be used.
 func printHTTPResponse(response []byte, ending responseEnding, s streams) error {
 	head, body, ok := finalResponse(response)
 	if !ok {
@@ -69,7 +69,7 @@ func printHTTPResponse(response []byte, ending responseEnding, s streams) error 
 	}
 	// Read as lossy UTF-8: what is not UTF-8 becomes U+FFFD.
 	headText := utf8lossy.String(head)
-	if err := writef(s.stderr, "%s\n", strings.TrimRightFunc(headText, unicode.IsSpace)); err != nil {
+	if err := writef(s.stderr, "%s\n", strings.TrimRightFunc(stripControls(headText), unicode.IsSpace)); err != nil {
 		return err
 	}
 	status, ok := statusCode(headText)

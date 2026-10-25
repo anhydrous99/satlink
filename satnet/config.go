@@ -192,7 +192,9 @@ type Tuning struct {
 	// so that they outlive TCPTimeout; zero sends none.
 	TCPKeepalive time.Duration
 
-	// NegotiationTimeout is how long PPP may take to come up after CONNECT.
+	// NegotiationTimeout is how long PPP may take to come up after CONNECT,
+	// and to come back up once the peer starts renegotiating: a link that
+	// renegotiates carries nothing, but the call still bills.
 	NegotiationTimeout time.Duration
 
 	// DNSCacheLifetime is how long a DNS answer is reused before asking

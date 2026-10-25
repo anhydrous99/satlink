@@ -52,7 +52,11 @@ func (h *Handset) sendSMS(number, text string) (int, error) {
 	if err != nil {
 		return 0, invalidArgument(err.Error())
 	}
-	pdu := append(h.serviceCentreAddress(), tpdu...)
+	address, err := h.serviceCentreAddress()
+	if err != nil {
+		return 0, err
+	}
+	pdu := append(address, tpdu...)
 	response, err := h.exec(request{
 		command:    fmt.Sprintf("AT+CMGS=%d", len(tpdu)),
 		timeout:    smsTimeout,
@@ -72,16 +76,21 @@ func (h *Handset) sendSMS(number, text string) (int, error) {
 // serviceCentreAddress returns the address of the SMS centre the SIM
 // names (AT+CSCA?), or of Iridium's when it names none. A handset that
 // cannot say gets Iridium's too: what fails then fails again at AT+CMGS,
-// which reports it.
-func (h *Handset) serviceCentreAddress() []byte {
-	if fields, err := h.queryFields("AT+CSCA?", "+CSCA"); err == nil && fieldAt(fields, 0) != "" {
+// which reports it. It fails only with the errors a method returns all the
+// same (callTrouble).
+func (h *Handset) serviceCentreAddress() ([]byte, error) {
+	fields, err := h.queryFields("AT+CSCA?", "+CSCA")
+	if trouble := callTrouble(err); trouble != nil {
+		return nil, trouble
+	}
+	if err == nil && fieldAt(fields, 0) != "" {
 		if address, err := smspdu.EncodeServiceCentre(fields[0]); err == nil {
-			return address
+			return address, nil
 		}
 	}
 	// Encoding a constant number cannot fail.
 	address, _ := smspdu.EncodeServiceCentre(iridiumServiceCentre)
-	return address
+	return address, nil
 }
 
 // listSMS is ListSMS, with the handset's lock held.

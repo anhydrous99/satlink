@@ -29,7 +29,10 @@ type ByteTransport interface {
 	// Read returns up to maxLen bytes, or an empty array (or null) if
 	// nothing arrived within timeoutMillis milliseconds. timeoutMillis is at
 	// least 1 and at most 2147483647, so it fits the Java int that
-	// UsbDeviceConnection.bulkTransfer takes.
+	// UsbDeviceConnection.bulkTransfer takes. A read that fails, as each
+	// one does once the handset is unplugged, returns an error rather than
+	// an empty array: the library would take that for silence and read
+	// again at once, keeping a CPU busy.
 	Read(maxLen int, timeoutMillis int64) ([]byte, error)
 
 	// RaiseDTR raises the DTR line; over USB CDC-ACM, a

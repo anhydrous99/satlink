@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -11,7 +12,6 @@ import (
 	"github.com/anhydrous99/satlink/internal/debugtext"
 	"github.com/anhydrous99/satlink/iridium"
 	"github.com/anhydrous99/satlink/satnet"
-	"github.com/spf13/cobra"
 )
 
 // `satlink net`: the handset's data call as an IP link that only this
@@ -26,6 +26,11 @@ const connectTimeout = 120 * time.Second
 // dataNumberVariable is the environment variable that stands in for
 // --number.
 const dataNumberVariable = "SATLINK_DATA_NUMBER"
+
+// passwordVariable is the environment variable that stands in for
+// --password: given on the command line, a password shows in the process
+// list, where other users can read it.
+const passwordVariable = "SATLINK_PASSWORD"
 
 // leastLimit is the smallest value --idle-secs, --max-minutes and --max-kb
 // take: a limit reached as soon as the call connects would bill a call for
@@ -50,8 +55,9 @@ type netFlags struct {
 
 // arguments declares the settings. Their defaults are the number that
 // SATLINK_DATA_NUMBER names, or else Iridium's internet gateway; nothing
-// else allowed; no credentials; the link's own default idle and call time
-// limits, and no data limit.
+// else allowed; no user name, and the password that SATLINK_PASSWORD holds,
+// or else none; the link's own default idle and call time limits, and no
+// data limit.
 func (f *netFlags) arguments() []*argument {
 	limits := satnet.DefaultLimits()
 	return []*argument{
@@ -63,7 +69,7 @@ func (f *netFlags) arguments() []*argument {
 		{long: "username", valueName: "USERNAME", help: "PPP user name (Iridium's gateway accepts any)",
 			hasDefault: true, value: stringValue{target: &f.username}},
 		{long: "password", valueName: "PASSWORD", help: "PPP password (Iridium's gateway accepts any)",
-			hasDefault: true, value: stringValue{target: &f.password}},
+			env: passwordVariable, hidesEnvValue: true, hasDefault: true, value: stringValue{target: &f.password}},
 		limitArgument("idle-secs", "Hang up after this many seconds without traffic",
 			&f.idleSeconds, wholeUnits(limits.IdleTimeout, time.Second)),
 		limitArgument("max-minutes", "Longest the call may last, in minutes, hanging up included",
@@ -280,30 +286,27 @@ func newNetCommand(execute func(netArguments) error) *command {
 	start := func(action netAction) error {
 		return execute(netArguments{netFlags: *flags, action: action})
 	}
-	return newCommand(&cobra.Command{
-		Use:   "net",
-		Short: "Use a data call as an IP link that only this program can use",
-	}, flags.arguments()...).withSubcommands(
-		netSubcommand(&cobra.Command{Use: "status", Short: "Bring the link up, show what was negotiated, and hang up"},
+	net := newCommand("net", "Use a data call as an IP link that only this program can use", nil, flags.arguments()...)
+	return net.withSubcommands(
+		netSubcommand("status", "Bring the link up, show what was negotiated, and hang up",
 			start, func() netAction { return statusAction{} }),
 		resolveCommand(start), getCommand(start), tcpCommand(start),
 	)
 }
 
-// netSubcommand returns a net subcommand, which cobraCommand names and
+// netSubcommand returns the net subcommand called name, which about
 // describes: running it starts the action that newAction makes from what
 // the command line gave arguments.
-func netSubcommand(cobraCommand *cobra.Command, start func(netAction) error, newAction func() netAction,
+func netSubcommand(name, about string, start func(netAction) error, newAction func() netAction,
 	arguments ...*argument) *command {
-	cobraCommand.RunE = func(*cobra.Command, []string) error {
+	return newCommand(name, about, func(context.Context) error {
 		return start(newAction())
-	}
-	return newCommand(cobraCommand, arguments...)
+	}, arguments...)
 }
 
 // resolveCommand is `satlink net resolve`.
 func resolveCommand(start func(netAction) error) *command {
 	var action resolveAction
-	return netSubcommand(&cobra.Command{Use: "resolve", Short: "Look up a host name over the link"},
+	return netSubcommand("resolve", "Look up a host name over the link",
 		start, func() netAction { return action }, requiredPositional("HOST", "Host name to look up", stringValue{target: &action.host}))
 }

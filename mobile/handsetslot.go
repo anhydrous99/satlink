@@ -24,8 +24,8 @@ const (
 	// slotHere means the handset is ready for commands.
 	slotHere handsetSlot = iota
 	// slotStranded means a data call the handset was in could not be ended
-	// and may still be up — its link's, or one Answer took by mistake — so
-	// only Reinitialize may use it.
+	// and may still be up — its link's, one Answer took by mistake, or one
+	// whose CONNECT no command awaited — so only Reinitialize may use it.
 	slotStranded
 	// slotDialling means a link is being set up with the handset.
 	slotDialling

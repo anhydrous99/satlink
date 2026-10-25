@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/anhydrous99/satlink/iridium"
-	"github.com/spf13/cobra"
 )
 
 // fullSignalBars is the most bars an Iridium handset shows.
@@ -14,14 +15,10 @@ const fullSignalBars = 5
 // statusCommand is `satlink status`: signal, battery and network
 // registration.
 func (c *cli) statusCommand() *command {
-	return newCommand(&cobra.Command{
-		Use:   "status",
-		Short: "Signal strength, battery and network registration",
-		RunE: func(*cobra.Command, []string) error {
-			return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
-				return printStatus(c.streams.stdout, handset)
-			}))
-		},
+	return newCommand("status", "Signal strength, battery and network registration", func(context.Context) error {
+		return c.withHandset(c.reportingEvents(func(handset *iridium.Handset) error {
+			return printStatus(c.streams.stdout, handset)
+		}))
 	})
 }
 
@@ -38,10 +35,25 @@ func printStatus(w io.Writer, handset *iridium.Handset) error {
 	if err := writef(w, "Signal:       %d/%d\n", bars, fullSignalBars); err != nil {
 		return err
 	}
-	if err := writef(w, "Battery:      %s\n", describeBattery(handset.Battery())); err != nil {
+	battery, batteryErr := handset.Battery()
+	if err := printReading(w, "Battery:      %s\n", describeBattery(battery, batteryErr), batteryErr); err != nil {
 		return err
 	}
-	return writef(w, "Registration: %s\n", describeRegistration(handset.Registration()))
+	registration, registrationErr := handset.Registration()
+	return printReading(w, "Registration: %s\n", describeRegistration(registration, registrationErr), registrationErr)
+}
+
+// printReading writes a reading's line, format with its description. When
+// reading it failed with readErr and left a call that may still be up, it
+// then fails with readErr, even if the line could not be written: the
+// command must not succeed, and it says how to end the call
+// (reportingEvents).
+func printReading(w io.Writer, format, description string, readErr error) error {
+	writeErr := writef(w, format, description)
+	if errors.Is(readErr, iridium.ErrCallMayStillBeUp) {
+		return readErr
+	}
+	return writeErr
 }
 
 // describeBattery is the charge in percent and the status, with the

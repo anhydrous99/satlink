@@ -40,7 +40,7 @@ const (
 	clientSeed   = 0x5eed
 	internetSeed = 0x1e7
 	// driverPollInterval is how often satnet's driver polls its stack, and
-	// so how soon sockets waiting for a busy line are offered a slot again.
+	// so how soon a socket that still wants a poll after one is polled again.
 	driverPollInterval = 20 * time.Millisecond
 	// maxSimulatedTime and maxSteps bound a scenario, which fails if it is
 	// not over by then; none needs nearly as long.
@@ -128,17 +128,16 @@ func (h *host) nextPoll(now time.Time) (time.Time, bool) {
 	case at.After(now):
 		return at, true
 	default:
-		// A socket had something to send at now, yet the poll at now left
-		// it unsent: the line is busy. The driver offers it a slot again
-		// at its next poll.
+		// A socket still wants a poll at now, after the poll at now: the
+		// driver polls it again at its next poll.
 		return now.Add(driverPollInterval), true
 	}
 }
 
 // pullDevice is a host's end of the line, a Device in the pull model: it
 // hands the interface what the other end sent, each datagram with a reply
-// slot that always takes the answer, and grants transmit slots only while the
-// line is free.
+// slot that always takes the answer, and takes every datagram the interface
+// sends.
 type pullDevice struct {
 	// inbox holds what the other end sent that the interface has yet to
 	// receive, oldest first.
@@ -146,11 +145,6 @@ type pullDevice struct {
 	// outbox holds what the interface sent during the current poll, for the
 	// line to carry, oldest first.
 	outbox []sentDatagram
-	// busyUntil is when the line is free again. Until then the device
-	// refuses transmit slots; reply slots do not wait for the line.
-	busyUntil time.Time
-	// refusals counts the transmit slots the device refused.
-	refusals int
 }
 
 // A pullDevice is the Device of each end of the line.
@@ -175,13 +169,9 @@ func (d *pullDevice) Receive(time.Time) ([]byte, ipstack.TransmitSlot, bool) {
 	return datagram, d.sendReply, true
 }
 
-// Transmit grants a slot unless the line is busy at now.
-func (d *pullDevice) Transmit(now time.Time) (ipstack.TransmitSlot, bool) {
-	if now.Before(d.busyUntil) {
-		d.refusals++
-		return nil, false
-	}
-	return d.sendTransmission, true
+// Transmit hands out a slot for the line.
+func (d *pullDevice) Transmit(time.Time) ipstack.TransmitSlot {
+	return d.sendTransmission
 }
 
 func (d *pullDevice) sendReply(datagram []byte) {

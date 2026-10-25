@@ -43,7 +43,8 @@ type ChecksumCapabilities struct {
 	UDP Checksum
 	// TCP applies to the TCP checksum, which covers a pseudo-header too.
 	TCP Checksum
-	// ICMPv4 applies to the ICMPv4 checksum.
+	// ICMPv4 applies to the ICMPv4 checksum. The stack reads no ICMP
+	// message, so only computing it on send has an effect.
 	ICMPv4 Checksum
 }
 

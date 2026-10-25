@@ -202,6 +202,33 @@ func TestAFailedRechallengeEndsAnAuthenticatedLink(t *testing.T) {
 	assertDownReason(t, link.client, DownReason{Kind: DownReasonAuthenticationFailed, Detail: "Access denied"})
 }
 
+func TestAnAuthenticatorThatKeepsChallengingWithoutDecidingEndsTheLink(t *testing.T) {
+	timers := DefaultTimers()
+	link := newTestLink(t, clientConfig(), serverConfigDemanding(AuthProtocolCHAPMD5))
+	link.exchangeUntil(t, func() bool { return link.client.Phase() == PhaseAuthenticate })
+	link.server.TakeOutput() // the server's own challenge is lost
+	// A Challenge (1) with a new identifier each time, just before the
+	// client would repeat its Response: each would restart its retries.
+	challenge := func(identifier uint8) []byte {
+		sent := packet{code: 1, identifier: identifier, data: lengthPrefixedThen(make([]byte, challengeLen), []byte("gw"))}
+		return framed(protocolCHAP, sent.encode())
+	}
+	for identifier := range uint8(timers.MaxConfigure) {
+		link.client.HandleInput(challenge(identifier), link.now)
+		link.client.TakeOutput() // the Response
+		link.now = link.now.Add(timers.Restart - time.Millisecond)
+		link.client.HandleTimeout(link.now)
+	}
+	if link.client.Phase() != PhaseAuthenticate {
+		t.Fatalf("phase = %v after %d challenges, want Authenticate", link.client.Phase(), timers.MaxConfigure)
+	}
+
+	link.client.HandleInput(challenge(uint8(timers.MaxConfigure)), link.now)
+	link.settle(t)
+
+	assertDownReason(t, link.client, DownReason{Kind: DownReasonAuthenticationFailed, Detail: "the peer never completed authentication"})
+}
+
 func TestALostCHAPChallengeIsSentAgain(t *testing.T) {
 	restart := DefaultTimers().Restart
 	link := newTestLink(t, clientConfig(), serverConfigDemanding(AuthProtocolCHAPMD5))

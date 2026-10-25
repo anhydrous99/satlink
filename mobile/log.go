@@ -1,7 +1,6 @@
 package mobile
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 
@@ -20,12 +19,7 @@ const logPackage = "mobile"
 
 // logError logs msg at error level.
 func logError(msg string) {
-	logger := slog.Default()
-	ctx := context.Background()
-	if !logger.Enabled(ctx, slog.LevelError) {
-		return
-	}
-	logger.Log(ctx, slog.LevelError, msg, logtext.PackageKey, logPackage)
+	logtext.Log(logPackage, slog.LevelError, msg)
 }
 
 // logPanic recovers a panic in progress in a goroutine this package

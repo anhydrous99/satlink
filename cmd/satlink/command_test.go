@@ -43,26 +43,20 @@ func TestEveryCommandWithSubcommandsHasAHelpSubcommandLast(t *testing.T) {
 	}
 }
 
-func TestCobraRunsEveryCommandButTheHelpSubcommand(t *testing.T) {
-	root := newFixture().root
-
-	var names []string
-	for _, cobraCommand := range root.runner.Commands() {
-		names = append(names, cobraCommand.Name())
+// The command line names only commands without subcommands, and answers the
+// help subcommand while it is read: every other command runs.
+func TestEveryCommandButGroupsAndTheHelpSubcommandRuns(t *testing.T) {
+	var check func(cmd *command)
+	check = func(cmd *command) {
+		if runs, want := cmd.run != nil, !cmd.hasSubcommands() && !cmd.showsHelp; runs != want {
+			t.Errorf("%s runs: %t, want %t", cmd.binName(), runs, want)
+		}
+		for _, subcommand := range cmd.subcommands {
+			check(subcommand)
+		}
 	}
 
-	if !slices.Equal(names, []string{"group"}) {
-		t.Errorf("cobra's subcommands are %q, want group alone", names)
-	}
-}
-
-func TestACommandsPathLeadsCobraToIt(t *testing.T) {
-	f := newFixture()
-	leaf := f.root.subcommand("group").subcommand("leaf")
-
-	if path := leaf.path(); !slices.Equal(path, []string{"group", "leaf"}) || f.root.path() != nil {
-		t.Errorf("paths %q and %q, want [group leaf] and none", path, f.root.path())
-	}
+	check(newCLI(environment{}, io.Discard).rootCommand())
 }
 
 func TestOnlyPossibleValuesThatSayWhatTheyMeanMakeLongHelp(t *testing.T) {

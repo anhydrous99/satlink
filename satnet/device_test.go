@@ -37,11 +37,7 @@ var deviceNow time.Time
 // handOver hands datagram to the device, as the stack does.
 func handOver(t *testing.T, device *linkDevice, datagram []byte) {
 	t.Helper()
-	slot, ok := device.Transmit(deviceNow)
-	if !ok {
-		t.Fatal("no slot, where the device has one whenever the stack asks")
-	}
-	slot(datagram)
+	device.Transmit(deviceNow)(datagram)
 }
 
 // released returns who sent each datagram that goes now, one line slot at a

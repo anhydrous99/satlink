@@ -123,8 +123,8 @@ const (
 	CloseReasonCallTimeLimit
 	// CloseReasonDataLimit means the configured data volume is used up.
 	CloseReasonDataLimit
-	// CloseReasonNegotiationTimedOut means PPP did not come up within the
-	// negotiation timeout.
+	// CloseReasonNegotiationTimedOut means PPP did not come up, or back up
+	// after the peer started renegotiating, within the negotiation timeout.
 	CloseReasonNegotiationTimedOut
 	// CloseReasonPPP means PPP went down: terminated by the peer, failed
 	// authentication, …

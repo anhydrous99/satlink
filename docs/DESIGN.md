@@ -26,13 +26,14 @@ expect, each with its reason. It describes the code as it is.
 | `mobile` | The gomobile API for Android and Apple platforms. | `IridiumHandset`, `SatelliteLink`, `ByteTransport` |
 | `cmd/satlink` | The command-line tool. | — |
 | `internal/ipstack` | The TCP/IP stack, in layers: `wire`, `storage`, `socket`, `tcp`, `udp`, `dns`. | see [IPSTACK.md](IPSTACK.md) |
-| `internal/logtext` | The one rendering of log records for people. | `NewHandler`, `PackageKey` |
+| `internal/logtext` | How the module logs, and the one rendering of log records for people. | `Log`, `NewHandler`, `PackageKey` |
 | `internal/debugtext` | The quoting and struct texts that messages use. | `Quote`, `IPv4Settings` |
 | `internal/ringprovider` | The TLS 1.2 suites and key exchange groups that satnet offers and sim serves. | — |
 | `internal/smspdu` | SMS PDUs: the SMS-SUBMIT iridium sends, and the SMS-DELIVER sim stores, both ways. | `Message`, `Decode`, `EncodeSubmit` |
 | `internal/utf8lossy`, `asciicase`, `errnotext` | Lossy UTF-8; ASCII-only case folding; OS error texts as strerror(3) writes them. | — |
 | `internal/memconn` | An in-memory `net.Conn` that sim's TLS echo runs crypto/tls over. | `Conn` |
 | `internal/simtest` | Shared test support: simulators, faulty transports, waiting helpers. | — |
+| `internal/logtest` | Shared test support for logging: the process-wide logger for one test, and what a package logs. | `Install`, `Record`, `Line` |
 
 Dependencies point one way. `iridium` imports only the `internal/` text helpers and
 `smspdu`, and `ppp` only `utf8lossy`. `satnet` and `sim` build on `iridium`, `ppp` and `ipstack`; `serial` on
@@ -82,7 +83,7 @@ from them.
 | The zero value cannot be a real value | the zero value, documented at the field | `Registration.CellID ""`, `Limits.MaxBytes 0` |
 | An optional struct | a pointer, nil for none | `DataCallSettings.Bearer`, `satnet.Status.IPv4` |
 | A lookup or poll that may find nothing | `(T, bool)` | `Endpoint.PollEvent`, `Watcher.NextStateChange` |
-| The zero value is a real value | a presence `bool` beside it | `Response.Connected` with `ConnectMessage` |
+| The zero value is a real value | a presence `bool` beside it | `Battery.Level` with `LevelReported` |
 | An optional deadline | `time.Time`, zero for none | `TCPConn.WaitAcknowledged` |
 
 A limit of zero means no limit, and a negative one is refused. In `mobile`, nothing
@@ -195,8 +196,11 @@ other goroutines. A `DataCall` used after `HangUp` fails with `ErrCall`.
   as crypto/tls and net/http rely on. A `Handset` serialises its exchanges.
 - Goroutines carry `runtime/pprof` labels and are named in logs.
 - Use the typed atomics (`atomic.Int64`, `atomic.Bool`, …), never `atomic.LoadInt64` on
-  plain fields: a misaligned 64-bit atomic panics on android/arm. `internal/portability`
-  type-checks every package for 32-bit targets.
+  plain fields: a misaligned 64-bit atomic panics on android/arm. `go vet` does not check
+  the alignment. staticcheck's SA1027 does, but only for a 32-bit target, so the
+  [checks](../CONTRIBUTING.md#the-checks-every-change-passes) run it for linux/386, which
+  aligns fields as android/arm does. `internal/portability` type-checks every package for
+  32-bit targets.
 
 ### Logging
 
@@ -205,8 +209,9 @@ ppp and serial do not log.
 
 - Each record carries a `"pkg"` attribute (`logtext.PackageKey`) naming the package:
   satnet, sim, ipstack or mobile.
-- Every logging package has one helper (`satnet/log.go`, `sim/log.go`, `mobile/log.go`,
-  ipstack's `netlog`). It checks `Enabled`, then logs with the package attribute.
+- Every logging package logs through `logtext.Log`, which checks `Enabled`, then logs with
+  the package attribute. Each wraps it in one-line helpers, one per level it uses; ipstack's
+  are in `netlog`.
 - satnet and sim format their texts at the call site, with `internal/debugtext` for struct
   values. ipstack passes values as attributes.
 - Levels are trace (`logtext.LevelTrace`, debug − 4), debug, info, warn and error.
@@ -222,9 +227,9 @@ Consumers render every record the same way, through `internal/logtext`. The CLI 
 - Unit tests sit beside the code they cover. Integration tests (`*_integration_test.go`,
   external packages) drive the public API against the simulator or fake transports.
 - Sans-I/O code is tested with explicit `now` values and never sleeps.
-- Shared helpers live in `internal/simtest`, `internal/memconn` and the `export_test.go`
-  files of `satnet` and `mobile`. They call `t.Helper` and clean up with `t.Cleanup`, so
-  that a test ends with no call up and no driver running.
+- Shared helpers live in `internal/simtest`, `internal/logtest`, `internal/memconn` and the
+  `export_test.go` files of `satnet` and `mobile`. They call `t.Helper` and clean up with
+  `t.Cleanup`, so that a test ends with no call up and no driver running.
 - Test names state the scenario: `TestHangUpEscapesToCommandModeThenHangsUp`.
 - Tests wait for conditions with deadlines (`simtest.Eventually`,
   `satnet.AwaitWaitingCall`). A fixed sleep only shows that something does not happen, and
@@ -351,18 +356,20 @@ records whether TCP ended, so that crypto/tls's `io.EOF` after a bare FIN become
 - **Zero-value objects**, which gomobile's constructors make, fail their methods cleanly.
 - **Lending.** `EstablishLinkWithHandset` lends the handset to the link. The setup settles
   where it goes exactly once: on to the link, or back.
-- **The stranded handset.** A lent link whose hang-up failed, or a panic in the setup,
-  strands the `IridiumHandset`. Its methods fail with `SatlinkErrorHangUpFailed` until
-  `Reinitialize` ends the call through the handset's own transport. A handset is never lost
-  with its link.
+- **The stranded handset.** A data call that could not be ended, or a panic in the setup,
+  strands the `IridiumHandset`. That call is a lent link's, one `Answer` took by mistake or
+  found up, or one whose `CONNECT` no command awaited. The handset's methods then fail with
+  `SatlinkErrorHangUpFailed` until `Reinitialize` ends the call through the handset's own
+  transport. A handset is never lost with its link.
 - **The port closer.** A serial link closes its port once its call has ended. It holds only
   the link's watcher, so a dropped link still hangs up.
 
 ### The CLI's command line
 
-The CLI parses its command line itself, rather than with cobra's or pflag's parser. Help
-text, error messages and option precedence are what users see, and this keeps them under
-the package's control. cobra only runs the command the parser chose.
+The CLI reads its command line itself, with no command-line library. Help text, error
+messages and option precedence are what users see, and this keeps them under the
+package's control. It keeps its own tree of commands, and runs the command the parser
+chose directly.
 
 ## Deliberate design choices
 
@@ -553,8 +560,12 @@ gomobile targets Android and Apple platforms only, so there are no JVM desktop b
 
 `internal/ipstack` is modelled on smoltcp 0.14, but handles four kinds of segment
 differently, where smoltcp would panic or hand the app octets the peer never sent. A hostile
-peer can reach three of them. IPSTACK.md lists the
-[segments smoltcp mishandles](IPSTACK.md#segments-smoltcp-mishandles) and the
+peer can reach three of them. Its DNS socket departs from smoltcp too, where a server's
+answer would fail a query. It compares names without regard to ASCII case, and keeps a
+query's name when a CNAME cannot be copied. IPSTACK.md lists the
+[segments smoltcp mishandles](IPSTACK.md#segments-smoltcp-mishandles), the
+[DNS names in another case](IPSTACK.md#dns-names-in-another-case),
+[a CNAME that cannot be copied](IPSTACK.md#a-cname-that-cannot-be-copied) and the
 [smoltcp defects kept](IPSTACK.md#smoltcp-defects-kept).
 
 ### DNS answers from port 5353 are accepted
