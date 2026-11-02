@@ -1,7 +1,11 @@
 # Iridium satellite handsets (USB vendor 0x1EDD).
-# Install:  sudo cp 99-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+# Install:  sudo cp 70-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
 # Grants the logged-in user access and adds a stable /dev/iridium* symlink.
+# Must run before 73-seat-late.rules applies the uaccess ACL.
 SUBSYSTEM=="tty", ATTRS{idVendor}=="1edd", MODE="0660", GROUP="dialout", TAG+="uaccess", SYMLINK+="iridium%n"
+
+# Direct USB access for handset diagnostics, restricted to Iridium devices.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="1edd", MODE="0660", GROUP="dialout", TAG+="uaccess"
 
 # Stop ModemManager from probing the handset and holding the port.
 ATTRS{idVendor}=="1edd", ENV{ID_MM_DEVICE_IGNORE}="1"

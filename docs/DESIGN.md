@@ -53,7 +53,7 @@ from them.
 - Initialisms follow Go: SMS, URC, IMEI, AT, TCP, DNS, TLS, IPv4, MTU, MRU, ACCM, PPP, LCP,
   IPCP, PAP, CHAP, USB, ID, DTR, ALPN, URL, HTTP, PEM, DER.
 - A name does not repeat its package: `sim.Handset`, `satnet.Config`, `iridium.USBVendorID`.
-- Product names say `satlink`: the binary, `SATLINK_PORT`, `linux/99-satlink.rules`,
+- Product names say `satlink`: the binary, `SATLINK_PORT`, `linux/70-satlink.rules`,
   goroutines such as `satlink-link`, the CHAP name `satlink-ppp`, and
   `User-Agent: satlink-cli`.
 - Hardware facts keep their Iridium names: the `iridium` package, `IridiumInternetNumber`,

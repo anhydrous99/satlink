@@ -59,6 +59,10 @@ type fakePort struct {
 	// interruptions is how many reads still fail with EINTR, as a read a
 	// signal cuts short does.
 	interruptions int
+	// writeInterruptions and drainInterruptions count calls a signal still
+	// interrupts before the write takes data or the output finishes draining.
+	writeInterruptions int
+	drainInterruptions int
 	// silentReads is how many reads still return nothing before what is
 	// queued, as the library's do when their timeout passes.
 	silentReads int
@@ -140,6 +144,10 @@ func (f *fakePort) Write(p []byte) (int, error) {
 	if f.fails {
 		return 0, errPort
 	}
+	if f.writeInterruptions > 0 {
+		f.writeInterruptions--
+		return 0, syscall.EINTR
+	}
 	taken := len(p)
 	switch {
 	case f.takesNothing:
@@ -210,6 +218,10 @@ func (f *fakePort) Drain() error {
 		return errPort
 	}
 	f.drains++
+	if f.drainInterruptions > 0 {
+		f.drainInterruptions--
+		return syscall.EINTR
+	}
 	return nil
 }
 
@@ -470,6 +482,34 @@ func TestWriteAllWritesEverythingThenDrains(t *testing.T) {
 
 	if err != nil || string(port.written) != "hello world" || port.drains != 1 {
 		t.Errorf("WriteAll = %v; port has %q after %d drains, want everything and one drain", err, port.written, port.drains)
+	}
+}
+
+func TestWriteAllRetriesInterruptedWritesWithoutLosingData(t *testing.T) {
+	port := newFakePort()
+	port.writeInterruptions = 2
+	port.takesAtMost = 2
+	transport := &Transport{port: port}
+
+	err := transport.WriteAll([]byte("AT+CGMM\r"))
+
+	if err != nil || string(port.written) != "AT+CGMM\r" || port.drains != 1 {
+		t.Errorf("WriteAll = %v; port has %q after %d drains, want the command once and one drain", err, port.written, port.drains)
+	}
+}
+
+func TestWriteAllRetriesInterruptedDrainsWithoutResendingTheCommand(t *testing.T) {
+	// On a real 9575 under Linux, SIGURG interrupted TCSBRK after the
+	// command had left. Returning EINTR then abandoned its answer, which
+	// could be read as the next command's.
+	port := newFakePort()
+	port.drainInterruptions = 3
+	transport := &Transport{port: port}
+
+	err := transport.WriteAll([]byte("AT\r"))
+
+	if err != nil || string(port.written) != "AT\r" || port.drains != 4 {
+		t.Errorf("WriteAll = %v; port has %q after %d drains, want the command once and four drain attempts", err, port.written, port.drains)
 	}
 }
 

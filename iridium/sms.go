@@ -35,8 +35,9 @@ const (
 
 // iridiumServiceCentre is Iridium's SMS centre, which a 9555A names in its
 // own messages. Messages go through it unless the SIM names another
-// (AT+CSCA): a 9555A whose SIM names none refuses a PDU that leaves the
-// choice to it, with +CMS ERROR: 303.
+// (AT+CSCA). Tested 9555A and 9575 handsets report +CMS ERROR: 330 when the
+// SIM names none; the 9555A refuses a PDU that leaves the choice to it,
+// with +CMS ERROR: 303.
 const iridiumServiceCentre = "+881662900005"
 
 // smsStatusNames are the storage statuses as text mode names them, by

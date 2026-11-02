@@ -149,21 +149,34 @@ func closeAbandonedPort(port serialport.Port) {
 
 // WriteAll writes every byte of p and waits until they have left, so every
 // write starts with an empty output queue. The serial library has no write
-// timeout: a device that stops taking data blocks the write. After Close it
-// fails with an *iridium.Error of kind ErrTransport, "the serial port is
-// closed", without touching the device.
+// timeout: a device that stops taking data blocks the write. Writes and
+// drains interrupted by a signal are retried without resending bytes the
+// port already took. After Close it fails with an *iridium.Error of kind
+// ErrTransport, "the serial port is closed", without touching the device.
 func (t *Transport) WriteAll(p []byte) error {
 	for len(p) > 0 {
 		written, err := t.write(p)
-		if err != nil {
+		if err != nil && !errors.Is(err, syscall.EINTR) {
 			return err
 		}
-		if written == 0 {
+		if written == 0 && err == nil {
 			return transportError(io.ErrShortWrite)
 		}
 		p = p[written:]
 	}
-	return t.usePort(t.port.Drain)
+	return t.drain()
+}
+
+// drain waits for the bytes already written to leave. A signal, including
+// Go's async-preemption SIGURG, may interrupt tcdrain after the command has
+// left: retry the drain alone so its answer is still consumed by its caller.
+func (t *Transport) drain() error {
+	for {
+		err := t.usePort(t.port.Drain)
+		if !errors.Is(err, syscall.EINTR) {
+			return err
+		}
+	}
 }
 
 // write writes what the library takes of p, reporting how much that was.

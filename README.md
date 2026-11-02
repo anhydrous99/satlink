@@ -6,7 +6,7 @@ itself (status, SMS, calls) and gives your app an IP link that **only your app
 can use**.
 
 > [!WARNING]
-> satlink has been tested on a real 9555A, but not yet with a satellite signal.
+> satlink has been tested on real 9555A and 9575 handsets, without a satellite signal.
 > See [Status](#status).
 
 ## Why satlink
@@ -79,7 +79,7 @@ On Linux, install the udev rule first. It grants you access without root and
 keeps ModemManager away from the handset:
 
 ```sh
-sudo cp linux/99-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+sudo cp linux/70-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
 ```
 
 The [CLI guide](docs/cli.md) covers every command, the limits, interrupting a
@@ -176,7 +176,13 @@ supported: iPhones don't expose USB CDC devices to apps.
 - **Not yet tested with a signal.** No call has connected over the satellite
   and no SMS has been delivered. Cancelling a dial during call setup is
   unverified too: without a signal, the dial fails first.
-- **The 9575 and the ROC service port are untested.**
+- **Tested on a 9575 without a signal.** On firmware DB24002, from Linux,
+  discovery, identity, status, stored SMS, hanging up while idle and recovery
+  from partial SMS entry work. Tests also found and fixed interrupted serial
+  drains that could leave replies unread and trigger the handset's auxiliary
+  controller mode. See the [9575 test report](docs/9575-testing.md) for the
+  reproduction, checks and remaining gaps.
+- **The ROC service port is untested.**
 - **DTR over USB is unverified.** If an app dies, the operating system drops
   DTR, which should end the call. A 9555A accepts AT&D2, and still takes
   commands while DTR is low. That dropping DTR ends a call needs a call up to

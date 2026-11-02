@@ -371,7 +371,9 @@ func (h *IridiumHandset) Info() (info *DeviceInfo, err error) {
 	}, nil
 }
 
-// IMSI reports the subscriber identity, which requires a SIM.
+// IMSI requests the subscriber identity. It requires a SIM and firmware
+// support for AT+CIMI; some handsets, including the tested 9575, return an
+// equipment error even with a readable SIM.
 func (h *IridiumHandset) IMSI() (imsi string, err error) {
 	defer recoverPanic(&err)
 	return withHandset(h, (*iridium.Handset).IMSI)
@@ -425,7 +427,11 @@ func (h *IridiumHandset) Registration() (registration *Registration, err error) 
 	}, nil
 }
 
-// Clock reports the handset's clock (yy/MM/dd,hh:mm:ss±zz).
+// Clock reports the handset's legacy AT+CCLK reading without quotes,
+// usually yy/MM/dd,hh:mm:ss; the time-zone field may be absent. Iridium
+// deprecates this command: its UTC conversion can be incorrect, and it may
+// return a frozen epoch value without network time. Use the host's clock
+// for application timestamps, even when this query succeeds.
 func (h *IridiumHandset) Clock() (clock string, err error) {
 	defer recoverPanic(&err)
 	return withHandset(h, (*iridium.Handset).Clock)

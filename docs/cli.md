@@ -18,13 +18,18 @@ From a checkout, `go install ./cmd/satlink` does the same, and
 - **Linux:** install the udev rule:
 
   ```sh
-  sudo cp linux/99-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
+  sudo cp linux/70-satlink.rules /etc/udev/rules.d/ && sudo udevadm control --reload
   ```
 
   It grants the logged-in user access and adds a `/dev/iridium*` symlink. It
   also stops ModemManager from touching the handset, as its Iridium plugin
   would otherwise dial by itself. Port discovery reads sysfs, so no libudev is
   needed.
+  Reconnect the handset after installing the rule. The `70-` prefix places
+  its access tag before systemd grants the active desktop user's access;
+  the older `99-satlink.rules` ran too late. The rule also grants direct USB
+  access for handset diagnostics. For a login without an active desktop
+  session, add the account to `dialout` and log in again.
 - **macOS:** building needs cgo and the macOS SDK; the Command Line Tools are
   enough. Don't add the handset as a modem in Network settings.
 - **Windows:** Iridium's driver makes the handset a COM port.

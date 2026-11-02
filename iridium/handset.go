@@ -453,7 +453,13 @@ func (h *Handset) Info() (DeviceInfo, error) {
 	return exchange(h, h.info)
 }
 
-// IMSI reports the subscriber identity (AT+CIMI), which requires a SIM.
+// IMSI requests the subscriber identity (AT+CIMI). It requires a SIM and
+// firmware that supports this 3GPP command, which the Iridium ISU AT
+// Command Reference does not define. Some handsets, including the tested
+// 9575, return ErrEquipment even with a readable SIM.
+//
+// A SIM's ICCID is a different identifier, available on supported handsets
+// through Command("AT+CICCID").
 func (h *Handset) IMSI() (string, error) {
 	return exchange(h, func() (string, error) { return h.queryText("AT+CIMI") })
 }
@@ -486,8 +492,14 @@ func (h *Handset) Registration() (Registration, error) {
 	return exchange(h, h.registration)
 }
 
-// Clock reports the handset's clock as +CCLK words it,
-// yy/MM/dd,hh:mm:ss±zz, without quotes.
+// Clock reports the handset's legacy AT+CCLK reading without quotes,
+// usually yy/MM/dd,hh:mm:ss; some firmware appends a time-zone field.
+//
+// Iridium deprecates AT+CCLK because system-time epoch changes can make its
+// UTC conversion incorrect. Without network time, firmware may return a
+// frozen epoch value even when the query succeeds. Use the host's clock
+// for application timestamps; a successful Clock query does not establish
+// that the handset's time is valid.
 func (h *Handset) Clock() (string, error) {
 	return exchange(h, h.clock)
 }
