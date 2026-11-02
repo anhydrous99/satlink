@@ -308,6 +308,8 @@ type Handset struct {
 	mu sync.Mutex
 	// rx holds what the handset sent that is not consumed yet.
 	rx lineBuffer
+	// sbdUnsafe prevents commands after an incomplete SBD wire exchange.
+	sbdUnsafe bool
 	// urcs are the unsolicited result codes received, oldest first.
 	urcs []string
 	// lastReceived is when the handset last sent something: the next
@@ -415,8 +417,8 @@ func (h *Handset) Initialize() error {
 // or returned, as that of a call answered by a key press ("AT+CKPD=140",
 // the Green key) may, is ended by the next method that reads from the
 // handset (see the package documentation). A response line that reads as
-// CONNECT counts as a call's, even if it is message text, as AT+SBDRT's
-// may be.
+// CONNECT counts as a call's. SBD data modes and network sessions are
+// refused here; use the typed SBD API.
 //
 // It fails with ErrInvalidArgument too if command contains CR or LF, with
 // ErrTimeout when no final result arrives in time, ErrCommandFailed on
@@ -439,6 +441,9 @@ func (h *Handset) rawCommand(command string, timeout time.Duration) (Response, e
 	}
 	if err := checkPrintable(command); err != nil {
 		return Response{}, err
+	}
+	if sbdEntersData(command) {
+		return Response{}, invalidArgument("use the typed SBD API for data-mode commands")
 	}
 	if mayGoOnline(command) {
 		return Response{}, invalidArgument(debugtext.Quote(command) +

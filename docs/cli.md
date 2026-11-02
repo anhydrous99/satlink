@@ -45,7 +45,7 @@ From a checkout, `go install ./cmd/satlink` does the same, and
 | `satlink sms list [unread]` | List stored messages |
 | `satlink sms read INDEX` / `delete INDEX` | Show or delete one message |
 | `satlink dial NUMBER` / `answer` / `hangup` | Voice calls. `hangup` also ends a data call left up |
-| `satlink at 'AT+CSQ'` | Send an AT command, raw. A line that can go online is refused: a data dial, `ATA`, `ATO`, `A/` or auto-answer (`ATS0=1`). So it is after another command (`ATE0D…`, `AT+CSQ D…`, `AT+CSQD…`). So are writes to S3 and S5, `=n`, which writes the register last referred to, and characters other than printable ASCII. An extended command that the ISU AT Command Reference does not define is read letter by letter, so `AT+BOGUS` is refused too. A space ends an extended command, so `AT+CKPD = 160` is refused, but `AT+CKPD=160` is sent. A call that comes up with the command's answer all the same is hung up at once. A key press that may answer a ringing call, such as `AT+CKPD=140` (the Green key), is sent: a call it answers may come up after `at` has exited, and bills by the minute until it is hung up. A response line that reads as `CONNECT` counts as a call's, even if it is message text, as `AT+SBDRT`'s may be |
+| `satlink at 'AT+CSQ'` | Send an AT command, raw. A line that can go online is refused: a data dial, `ATA`, `ATO`, `A/` or auto-answer (`ATS0=1`). So it is after another command (`ATE0D…`, `AT+CSQ D…`, `AT+CSQD…`). So are writes to S3 and S5, `=n`, which writes the register last referred to, and characters other than printable ASCII. An extended command that the ISU AT Command Reference does not define is read letter by letter, so `AT+BOGUS` is refused too. A space ends an extended command, so `AT+CKPD = 160` is refused, but `AT+CKPD=160` is sent. A call that comes up with the command's answer all the same is hung up at once. A key press that may answer a ringing call, such as `AT+CKPD=140` (the Green key), is sent: a call it answers may come up after `at` has exited, and bills by the minute until it is hung up. SBD data modes and network sessions require the typed SBD API or `sbd` commands |
 | `satlink monitor` | Print incoming SMS and `RING` events until interrupted |
 | `satlink net status` | Dial, show the negotiated addresses, hang up |
 | `satlink net resolve HOST` | Look up a host name over the link |
@@ -172,3 +172,10 @@ the link up.
 
 Styles are used only on terminals. On Windows, MSYS and Cygwin terminals are
 not taken for terminals, and a console without `TERM` gets no styles.
+
+## Short Burst Data
+
+The `sbd` command provides one-shot exchanges, local loopback and durable
+queue operations. Its foreground worker retries uncertain transmissions, which
+can produce duplicates. See the [SBD guide](sbd.md) for commands, defaults and
+provider provisioning.

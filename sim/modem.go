@@ -19,6 +19,7 @@ const abortGrace = 125 * time.Millisecond
 
 // modem is the simulated handset's state and behaviour.
 type modem struct {
+	sbd      sbdModem
 	config   Config
 	settings settings
 	input    inputMode
@@ -151,6 +152,7 @@ func (m *modem) receive(input []byte, now time.Time) {
 // advance moves the simulation to now: call setup, the escape guard time
 // and the data call's traffic.
 func (m *modem) advance(now time.Time) {
+	m.advanceSBD(now)
 	m.completeCallSetup(now)
 	m.watchEscapeGuard(now)
 	m.runCircuit(now)
@@ -215,6 +217,9 @@ func (m *modem) shutDown() {
 // byte at a time while each may change the mode, and returns what is left.
 func (m *modem) consume(input []byte, now time.Time) []byte {
 	b, rest := input[0], input[1:]
+	if m.consumeSBD(b, now) {
+		return rest
+	}
 	if m.call.kind == callDialing {
 		// Real handsets abandon call setup when the app sends anything
 		// after the grace time.
@@ -254,6 +259,9 @@ func (m *modem) runCommandLine(text string, now time.Time) {
 	// Lines without the AT prefix are not for the handset.
 	body, ok := stripAttention(text)
 	if !ok {
+		return
+	}
+	if m.executeSBD(sbdCommandBody(text), now) {
 		return
 	}
 	parsed, ok := parseCommand(body)

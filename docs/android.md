@@ -169,3 +169,9 @@ gobind's `equals` and `hashCode` compare exported fields only:
 - **Records** compare the lists they hold as lists do, which is always equal.
   The `Data` of `Received` and `Datagram` compares by reference: compare
   contents instead.
+
+## Short Burst Data
+
+The mobile API includes SBD exchanges, durable queues and a managed worker.
+The app supplies private storage and controls the worker lifecycle. See the
+[SBD guide](sbd.md#go-and-mobile-apis) for interfaces and delivery semantics.

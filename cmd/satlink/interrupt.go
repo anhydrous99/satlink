@@ -94,6 +94,7 @@ func reactionTo(firstHandled, now time.Time) reaction {
 // request, and a later one quits at once. Both say so on stderr. Only one
 // goroutine handles interruptions; askedToStop may be called from any.
 type interruptionHandler struct {
+	sbd bool
 	// stopRequested is set by the first interruption.
 	stopRequested atomic.Bool
 	interrupt     context.CancelFunc
@@ -117,7 +118,11 @@ func (h *interruptionHandler) handle(now time.Time) {
 	case reactionStop:
 		h.requestStop()
 	case reactionQuit:
-		warnCallMayStillBeUp(h.stderr, " (quitting at once)")
+		if h.sbd {
+			_, _ = fmt.Fprintln(h.stderr, "Quitting: an active SBD transmission may have been delivered; the worker will retry it.")
+		} else {
+			warnCallMayStillBeUp(h.stderr, " (quitting at once)")
+		}
 		h.quit()
 	}
 }
@@ -129,7 +134,7 @@ func (h *interruptionHandler) requestStop() {
 	h.interrupt()
 	// Best effort, and only once the hang-up is under way: standard error
 	// can block.
-	_, _ = fmt.Fprintln(h.stderr, interruptedMessage)
+	_, _ = fmt.Fprintln(h.stderr, h.stopMessage())
 	// A repeat that waited behind the message is no later one.
 	h.firstHandled = time.Now()
 }
@@ -160,8 +165,12 @@ type interruptions struct {
 // a later repeat quits at once through quit, and both say so on stderr. The
 // context catch returns is done from the first interruption on.
 func (i *interruptions) catch(notify func(chan<- os.Signal) func(), quit func(), stderr io.Writer) context.Context {
+	return i.catchMode(notify, quit, stderr, false)
+}
+func (i *interruptions) catchMode(notify func(chan<- os.Signal) func(), quit func(), stderr io.Writer, sbd bool) context.Context {
 	interrupted, interrupt := context.WithCancel(context.Background())
 	i.handler = newInterruptionHandler(interrupt, quit, stderr)
+	i.handler.sbd = sbd
 	i.signals = make(chan os.Signal, signalBacklog)
 	i.stopReacting = make(chan struct{})
 	i.stopRelaying = notify(i.signals)
@@ -197,4 +206,11 @@ func (i *interruptions) stop() {
 // askedToStop reports whether an interruption asked the run to stop.
 func (i *interruptions) askedToStop() bool {
 	return i.handler != nil && i.handler.askedToStop()
+}
+
+func (h *interruptionHandler) stopMessage() string {
+	if h.sbd {
+		return "Interrupted: stopping after the active SBD session (again to quit at once)…"
+	}
+	return interruptedMessage
 }

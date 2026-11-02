@@ -10,7 +10,10 @@
 // a TCP bridge, need only implement Transport.
 //
 // A [Handset] covers the handset itself: identity, signal, battery,
-// registration, the clock, SMS, voice calls and raw commands.
+// registration, the clock, SMS, voice calls, Short Burst Data and raw commands.
+// AcquireSBD reserves the handset for SBD buffer operations and satellite
+// sessions. ExchangeSBD performs an atomic one-shot exchange. Package sbd
+// adds durable queues, automatic retries and an explicitly started worker.
 // Each method's documentation names the AT commands it sends. Unsolicited
 // result codes (incoming SMS, RING, …) seen while waiting for responses are
 // queued. Fetch them with [Handset.TakeURCs], or wait for new ones with
@@ -35,7 +38,8 @@
 //     for each message;
 //   - SMS submission waits up to two minutes, as it goes over the satellite
 //     link;
-//   - dialling waits up to ninety seconds.
+//   - dialling waits up to ninety seconds;
+//   - SBD sessions wait two minutes by default, with their own settings.
 //
 // A command waits 20 ms after the handset last sent something, as a 9555A
 // silently drops one written straight after its previous answer.

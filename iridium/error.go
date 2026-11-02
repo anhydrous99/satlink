@@ -75,21 +75,31 @@ const (
 	// ErrCancelled reports that the call setup was stopped with a
 	// [Cancellation].
 	ErrCancelled
+
+	// ErrSBD reports an SBD operation or network failure; Code is numeric.
+	ErrSBD
+	// ErrSBDUncertain means a session may have delivered its payload.
+	ErrSBDUncertain
+	// ErrSBDUnsynchronised requires closing and resetting the handset.
+	ErrSBDUnsynchronised
 )
 
 // kindLabels are the kinds' labels, which begin each error's message.
 var kindLabels = [...]string{
-	ErrTransport:        "transport error",
-	ErrTimeout:          "timed out",
-	ErrCommandFailed:    "handset returned ERROR",
-	ErrEquipment:        "+CME ERROR",
-	ErrSMS:              "+CMS ERROR",
-	ErrCall:             "call failed",
-	ErrParse:            "unexpected response",
-	ErrInvalidArgument:  "invalid argument",
-	ErrBusy:             "the handset is in a data call",
-	ErrCallMayStillBeUp: "the call may still be up",
-	ErrCancelled:        "the call setup was cancelled",
+	ErrTransport:         "transport error",
+	ErrTimeout:           "timed out",
+	ErrCommandFailed:     "handset returned ERROR",
+	ErrEquipment:         "+CME ERROR",
+	ErrSMS:               "+CMS ERROR",
+	ErrCall:              "call failed",
+	ErrParse:             "unexpected response",
+	ErrInvalidArgument:   "invalid argument",
+	ErrBusy:              "the handset is in a data call",
+	ErrCallMayStillBeUp:  "the call may still be up",
+	ErrCancelled:         "the call setup was cancelled",
+	ErrSBD:               "SBD failed",
+	ErrSBDUncertain:      "SBD delivery is uncertain",
+	ErrSBDUnsynchronised: "SBD exchange is incomplete; close and reset the handset before reconnecting",
 }
 
 // Error returns the kind's label, such as "transport error".
@@ -138,8 +148,21 @@ type Error struct {
 // `timed out waiting for a response to "AT+CSQ"`.
 func (e *Error) Error() string {
 	switch e.Kind {
-	case ErrTransport, ErrCall, ErrParse, ErrInvalidArgument, ErrCallMayStillBeUp:
+	case ErrTransport, ErrCall, ErrParse, ErrInvalidArgument, ErrCallMayStillBeUp, ErrSBDUncertain:
 		return e.Kind.Error() + ": " + e.messageOrCause()
+	case ErrSBD:
+		detail := e.messageOrCause()
+		if e.Code != "" {
+			if detail != "" {
+				detail = e.Code + ": " + detail
+			} else {
+				detail = e.Code
+			}
+		}
+		if detail == "" {
+			return e.Kind.Error()
+		}
+		return e.Kind.Error() + ": " + detail
 	case ErrTimeout:
 		return "timed out waiting for a response to " + debugtext.Quote(e.Command)
 	case ErrCommandFailed:

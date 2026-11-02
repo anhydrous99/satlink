@@ -4,7 +4,7 @@ exit status 2
 --- stderr
 error: unrecognized subcommand 's'
 
-  tip: some similar subcommands exist: 'status', 'answer', 'sms'
+  tip: some similar subcommands exist: 'status', 'answer', 'sms', 'sbd'
 
 Usage: satlink [OPTIONS] <COMMAND>
 

@@ -38,6 +38,10 @@ func (h *Handset) lock() error {
 		h.mu.Unlock()
 		return busyError()
 	}
+	if h.sbdUnsafe {
+		h.mu.Unlock()
+		return &Error{Kind: ErrSBDUnsynchronised}
+	}
 	return nil
 }
 

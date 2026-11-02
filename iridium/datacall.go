@@ -453,6 +453,9 @@ func (h *Handset) setUpCall(settings DataCallSettings, start callStart) (*DataCa
 			h.release()
 		}
 	}()
+	if h.sbdUnsafe {
+		return nil, &Error{Kind: ErrSBDUnsynchronised}
+	}
 	returned := false
 	defer h.pulseDTRUnless(&returned)
 	call, err := h.connect(settings, start)

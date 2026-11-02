@@ -98,6 +98,15 @@ func fromCoreError(e *iridium.Error) *SatlinkError {
 
 // coreErrorConversions convert each kind of handset error.
 var coreErrorConversions = [...]func(e *iridium.Error) *SatlinkError{
+	iridium.ErrSBD: func(e *iridium.Error) *SatlinkError {
+		return &SatlinkError{Kind: SatlinkErrorSBD, Reason: e.Error(), Code: e.Code}
+	},
+	iridium.ErrSBDUncertain: func(e *iridium.Error) *SatlinkError {
+		return &SatlinkError{Kind: SatlinkErrorSBDUncertain, Reason: e.Error()}
+	},
+	iridium.ErrSBDUnsynchronised: func(e *iridium.Error) *SatlinkError {
+		return &SatlinkError{Kind: SatlinkErrorSBDUnsynchronised, Reason: e.Error()}
+	},
 	iridium.ErrTransport: func(e *iridium.Error) *SatlinkError {
 		return &SatlinkError{Kind: SatlinkErrorTransport, Reason: messageOrCause(e.Message, e.Err)}
 	},
