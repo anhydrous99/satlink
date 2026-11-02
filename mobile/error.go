@@ -99,6 +99,12 @@ const (
 	// SatlinkErrorCancelled reports that a Cancellation stopped the link
 	// being set up; no call is left up.
 	SatlinkErrorCancelled
+	// SatlinkErrorSBD reports a protocol or network SBD failure.
+	SatlinkErrorSBD
+	// SatlinkErrorSBDUncertain means the gateway may have accepted a message.
+	SatlinkErrorSBDUncertain
+	// SatlinkErrorSBDUnsynchronised requires handset reset and reconnect.
+	SatlinkErrorSBDUnsynchronised
 )
 
 // SatlinkError is what every failing call of this package reports. Kind is
@@ -140,20 +146,23 @@ func (e *SatlinkError) Error() string {
 
 // errorMessages words each kind's message from the error's fields.
 var errorMessages = [...]func(e *SatlinkError) string{
-	SatlinkErrorTransport:        func(e *SatlinkError) string { return "transport: " + e.Reason },
-	SatlinkErrorTimeout:          func(e *SatlinkError) string { return "timed out waiting for " + e.Command },
-	SatlinkErrorCommandFailed:    func(e *SatlinkError) string { return "command failed: " + e.Command },
-	SatlinkErrorEquipment:        func(e *SatlinkError) string { return "+CME ERROR: " + e.Code },
-	SatlinkErrorSMS:              func(e *SatlinkError) string { return "+CMS ERROR: " + e.Code },
-	SatlinkErrorCall:             func(e *SatlinkError) string { return "call failed: " + e.Result },
-	SatlinkErrorParse:            func(e *SatlinkError) string { return "unexpected response: " + e.Reason },
-	SatlinkErrorInvalidArgument:  func(e *SatlinkError) string { return "invalid argument: " + e.Reason },
-	SatlinkErrorPolicyDenied:     func(e *SatlinkError) string { return e.Destination + " is not allowed by the link settings" },
-	SatlinkErrorInvalidHost:      func(e *SatlinkError) string { return debugtext.Quote(e.Host) + " is not a valid host name" },
-	SatlinkErrorNameNotFound:     func(e *SatlinkError) string { return "no address found for " + e.Host },
-	SatlinkErrorNoDNSServer:      func(*SatlinkError) string { return "the link has no DNS server" },
-	SatlinkErrorConnectionFailed: func(e *SatlinkError) string { return "could not connect to " + e.Address },
-	SatlinkErrorConnectionReset:  func(*SatlinkError) string { return "the connection was reset" },
+	SatlinkErrorSBD:               func(e *SatlinkError) string { return "SBD: " + e.Reason },
+	SatlinkErrorSBDUncertain:      func(e *SatlinkError) string { return "SBD delivery uncertain: " + e.Reason },
+	SatlinkErrorSBDUnsynchronised: func(e *SatlinkError) string { return "SBD requires reset: " + e.Reason },
+	SatlinkErrorTransport:         func(e *SatlinkError) string { return "transport: " + e.Reason },
+	SatlinkErrorTimeout:           func(e *SatlinkError) string { return "timed out waiting for " + e.Command },
+	SatlinkErrorCommandFailed:     func(e *SatlinkError) string { return "command failed: " + e.Command },
+	SatlinkErrorEquipment:         func(e *SatlinkError) string { return "+CME ERROR: " + e.Code },
+	SatlinkErrorSMS:               func(e *SatlinkError) string { return "+CMS ERROR: " + e.Code },
+	SatlinkErrorCall:              func(e *SatlinkError) string { return "call failed: " + e.Result },
+	SatlinkErrorParse:             func(e *SatlinkError) string { return "unexpected response: " + e.Reason },
+	SatlinkErrorInvalidArgument:   func(e *SatlinkError) string { return "invalid argument: " + e.Reason },
+	SatlinkErrorPolicyDenied:      func(e *SatlinkError) string { return e.Destination + " is not allowed by the link settings" },
+	SatlinkErrorInvalidHost:       func(e *SatlinkError) string { return debugtext.Quote(e.Host) + " is not a valid host name" },
+	SatlinkErrorNameNotFound:      func(e *SatlinkError) string { return "no address found for " + e.Host },
+	SatlinkErrorNoDNSServer:       func(*SatlinkError) string { return "the link has no DNS server" },
+	SatlinkErrorConnectionFailed:  func(e *SatlinkError) string { return "could not connect to " + e.Address },
+	SatlinkErrorConnectionReset:   func(*SatlinkError) string { return "the connection was reset" },
 	SatlinkErrorDatagramTooLarge: func(e *SatlinkError) string {
 		return fmt.Sprintf("a %d-byte datagram exceeds the %d-byte limit", e.Len, e.Max)
 	},

@@ -124,11 +124,18 @@ handset and `sim` for tests.
 - Kotlin and Java: the [Android guide](docs/android.md).
 - Swift and Objective-C: the [macOS guide](docs/macos.md).
 
+## Short Burst Data
+
+SBD buffer operations, one-shot exchanges and a durable messaging worker use
+the same USB connection. See the [SBD guide](docs/sbd.md) for provisioning,
+CLI commands, automatic retry semantics and hardware validation status.
+
 ## Packages
 
 | Package | What it is |
 |---|---|
 | [`iridium`](https://pkg.go.dev/github.com/anhydrous99/satlink/iridium) | The handset: AT commands, SMS, voice and data calls, over any byte transport |
+| `sbd` | Durable SBD outbox/inbox, retries and an explicitly started worker |
 | [`satnet`](https://pkg.go.dev/github.com/anhydrous99/satlink/satnet) | The app-private IP link: PPP and TCP/IP in-process, with policy, limits and TLS |
 | [`serial`](https://pkg.go.dev/github.com/anhydrous99/satlink/serial) | The desktop transport: finds handsets by USB vendor ID and opens them |
 | [`sim`](https://pkg.go.dev/github.com/anhydrous99/satlink/sim) | A simulated handset, gateway and internet, for tests and demos |

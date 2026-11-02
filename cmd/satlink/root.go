@@ -41,7 +41,7 @@ func (c *cli) rootCommand() *command {
 	return root.withSubcommands(
 		c.listCommand(), c.infoCommand(), c.statusCommand(), c.smsCommand(),
 		c.dialCommand(), c.answerCommand(), c.hangUpCommand(), c.atCommand(),
-		c.monitorCommand(), c.netCommand(),
+		c.monitorCommand(), c.netCommand(), c.sbdCommand(),
 	)
 }
 

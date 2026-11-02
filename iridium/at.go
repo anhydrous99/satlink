@@ -129,7 +129,7 @@ func bareFinalResult(line string) (FinalResultKind, bool) {
 // urcPrefixes are the prefixes of unsolicited result codes the handset may
 // emit at any time.
 var urcPrefixes = [...]string{
-	"RING", "+CRING", "+CLIP", "+CCWA", "+CMTI", "+CDSI", "+CMT", "+CDS", "+CREG", "+CIEV", "+CUSD",
+	"SBDRING", "RING", "+CRING", "+CLIP", "+CCWA", "+CMTI", "+CDSI", "+CMT", "+CDS", "+CREG", "+CIEV", "+CUSD",
 }
 
 // responsePrefix returns the "+XXX" prefix a command's information response

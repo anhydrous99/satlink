@@ -577,3 +577,16 @@ pending query without forging a server's address. Only the query's source port a
 transaction id stand in the way, and a few observed TCP initial sequence numbers reveal
 both. Dropping the branch means updating this entry and IPSTACK.md's
 [What is left out](IPSTACK.md#what-is-left-out).
+
+## Short Burst Data
+
+`iridium` owns SBD framing and exclusive handset access. Its binary reader
+consumes payload bytes by length, bypassing line and unsolicited-event parsing.
+An incomplete wire exchange quarantines the handset object.
+
+Package `sbd` adds a transactional queue and foreground manager. Attempts are
+committed before radio use; inbound records are committed before handset-buffer
+clearing. Uncertain attempts retry automatically and can produce duplicates.
+The worker locks a separate database for its lifetime and opens the queue only
+for short transactions, so other processes may enqueue during satellite I/O.
+See the [SBD guide](sbd.md) for the public behaviour and validation matrix.
